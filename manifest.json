@@ -13,7 +13,6 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "<all_urls>",
     "https://dsvsesvc.sos.state.mi.us/*",
     "https://data.opensanctions.org/*",
     "https://www.michigan.gov/*"

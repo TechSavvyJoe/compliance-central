@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00274C"/>
+      <stop offset="100%" style="stop-color:#003d73"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield fills entire icon edge to edge -->
+  <path d="M64 0 L128 24 L128 64 C128 104 80 128 64 128 C48 128 0 104 0 64 L0 24 Z" 
+        fill="url(#grad)" stroke="none"/>
+  <!-- Gold checkmark -->
+  <path d="M32 64 L52 84 L96 40" 
+        stroke="#FFCB05" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

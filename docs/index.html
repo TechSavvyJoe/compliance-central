@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Compliance Central</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f9f9f9;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 20px;
+        }
+        h1 {
+            color: #00274C;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #00274C;
+            margin-top: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .last-updated {
+            color: #666;
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        .section {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            font-size: 0.8em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Compliance Central</h1>
+        <p>Privacy Policy</p>
+        <p class="last-updated">Last Updated: December 19, 2025</p>
+    </header>
+
+    <div class="section">
+        <h2>1. Overview</h2>
+        <p><strong>Compliance Central</strong> ("we", "our", or "the extension") is a Chrome Extension designed to efficient compliance screening for Michigan Automotive Dealers. We prioritize your privacy and are committed to protecting your data. This policy explains how we handle your information.</p>
+    </div>
+
+    <div class="section">
+        <h2>2. Data Collection and Usage</h2>
+        <p>Compliance Central operates primarily as a client-side tool. We do not maintain a central server that collects, stores, or analyzes your personal data or the customer data you process.</p>
+        <ul>
+            <li><strong>Local Storage:</strong> All compliance search results, history, and settings are stored locally on your device using Chrome's <code>storage.local</code> and <code>storage.session</code> APIs.</li>
+            <li><strong>No Tracking:</strong> We do not track your browsing history or usage behavior outside of the extension's specific functionality.</li>
+            <li><strong>No Analytics:</strong> We do not use third-party analytics services (like Google Analytics) to track your interaction with the extension.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>3. Third-Party Services</h2>
+        <p>To perform compliance checks, the extension interacts with specific public government databases directly from your browser:</p>
+        <ul>
+            <li><strong>MDOS (Michigan Department of State):</strong> The extension automates searches on the MDOS e-Services portal to retrieve Repeat Offender and Title/Lien information. This interaction occurs directly between your browser and the MDOS website.</li>
+            <li><strong>OFAC (Office of Foreign Assets Control):</strong> The extension downloads the public SDN list from OpenSanctions or the US Treasury to perform local screenings. Your search queries are matched locally and are not sent to any third-party server for processing.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>4. Permissions</h2>
+        <p>The extension requires specific permissions to function:</p>
+        <ul>
+            <li><code>storage</code>: To save your settings and search history locally.</li>
+            <li><code>host_permissions</code>: To interact with the MDOS portal and download OFAC data updates.</li>
+            <li><code>scripting</code>: To automate form filling on the MDOS portal (e.g., entering VINs for title checks).</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>5. Your Rights</h2>
+        <p>Since all data is stored locally on your device, you have complete control over it:</p>
+        <ul>
+            <li>You can clear your search history at any time using the "Clear History" button within the extension.</li>
+            <li>You can remove all extension data by uninstalling the extension from Chrome.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>6. Contact Us</h2>
+        <p>If you have any questions about this Privacy Policy or the extension, please contact us via the Chrome Web Store support page.</p>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Compliance Central. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

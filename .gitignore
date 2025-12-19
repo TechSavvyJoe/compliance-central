@@ -1,0 +1,25 @@
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+
+# Extension Builds
+*.zip
+*.crx
+*.pem
+
+# Development Assets
+task.md
+implementation_plan.md
+walkthrough.md
+store_assets/
+icons/generate_*.py
+__pycache__/
+*.log
+
+# Sensitive
+.env

@@ -15,7 +15,8 @@
   "host_permissions": [
     "https://dsvsesvc.sos.state.mi.us/*",
     "https://data.opensanctions.org/*",
-    "https://www.michigan.gov/*"
+    "https://www.michigan.gov/*",
+    "https://compliance-central-api.fly.dev/*"
   ],
   "side_panel": {
     "default_path": "sidepanel.html"

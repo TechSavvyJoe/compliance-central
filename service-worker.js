@@ -18,6 +18,11 @@ import {
   getSDNCount,
   getAllSDNEntries,
 } from "./ofac/storage.js";
+import {
+  BACKEND_CONFIG,
+  backendRepeatOffenderCheck,
+  backendTitleCheck,
+} from "./lib/backend-api.js";
 
 // ============================================================================
 // CONSTANTS
@@ -402,6 +407,54 @@ async function performSDNUpdate() {
 // ============================================================================
 
 async function handleRepeatOffenderCheck(searchData) {
+  // Use backend API if enabled (headless browser on Fly.io)
+  if (BACKEND_CONFIG.USE_BACKEND) {
+    console.log("[RepeatOffender] Using Fly.io backend API");
+    try {
+      const result = await backendRepeatOffenderCheck(searchData);
+      if (result.success) {
+        // Store screenshot for later use
+        const screenshotKey =
+          searchData.screenshotStorageKey || "repeatOffenderScreenshot";
+        if (result.result.screenshotData) {
+          await chrome.storage.local.set({
+            [screenshotKey]: result.result.screenshotData,
+            lastResult: result.result,
+          });
+        }
+        // Set badge
+        const badgeText =
+          result.result.status === "eligible"
+            ? "✓"
+            : result.result.status === "ineligible"
+            ? "!"
+            : "?";
+        const badgeColor =
+          result.result.status === "eligible"
+            ? "#2e7d32"
+            : result.result.status === "ineligible"
+            ? "#c62828"
+            : "#f57c00";
+        await chrome.action.setBadgeText({ text: badgeText });
+        await chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+        // Save to history
+        await addToRepeatOffenderHistory(searchData, result.result);
+        return result;
+      }
+      // If backend fails, fall through to local execution
+      console.warn(
+        "[RepeatOffender] Backend failed, falling back to local:",
+        result.error
+      );
+    } catch (backendError) {
+      console.warn(
+        "[RepeatOffender] Backend error, falling back to local:",
+        backendError.message
+      );
+    }
+  }
+
+  // Local tab-based execution (fallback or when backend disabled)
   let tab = null;
   try {
     // Create NEW tab for independent execution
@@ -572,6 +625,34 @@ async function addToRepeatOffenderHistory(searchData, result) {
 // ============================================================================
 
 async function handleTitleCheck(data) {
+  // Use backend API if enabled (headless browser on Fly.io)
+  if (BACKEND_CONFIG.USE_BACKEND) {
+    console.log("[TitleCheck] Using Fly.io backend API");
+    try {
+      const result = await backendTitleCheck(data);
+      if (result.success) {
+        // Store screenshot for later use
+        if (result.result.screenshotData) {
+          await chrome.storage.local.set({
+            titleScreenshot: result.result.screenshotData,
+          });
+        }
+        return result;
+      }
+      // If backend fails, fall through to local execution
+      console.warn(
+        "[TitleCheck] Backend failed, falling back to local:",
+        result.error
+      );
+    } catch (backendError) {
+      console.warn(
+        "[TitleCheck] Backend error, falling back to local:",
+        backendError.message
+      );
+    }
+  }
+
+  // Local tab-based execution (fallback or when backend disabled)
   let tab = null;
   try {
     // Step 1: Create tab at MDOS homepage

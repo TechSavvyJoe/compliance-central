@@ -33,7 +33,7 @@ function buildSanitizedName(customer) {
     sanitizeHTML(customer.firstName),
     sanitizeHTML(customer.middleName || ""),
     sanitizeHTML(customer.lastName),
-  ].filter(p => p.trim());
+  ].filter((p) => p.trim());
 
   let name = parts.join(" ");
   if (customer.suffix) {
@@ -1025,34 +1025,78 @@ function resetProgress() {
   setCheckStatus("titleStatus", "waiting");
 }
 
-function updateProgress(percent, label) {
-  elements.progressFill.style.width = percent + "%";
-  elements.progressPercent.textContent = percent + "%";
+// Progress Bar Animation State
+let currentProgress = 0;
+let targetProgress = 0;
+let progressAnimationId = null;
 
-  // Update label based on progress or custom label
-  if (elements.progressLabel) {
-    if (label) {
-      elements.progressLabel.textContent = label;
+function updateProgress(percent, label) {
+  // Update target, but don't jump immediately
+  targetProgress = percent;
+
+  // Custom label handling
+  if (label && elements.progressLabel) {
+    elements.progressLabel.textContent = label;
+  }
+
+  // Start animation loop if not running
+  if (!progressAnimationId) {
+    animateProgress();
+  }
+}
+
+function animateProgress() {
+  // Smoothly move current towards target
+  if (currentProgress < targetProgress) {
+    // Variable speed: faster at start, slower as it gets closer (ease-out)
+    // But maintain a minimum speed so it doesn't stall
+    const delta = targetProgress - currentProgress;
+    const step = Math.max(0.1, delta * 0.05);
+    currentProgress = Math.min(targetProgress, currentProgress + step);
+  } else if (currentProgress > targetProgress) {
+    // Instant reset if going backwards (e.g. new search)
+    currentProgress = targetProgress;
+  }
+
+  // Render
+  const displayPercent = Math.round(currentProgress * 10) / 10; // 1 decimal place
+  elements.progressFill.style.width = displayPercent + "%";
+  elements.progressPercent.textContent = Math.round(displayPercent) + "%";
+
+  // Auto-generate label if not set manually
+  if (
+    elements.progressLabel &&
+    !elements.progressLabel.textContent.includes("Extracting")
+  ) {
+    if (displayPercent < 20) {
+      elements.progressLabel.textContent = "Running OFAC check...";
+    } else if (displayPercent < 50) {
+      elements.progressLabel.textContent = "Checking Repeat Offender...";
+    } else if (displayPercent < 90) {
+      elements.progressLabel.textContent = "Verifying Title & Lien...";
+    } else if (displayPercent < 100) {
+      elements.progressLabel.textContent = "Finalizing report...";
     } else {
-      // Auto-generate label based on percent
-      if (percent < 20) {
-        elements.progressLabel.textContent = "Running OFAC check...";
-      } else if (percent < 50) {
-        elements.progressLabel.textContent = "Checking Repeat Offender...";
-      } else if (percent < 90) {
-        elements.progressLabel.textContent = "Verifying Title & Lien...";
-      } else if (percent < 100) {
-        elements.progressLabel.textContent = "Finalizing...";
-      } else {
-        elements.progressLabel.textContent = "Complete!";
-      }
+      elements.progressLabel.textContent = "Complete!";
     }
   }
 
-  // Hide spinner when complete
-  if (elements.progressSpinner) {
-    elements.progressSpinner.style.display =
-      percent >= 100 ? "none" : "inline-block";
+  // Stop or continue animation
+  if (
+    Math.abs(currentProgress - targetProgress) < 0.1 &&
+    targetProgress >= 100
+  ) {
+    progressAnimationId = null;
+    // Hide spinner when fully complete (visual delay)
+    if (elements.progressSpinner) {
+      setTimeout(() => (elements.progressSpinner.style.display = "none"), 500);
+    }
+  } else {
+    // Keep animating if not at target or not complete
+    progressAnimationId = requestAnimationFrame(animateProgress);
+    if (elements.progressSpinner) {
+      elements.progressSpinner.style.display = "inline-block";
+    }
   }
 }
 
@@ -2065,7 +2109,9 @@ async function printOfacReport() {
               .slice(0, 5)
               .map(
                 (m) =>
-                  `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(m.score)}%, Type: ${sanitizeHTML(m.type)})</li>`
+                  `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(
+                    m.score
+                  )}%, Type: ${sanitizeHTML(m.type)})</li>`
               )
               .join("")}
           </ul>
@@ -2403,12 +2449,20 @@ async function printAllReports() {
         </div>
         <div class="subject-box">
           <h3>SUBJECT SCREENED</h3>
-          <p><strong>Name:</strong> ${customer ? buildSanitizedName(customer) : "N/A"}</p>
-          <p><strong>DOB:</strong> ${sanitizeHTML(customer?.dob) || "Not Provided"}</p>
-          <p><strong>DLN/PID:</strong> ${sanitizeHTML(customer?.dlnPid) || "Not Provided"}</p>
+          <p><strong>Name:</strong> ${
+            customer ? buildSanitizedName(customer) : "N/A"
+          }</p>
+          <p><strong>DOB:</strong> ${
+            sanitizeHTML(customer?.dob) || "Not Provided"
+          }</p>
+          <p><strong>DLN/PID:</strong> ${
+            sanitizeHTML(customer?.dlnPid) || "Not Provided"
+          }</p>
           ${
             customer?.tradeVin
-              ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(customer.tradeVin)}</p>`
+              ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(
+                  customer.tradeVin
+                )}</p>`
               : ""
           }
         </div>
@@ -2689,7 +2743,9 @@ function generateSimpleExport(results) {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Compliance Check - ${sanitizeHTML(customer.firstName)} ${sanitizeHTML(customer.lastName)}</title>
+      <title>Compliance Check - ${sanitizeHTML(
+        customer.firstName
+      )} ${sanitizeHTML(customer.lastName)}</title>
       <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         h1 { color: #00274C; border-bottom: 2px solid #00274C; padding-bottom: 10px; }
@@ -2721,10 +2777,14 @@ function generateSimpleExport(results) {
         <h3>Customer Information</h3>
         <p><strong>Name:</strong> ${buildSanitizedName(customer)}</p>
         <p><strong>DOB:</strong> ${sanitizeHTML(customer.dob)}</p>
-        <p><strong>DLN/PID:</strong> ${sanitizeHTML(customer.dlnPid) || "N/A"}</p>
+        <p><strong>DLN/PID:</strong> ${
+          sanitizeHTML(customer.dlnPid) || "N/A"
+        }</p>
         ${
           customer.tradeVin
-            ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(customer.tradeVin)}</p>`
+            ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(
+                customer.tradeVin
+              )}</p>`
             : ""
         }
       </div>
@@ -2761,8 +2821,12 @@ function generateSimpleExport(results) {
           }; border-radius: 4px;">
             <div>
               <p style="margin: 0; font-weight: bold; color: #374151;">Subject Screened:</p>
-              <p style="margin: 5px 0 0 0; color: #374151;">${buildSanitizedName(customer)}</p>
-              <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">DOB: ${sanitizeHTML(customer.dob)}</p>
+              <p style="margin: 5px 0 0 0; color: #374151;">${buildSanitizedName(
+                customer
+              )}</p>
+              <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">DOB: ${sanitizeHTML(
+                customer.dob
+              )}</p>
             </div>
             <div style="text-align: center;">
               <p style="margin: 0; font-size: 24px; font-weight: bold; color: ${

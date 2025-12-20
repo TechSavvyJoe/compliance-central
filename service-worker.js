@@ -152,7 +152,7 @@ async function handleRunAllChecks(data) {
     // MDOS checks run sequentially (one after the other)
     const mdosPromise = (async () => {
       // 1. BUYER REPEAT OFFENDER CHECK
-      await saveState(10);
+      await saveState(hasCoBuyer ? 25 : 30); // Start RO
       try {
         // Add storage key to customer object for this check
         const customerWithKey = {
@@ -160,6 +160,8 @@ async function handleRunAllChecks(data) {
           screenshotStorageKey: "repeatOffenderScreenshot",
         };
         const roResult = await handleRepeatOffenderCheck(customerWithKey);
+        await saveState(hasCoBuyer ? 35 : 45); // Mid-RO
+
         if (roResult.success) {
           const checkRes = roResult.result;
           checkRes.passed = checkRes.status === "eligible";
@@ -186,17 +188,19 @@ async function handleRunAllChecks(data) {
         };
       }
       // Save after RO check
-      await saveState(hasCoBuyer ? 35 : hasTrade ? 50 : 90);
+      await saveState(hasCoBuyer ? 45 : hasTrade ? 60 : 90);
 
       // 2. CO-BUYER REPEAT OFFENDER CHECK (if has co-buyer)
       if (hasCoBuyer) {
-        await saveState(40);
+        await saveState(50);
         try {
           const coBuyerWithKey = {
             ...customer.coBuyer,
             screenshotStorageKey: "coBuyerRepeatOffenderScreenshot",
           };
           const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
+          await saveState(60);
+
           if (cbRoResult.success) {
             const checkRes = cbRoResult.result;
             checkRes.passed = checkRes.status === "eligible";
@@ -223,16 +227,18 @@ async function handleRunAllChecks(data) {
             status: "error",
           };
         }
-        await saveState(hasTrade ? 60 : 90);
+        await saveState(hasTrade ? 70 : 90);
       }
 
       // 3. TITLE CHECK (after Repeat Offender completes)
       if (hasTrade) {
-        await saveState(70);
+        await saveState(75);
         try {
           const titleResult = await handleTitleCheck({
             vin: customer.tradeVin,
           });
+          await saveState(85);
+
           if (titleResult.success) {
             const checkRes = titleResult.result;
             const titleStorage = await chrome.storage.local.get(
@@ -257,7 +263,7 @@ async function handleRunAllChecks(data) {
             warning: true,
           };
         }
-        await saveState(90);
+        await saveState(95);
       }
     })();
 

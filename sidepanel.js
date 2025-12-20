@@ -126,8 +126,26 @@ async function loadPersistedResults() {
       "searchProgress",
     ]);
 
-    // 1. RESTORE RUNNING STATE
+    // 1. RESTORE RUNNING STATE (with timeout protection)
     if (storage.searchStatus === "running") {
+      // Check if the search has been running too long (>2 minutes = likely stuck)
+      const startTime = storage.currentResults?.timestamp;
+      if (startTime) {
+        const elapsed = Date.now() - new Date(startTime).getTime();
+        const maxRunTime = 2 * 60 * 1000; // 2 minutes
+        if (elapsed > maxRunTime) {
+          console.warn("[Sidepanel] Search appears stuck, resetting state...");
+          await chrome.storage.local.set({
+            searchStatus: "idle",
+            searchProgress: 0,
+          });
+          isRunning = false;
+          setButtonsDisabled(false);
+          elements.progressSection.classList.add("hidden");
+          return;
+        }
+      }
+
       isRunning = true;
       setButtonsDisabled(true);
       elements.resultsSection.classList.add("hidden");
@@ -376,6 +394,14 @@ async function loadCachedFormData() {
 // ============================================================================
 
 function handleClear() {
+  // Reset running state to fix stuck buttons
+  isRunning = false;
+  setButtonsDisabled(false);
+  chrome.storage.local.set({
+    searchStatus: "idle",
+    searchProgress: 0,
+  });
+
   // Clear form inputs - Buyer
   elements.firstName.value = "";
   elements.middleName.value = "";
@@ -430,7 +456,7 @@ function handleClear() {
   setCheckStatus("titleStatus", "waiting");
   updateProgress(0);
 
-  // Disable title button
+  // Disable title button (no VIN entered)
   elements.runTitleBtn.disabled = true;
 
   // Focus on first input

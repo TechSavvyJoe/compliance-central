@@ -4,6 +4,97 @@
  */
 
 // ============================================================================
+// SECURITY UTILITIES
+// ============================================================================
+
+/**
+ * Sanitize a string for safe HTML insertion
+ * Prevents XSS attacks by escaping HTML special characters
+ * @param {string} str - The string to sanitize
+ * @returns {string} - The sanitized string
+ */
+function sanitizeHTML(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Build a full name string from customer data (sanitized)
+ * @param {Object} customer - Customer object with firstName, middleName, lastName, suffix
+ * @returns {string} - Sanitized full name string
+ */
+function buildSanitizedName(customer) {
+  const parts = [
+    sanitizeHTML(customer.firstName),
+    sanitizeHTML(customer.middleName || ""),
+    sanitizeHTML(customer.lastName),
+  ].filter(p => p.trim());
+
+  let name = parts.join(" ");
+  if (customer.suffix) {
+    name += " " + sanitizeHTML(customer.suffix);
+  }
+  return name;
+}
+
+/**
+ * Set up safe cleanup for print windows
+ * Ensures window closes after print OR after timeout if user cancels
+ * @param {Window} printWindow - The print window to manage
+ * @param {number} timeoutMs - Timeout in ms before forcing close (default 5 min)
+ */
+function setupPrintWindowCleanup(printWindow, timeoutMs = 300000) {
+  let closed = false;
+
+  const closeWindow = () => {
+    if (!closed && printWindow && !printWindow.closed) {
+      closed = true;
+      try {
+        printWindow.close();
+      } catch (e) {
+        // Window may already be closed
+      }
+    }
+  };
+
+  // Primary: close after print dialog closes
+  printWindow.onafterprint = closeWindow;
+
+  // Fallback: close after timeout if still open (handles user cancel)
+  setTimeout(() => {
+    if (!closed && printWindow && !printWindow.closed) {
+      console.log("[Print] Window still open after timeout, closing...");
+      closeWindow();
+    }
+  }, timeoutMs);
+
+  // Also close if window loses focus after print dialog
+  // (handles ESC/cancel in many browsers)
+  let printStarted = false;
+  printWindow.onbeforeprint = () => {
+    printStarted = true;
+  };
+
+  // Track when focus returns to main window (print dialog closed)
+  const checkClose = () => {
+    if (printStarted && !closed) {
+      // Give a short delay for onafterprint to fire first
+      setTimeout(() => {
+        if (!closed && printWindow && !printWindow.closed) {
+          closeWindow();
+        }
+      }, 1000);
+    }
+  };
+  window.addEventListener("focus", checkClose, { once: true });
+}
+
+// ============================================================================
 // STATE MANAGEMENT
 // ============================================================================
 
@@ -1457,62 +1548,8 @@ async function populateHistoryModal() {
       })
       .join("");
 
-    // Add click listeners for View & Restore
-    const viewBtns = elements.historyList.querySelectorAll(".history-view-btn");
-    viewBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute("data-index"));
-        loadHistoryItem(history[index]);
-      });
-    });
-
-    // Add click listeners for Print OFAC
-    const ofacBtns = elements.historyList.querySelectorAll(
-      ".history-print-ofac"
-    );
-    ofacBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute("data-index"));
-        printHistoryOfac(history[index]);
-      });
-    });
-
-    // Add click listeners for Print Repeat Offender
-    const repeatBtns = elements.historyList.querySelectorAll(
-      ".history-print-repeat"
-    );
-    repeatBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute("data-index"));
-        printHistoryRepeat(history[index]);
-      });
-    });
-
-    // Add click listeners for Print Title
-    const titleBtns = elements.historyList.querySelectorAll(
-      ".history-print-title"
-    );
-    titleBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute("data-index"));
-        printHistoryTitle(history[index]);
-      });
-    });
-
-    // Add click listeners for Print All
-    const printAllBtns =
-      elements.historyList.querySelectorAll(".history-print-all");
-    printAllBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute("data-index"));
-        printHistoryAll(history[index]);
-      });
-    });
+    // Store history data for event delegation
+    window._historyData = history;
   } catch (error) {
     console.error("Error populating history:", error);
     elements.historyList.innerHTML =
@@ -1775,8 +1812,8 @@ function printRepeatScreenshot() {
   // Wait for image to load, then print from parent window
   const img = printWindow.document.getElementById("screenshot");
 
-  // Close window after print dialog closes
-  printWindow.onafterprint = () => printWindow.close();
+  // Set up safe cleanup for print window (handles cancel/timeout)
+  setupPrintWindowCleanup(printWindow);
 
   if (img.complete) {
     setTimeout(() => {
@@ -1849,8 +1886,8 @@ function printTitleScreenshot() {
   // Wait for image to load, then print from parent window
   const img = printWindow.document.getElementById("screenshot");
 
-  // Close window after print dialog closes
-  printWindow.onafterprint = () => printWindow.close();
+  // Set up safe cleanup for print window (handles cancel/timeout)
+  setupPrintWindowCleanup(printWindow);
 
   if (img.complete) {
     setTimeout(() => {
@@ -1962,24 +1999,22 @@ async function printOfacReport() {
         <table>
           <tr>
             <td><strong>Full Name:</strong></td>
-            <td>${customer.firstName} ${customer.middleName || ""} ${
-    customer.lastName
-  }${customer.suffix ? " " + customer.suffix : ""}</td>
+            <td>${buildSanitizedName(customer)}</td>
           </tr>
           <tr>
             <td><strong>Date of Birth:</strong></td>
-            <td>${customer.dob || "Not Provided"}</td>
+            <td>${sanitizeHTML(customer.dob) || "Not Provided"}</td>
           </tr>
           <tr>
             <td><strong>Driver License / PID:</strong></td>
-            <td>${customer.dlnPid || "Not Provided"}</td>
+            <td>${sanitizeHTML(customer.dlnPid) || "Not Provided"}</td>
           </tr>
           ${
             customer.tradeVin
               ? `
           <tr>
             <td><strong>Trade-In VIN:</strong></td>
-            <td>${customer.tradeVin}</td>
+            <td>${sanitizeHTML(customer.tradeVin)}</td>
           </tr>
           `
               : ""
@@ -2004,7 +2039,7 @@ async function printOfacReport() {
               .slice(0, 5)
               .map(
                 (m) =>
-                  `<li>${m.name} (Score: ${m.score}%, Type: ${m.type})</li>`
+                  `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(m.score)}%, Type: ${sanitizeHTML(m.type)})</li>`
               )
               .join("")}
           </ul>
@@ -2029,8 +2064,8 @@ async function printOfacReport() {
   `);
   printWindow.document.close();
 
-  // Close window after print dialog closes
-  printWindow.onafterprint = () => printWindow.close();
+  // Set up safe cleanup for print window (handles cancel/timeout)
+  setupPrintWindowCleanup(printWindow);
 
   // Print with slight delay to ensure rendering
   setTimeout(() => {
@@ -2266,8 +2301,8 @@ async function printCoBuyerRepeatScreenshot() {
   `);
   printWindow.document.close();
 
-  // Close window after print dialog closes
-  printWindow.onafterprint = () => printWindow.close();
+  // Set up safe cleanup for print window (handles cancel/timeout)
+  setupPrintWindowCleanup(printWindow);
 
   // SAFELY attach events from parent context (No CSP violation)
   const btn = printWindow.document.getElementById("printBtn");
@@ -2342,16 +2377,12 @@ async function printAllReports() {
         </div>
         <div class="subject-box">
           <h3>SUBJECT SCREENED</h3>
-          <p><strong>Name:</strong> ${customer?.firstName || ""} ${
-      customer?.middleName || ""
-    } ${customer?.lastName || ""}${
-      customer?.suffix ? " " + customer.suffix : ""
-    }</p>
-          <p><strong>DOB:</strong> ${customer?.dob || "Not Provided"}</p>
-          <p><strong>DLN/PID:</strong> ${customer?.dlnPid || "Not Provided"}</p>
+          <p><strong>Name:</strong> ${customer ? buildSanitizedName(customer) : "N/A"}</p>
+          <p><strong>DOB:</strong> ${sanitizeHTML(customer?.dob) || "Not Provided"}</p>
+          <p><strong>DLN/PID:</strong> ${sanitizeHTML(customer?.dlnPid) || "Not Provided"}</p>
           ${
             customer?.tradeVin
-              ? `<p><strong>Trade VIN:</strong> ${customer.tradeVin}</p>`
+              ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(customer.tradeVin)}</p>`
               : ""
           }
         </div>
@@ -2546,7 +2577,8 @@ async function printAllReports() {
   const totalImages = images.length;
 
   const tryPrint = () => {
-    printWindow.onafterprint = () => printWindow.close();
+    // Set up safe cleanup for print window (handles cancel/timeout)
+    setupPrintWindowCleanup(printWindow);
     setTimeout(() => {
       printWindow.focus();
       printWindow.print();
@@ -2631,9 +2663,7 @@ function generateSimpleExport(results) {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Compliance Check - ${customer.firstName} ${
-    customer.lastName
-  }</title>
+      <title>Compliance Check - ${sanitizeHTML(customer.firstName)} ${sanitizeHTML(customer.lastName)}</title>
       <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         h1 { color: #00274C; border-bottom: 2px solid #00274C; padding-bottom: 10px; }
@@ -2663,14 +2693,12 @@ function generateSimpleExport(results) {
       
       <div class="section">
         <h3>Customer Information</h3>
-        <p><strong>Name:</strong> ${customer.firstName} ${
-    customer.middleName || ""
-  } ${customer.lastName}${customer.suffix ? " " + customer.suffix : ""}</p>
-        <p><strong>DOB:</strong> ${customer.dob}</p>
-        <p><strong>DLN/PID:</strong> ${customer.dlnPid || "N/A"}</p>
+        <p><strong>Name:</strong> ${buildSanitizedName(customer)}</p>
+        <p><strong>DOB:</strong> ${sanitizeHTML(customer.dob)}</p>
+        <p><strong>DLN/PID:</strong> ${sanitizeHTML(customer.dlnPid) || "N/A"}</p>
         ${
           customer.tradeVin
-            ? `<p><strong>Trade VIN:</strong> ${customer.tradeVin}</p>`
+            ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(customer.tradeVin)}</p>`
             : ""
         }
       </div>
@@ -2707,12 +2735,8 @@ function generateSimpleExport(results) {
           }; border-radius: 4px;">
             <div>
               <p style="margin: 0; font-weight: bold; color: #374151;">Subject Screened:</p>
-              <p style="margin: 5px 0 0 0; color: #374151;">${
-                customer.firstName
-              } ${customer.middleName || ""} ${customer.lastName}</p>
-              <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">DOB: ${
-                customer.dob
-              }</p>
+              <p style="margin: 5px 0 0 0; color: #374151;">${buildSanitizedName(customer)}</p>
+              <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">DOB: ${sanitizeHTML(customer.dob)}</p>
             </div>
             <div style="text-align: center;">
               <p style="margin: 0; font-size: 24px; font-weight: bold; color: ${

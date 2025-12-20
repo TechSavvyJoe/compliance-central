@@ -33,6 +33,37 @@ const UPDATE_ALARM_NAME = "ofac-sdn-update";
 const UPDATE_INTERVAL_HOURS = 24;
 
 // ============================================================================
+// STATE UPDATE LOCK (Prevents race conditions in concurrent storage updates)
+// ============================================================================
+
+let stateUpdateLock = Promise.resolve();
+
+/**
+ * Atomic state update helper - ensures no concurrent storage writes
+ * @param {Function} updateFn - Function that receives current state and returns updates
+ * @returns {Promise} - Resolves when update is complete
+ */
+async function atomicStateUpdate(updateFn) {
+  // Chain updates to ensure they happen sequentially
+  stateUpdateLock = stateUpdateLock.then(async () => {
+    try {
+      const current = await chrome.storage.local.get([
+        "currentResults",
+        "searchProgress",
+        "searchStatus",
+      ]);
+      const updates = updateFn(current);
+      if (updates && Object.keys(updates).length > 0) {
+        await chrome.storage.local.set(updates);
+      }
+    } catch (e) {
+      console.error("[State] Atomic update error:", e);
+    }
+  });
+  return stateUpdateLock;
+}
+
+// ============================================================================
 // SIDE PANEL SETUP
 // ============================================================================
 
@@ -75,11 +106,13 @@ async function handleRunAllChecks(data) {
     currentResults: results,
   });
 
-  // Helper to save current state
+  // Helper to save current state atomically (prevents race conditions)
   const saveState = async (progress) => {
-    const update = { currentResults: results };
-    if (progress !== undefined) update.searchProgress = progress;
-    await chrome.storage.local.set(update);
+    await atomicStateUpdate((current) => {
+      const update = { currentResults: results };
+      if (progress !== undefined) update.searchProgress = progress;
+      return update;
+    });
   };
 
   try {

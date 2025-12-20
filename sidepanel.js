@@ -1217,6 +1217,11 @@ function setButtonsDisabled(disabled) {
 
 async function saveToHistory(results) {
   try {
+    // Ensure finalDecision is calculated
+    if (!results.finalDecision) {
+      results.finalDecision = calculateFinalDecision(results.checks);
+    }
+
     const storage = await chrome.storage.local.get("complianceHistory");
     const history = storage.complianceHistory || [];
 
@@ -1225,7 +1230,7 @@ async function saveToHistory(results) {
       customer: `${results.customer.firstName} ${results.customer.lastName}`,
       vin: results.customer.tradeVin || null,
       timestamp: results.timestamp,
-      decision: results.finalDecision.level,
+      decision: results.finalDecision?.level || "UNKNOWN",
       checks: {
         ofac: results.checks.ofac?.passed,
         repeatOffender: results.checks.repeatOffender?.passed,
@@ -1241,6 +1246,10 @@ async function saveToHistory(results) {
     }
 
     await chrome.storage.local.set({ complianceHistory: history });
+    console.log("[Sidepanel] History saved successfully");
+
+    // Update the history count display
+    await updateHistoryCount();
   } catch (error) {
     console.error("Error saving to history:", error);
   }

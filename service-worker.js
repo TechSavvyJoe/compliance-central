@@ -411,12 +411,20 @@ async function handleRepeatOffenderCheck(searchData) {
   if (BACKEND_CONFIG.USE_BACKEND) {
     console.log("[RepeatOffender] Using Fly.io backend API");
     try {
+      console.log("[RepeatOffender] Calling backendRepeatOffenderCheck...");
       const result = await backendRepeatOffenderCheck(searchData);
+      console.log(
+        "[RepeatOffender] Backend returned:",
+        result.success ? "SUCCESS" : "FAILED"
+      );
+
       if (result.success) {
+        console.log("[RepeatOffender] Processing successful result...");
         // Store screenshot for later use
         const screenshotKey =
           searchData.screenshotStorageKey || "repeatOffenderScreenshot";
         if (result.result.screenshotData) {
+          console.log("[RepeatOffender] Storing screenshot...");
           await chrome.storage.local.set({
             [screenshotKey]: result.result.screenshotData,
             lastResult: result.result,
@@ -438,7 +446,11 @@ async function handleRepeatOffenderCheck(searchData) {
         await chrome.action.setBadgeText({ text: badgeText });
         await chrome.action.setBadgeBackgroundColor({ color: badgeColor });
         // Save to history
+        console.log("[RepeatOffender] Saving to history...");
         await addToRepeatOffenderHistory(searchData, result.result);
+        console.log(
+          "[RepeatOffender] Backend check complete, returning result"
+        );
         return result;
       }
       // If backend fails, fall through to local execution

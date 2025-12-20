@@ -333,6 +333,32 @@ function initEventListeners() {
   );
   elements.clearAllHistoryBtn.addEventListener("click", clearAllHistory);
 
+  // Delegated event handler for history list buttons (prevents memory leaks)
+  // Single listener handles all button types instead of attaching per-button
+  elements.historyList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+
+    e.stopPropagation();
+    const index = parseInt(btn.getAttribute("data-index"));
+    const history = window._historyData;
+    if (!history || index < 0 || index >= history.length) return;
+
+    const item = history[index];
+
+    if (btn.classList.contains("history-view-btn")) {
+      loadHistoryItem(item);
+    } else if (btn.classList.contains("history-print-ofac")) {
+      printHistoryOfac(item);
+    } else if (btn.classList.contains("history-print-repeat")) {
+      printHistoryRepeat(item);
+    } else if (btn.classList.contains("history-print-title")) {
+      printHistoryTitle(item);
+    } else if (btn.classList.contains("history-print-all")) {
+      printHistoryAll(item);
+    }
+  });
+
   // Screenshot modal
   elements.closeScreenshotModal.addEventListener("click", () =>
     hideModal("screenshot")

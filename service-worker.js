@@ -750,6 +750,13 @@ async function handleTitleCheck(data) {
       }
     }
 
+    // Capture existing MDOS tabs BEFORE clicking (for accurate new tab detection)
+    const existingTabs = await chrome.tabs.query({
+      url: "https://dsvsesvc.sos.state.mi.us/*",
+    });
+    const existingTabIds = new Set(existingTabs.map((t) => t.id));
+    const originalTabId = tab.id;
+
     // Step 2: Click "Search for Liens and Brands" link
     const clickResult = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -775,19 +782,33 @@ async function handleTitleCheck(data) {
     // Step 3: Wait for page/tab change
     await sleep(300);
 
-    // Check if a new tab opened (the link may open a new tab)
-    const allTabs = await chrome.tabs.query({
+    // Check if a NEW tab opened (compare with before-click snapshot)
+    const allTabsAfter = await chrome.tabs.query({
       url: "https://dsvsesvc.sos.state.mi.us/*",
     });
 
-    // Use the most recently created tab (highest ID)
-    if (allTabs.length > 0) {
-      const newestTab = allTabs.reduce(
-        (newest, t) => (t.id > newest.id ? t : newest),
-        allTabs[0]
-      );
-      tab = newestTab;
-      // Don't activate - keep in background
+    // Find tabs that are truly new (not in our before-click snapshot)
+    const newTabs = allTabsAfter.filter((t) => !existingTabIds.has(t.id));
+
+    if (newTabs.length > 0) {
+      // A new tab was opened - use the first one (most likely the one opened by the link)
+      tab = newTabs[0];
+      console.log(`[Title] New tab opened: ${tab.id}, switching to it`);
+    } else {
+      // No new tab - the link navigated the existing tab
+      // Verify our original tab still exists
+      try {
+        await chrome.tabs.get(originalTabId);
+        tab = { id: originalTabId };
+      } catch {
+        // Original tab is gone - try to find a valid MDOS tab
+        if (allTabsAfter.length > 0) {
+          tab = allTabsAfter[0];
+          console.log(`[Title] Original tab gone, using tab: ${tab.id}`);
+        } else {
+          throw new Error("Lost MDOS tab during navigation");
+        }
+      }
     }
 
     await waitForTabReady(tab.id);

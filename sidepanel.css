@@ -426,8 +426,8 @@ body {
 
 /* Co-Buyer Toggle */
 .cobuyer-toggle {
-  padding: var(--spacing-sm) var(--spacing-md);
-  margin: var(--spacing-sm) 0;
+  padding: 2px 12px;
+  margin: 0;
 }
 
 .checkbox-label {

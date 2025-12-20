@@ -1296,6 +1296,9 @@ async function populateHistoryModal() {
       return;
     }
 
+    // Store history for later access by download functions
+    window._historyData = history;
+
     elements.historyList.innerHTML = history
       .slice(0, 50)
       .map((item, index) => {
@@ -1307,33 +1310,162 @@ async function populateHistoryModal() {
         const dateStr = date.toLocaleDateString();
 
         let decisionClass = "status-pass";
-        if (item.decision === "DENIED") decisionClass = "status-fail";
-        else if (item.decision === "REVIEW") decisionClass = "status-warning";
+        let decisionIcon = "✅";
+        if (item.decision === "DENIED") {
+          decisionClass = "status-fail";
+          decisionIcon = "❌";
+        } else if (item.decision === "REVIEW") {
+          decisionClass = "status-warning";
+          decisionIcon = "⚠️";
+        }
+
+        // Build check status icons
+        const checks = item.checks || {};
+        const fullResults = item.fullResults;
+
+        // OFAC status
+        const ofacStatus =
+          checks.ofac !== undefined ? (checks.ofac ? "✅" : "❌") : "—";
+
+        // Repeat Offender status
+        const repeatStatus =
+          checks.repeatOffender !== undefined
+            ? checks.repeatOffender
+              ? "✅"
+              : "❌"
+            : "—";
+
+        // Title status
+        const titleStatus =
+          checks.title !== undefined ? (checks.title ? "✅" : "⚠️") : "—";
+
+        // Check if we have downloadable data
+        const hasOfac = fullResults?.checks?.ofac;
+        const hasRepeat = fullResults?.checks?.repeatOffender?.screenshotData;
+        const hasTitle = fullResults?.checks?.title?.screenshotData;
 
         return `
-        <div class="history-item" data-index="${index}" style="cursor: pointer; transition: background 0.2s;">
-          <div class="history-item-header">
-            <span class="history-customer">${item.customer}</span>
-            <span class="history-decision ${decisionClass}">${
+        <div class="history-item" data-index="${index}">
+          <div class="history-item-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="history-customer" style="font-weight: 600; font-size: 14px;">${
+              item.customer
+            }</span>
+            <span class="history-decision ${decisionClass}" style="padding: 2px 8px; border-radius: 4px; font-size: 11px;">${decisionIcon} ${
           item.decision
         }</span>
           </div>
-          <div class="history-meta">
+          
+          <div class="history-meta" style="font-size: 11px; color: #94a3b8; margin: 6px 0;">
             ${dateStr} at ${timeStr}
-            ${item.vin ? ` • VIN: ${item.vin.slice(-6)}` : ""}
-            <span style="float: right; font-size: 10px; opacity: 0.7;">Click to View</span>
+            ${item.vin ? ` • VIN: ...${item.vin.slice(-6)}` : " • No Trade-In"}
+          </div>
+          
+          <div class="history-checks" style="display: flex; gap: 12px; margin: 8px 0; font-size: 11px;">
+            <span title="OFAC Screening">🌐 ${ofacStatus}</span>
+            <span title="Repeat Offender">🚫 ${repeatStatus}</span>
+            <span title="Title & Lien">📄 ${titleStatus}</span>
+          </div>
+          
+          <div class="history-actions" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+            <button class="btn-sm history-view-btn" data-index="${index}" style="background: #1e3a5f; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">
+              👁️ View & Restore
+            </button>
+            ${
+              hasOfac
+                ? `
+              <button class="btn-sm history-print-ofac" data-index="${index}" style="background: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">
+                🖨️ OFAC
+              </button>
+            `
+                : ""
+            }
+            ${
+              hasRepeat
+                ? `
+              <button class="btn-sm history-print-repeat" data-index="${index}" style="background: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">
+                🖨️ Repeat
+              </button>
+            `
+                : ""
+            }
+            ${
+              hasTitle
+                ? `
+              <button class="btn-sm history-print-title" data-index="${index}" style="background: #334155; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">
+                🖨️ Title
+              </button>
+            `
+                : ""
+            }
+            ${
+              hasOfac || hasRepeat || hasTitle
+                ? `
+              <button class="btn-sm history-print-all" data-index="${index}" style="background: #0f766e; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px;">
+                📋 Print All
+              </button>
+            `
+                : ""
+            }
           </div>
         </div>
       `;
       })
       .join("");
 
-    // Add click listeners
-    const items = elements.historyList.querySelectorAll(".history-item");
-    items.forEach((item) => {
-      item.addEventListener("click", () => {
-        const index = parseInt(item.getAttribute("data-index"));
+    // Add click listeners for View & Restore
+    const viewBtns = elements.historyList.querySelectorAll(".history-view-btn");
+    viewBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute("data-index"));
         loadHistoryItem(history[index]);
+      });
+    });
+
+    // Add click listeners for Print OFAC
+    const ofacBtns = elements.historyList.querySelectorAll(
+      ".history-print-ofac"
+    );
+    ofacBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute("data-index"));
+        printHistoryOfac(history[index]);
+      });
+    });
+
+    // Add click listeners for Print Repeat Offender
+    const repeatBtns = elements.historyList.querySelectorAll(
+      ".history-print-repeat"
+    );
+    repeatBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute("data-index"));
+        printHistoryRepeat(history[index]);
+      });
+    });
+
+    // Add click listeners for Print Title
+    const titleBtns = elements.historyList.querySelectorAll(
+      ".history-print-title"
+    );
+    titleBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute("data-index"));
+        printHistoryTitle(history[index]);
+      });
+    });
+
+    // Add click listeners for Print All
+    const printAllBtns =
+      elements.historyList.querySelectorAll(".history-print-all");
+    printAllBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute("data-index"));
+        printHistoryAll(history[index]);
       });
     });
   } catch (error) {
@@ -1341,6 +1473,55 @@ async function populateHistoryModal() {
     elements.historyList.innerHTML =
       '<p class="history-empty">Error loading history</p>';
   }
+}
+
+// Print OFAC from history
+function printHistoryOfac(item) {
+  if (!item.fullResults?.checks?.ofac) {
+    alert("No OFAC data saved for this entry.");
+    return;
+  }
+  // Temporarily set currentResults for the print function
+  const originalResults = currentResults;
+  currentResults = item.fullResults;
+  printOfacReport();
+  currentResults = originalResults;
+}
+
+// Print Repeat Offender from history
+function printHistoryRepeat(item) {
+  if (!item.fullResults?.checks?.repeatOffender?.screenshotData) {
+    alert("No Repeat Offender screenshot saved for this entry.");
+    return;
+  }
+  const originalResults = currentResults;
+  currentResults = item.fullResults;
+  printRepeatScreenshot();
+  currentResults = originalResults;
+}
+
+// Print Title from history
+function printHistoryTitle(item) {
+  if (!item.fullResults?.checks?.title?.screenshotData) {
+    alert("No Title/Lien screenshot saved for this entry.");
+    return;
+  }
+  const originalResults = currentResults;
+  currentResults = item.fullResults;
+  printTitleScreenshot();
+  currentResults = originalResults;
+}
+
+// Print All from history
+function printHistoryAll(item) {
+  if (!item.fullResults) {
+    alert("No saved results for this entry.");
+    return;
+  }
+  const originalResults = currentResults;
+  currentResults = item.fullResults;
+  printAllReports();
+  currentResults = originalResults;
 }
 
 // Restore session from history

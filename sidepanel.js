@@ -853,13 +853,23 @@ function calculateFinalDecision(checks) {
 
   // Trade warnings (if trade exists)
   if (checks.title) {
-    const titleClean = checks.title.titleBrand === "CLEAN";
+    const titleBrand = checks.title.titleBrand;
 
-    if (!titleClean && checks.title.titleBrand !== "UNKNOWN") {
+    // Only flag if there's an actual brand (not clean, unknown, undefined, null, or empty)
+    const hasProblemBrand =
+      titleBrand &&
+      titleBrand !== "CLEAN" &&
+      titleBrand !== "UNKNOWN" &&
+      titleBrand !== "undefined" &&
+      titleBrand.toLowerCase() !== "none" &&
+      titleBrand.toLowerCase() !== "no brands" &&
+      !titleBrand.toLowerCase().includes("no brand");
+
+    if (hasProblemBrand) {
       return {
         approved: false,
         level: "REVIEW",
-        reason: `Trade title branded as ${checks.title.titleBrand} - requires disclosure`,
+        reason: `Trade title branded as ${titleBrand} - requires disclosure`,
         warnings: [],
       };
     }

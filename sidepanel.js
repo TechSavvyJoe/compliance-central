@@ -3,6 +3,8 @@
  * Main UI orchestration for the unified compliance tool
  */
 
+import { CONFIG } from "./lib/config.js";
+
 // ============================================================================
 // SECURITY UTILITIES
 // ============================================================================
@@ -206,6 +208,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCachedFormData();
   await loadPersistedResults(); // Load previous results if they exist
   await updateHistoryCount();
+
+  // Privacy: Purge entries older than retention period on startup
+  await purgeOldHistoryEntries();
 });
 
 // Load persisted results when sidebar reopens
@@ -223,7 +228,7 @@ async function loadPersistedResults() {
       const startTime = storage.currentResults?.timestamp;
       if (startTime) {
         const elapsed = Date.now() - new Date(startTime).getTime();
-        const maxRunTime = 2 * 60 * 1000; // 2 minutes
+        const maxRunTime = CONFIG.timeouts.stuckSearchTimeout;
         if (elapsed > maxRunTime) {
           console.warn("[Sidepanel] Search appears stuck, resetting state...");
           await chrome.storage.local.set({
@@ -486,7 +491,7 @@ async function loadCachedFormData() {
     if (result.cachedFormData && result.cachedAt) {
       // Only use cache if less than 10 minutes old
       const cacheAge = Date.now() - result.cachedAt;
-      if (cacheAge < 10 * 60 * 1000) {
+      if (cacheAge < CONFIG.timeouts.formCacheExpiry) {
         const data = result.cachedFormData;
         elements.firstName.value = data.firstName || "";
         if (elements.middleName)
@@ -1386,8 +1391,50 @@ function setButtonsDisabled(disabled) {
 // HISTORY MANAGEMENT
 // ============================================================================
 
+// Data retention: automatically purge entries older than configured days
+const DATA_RETENTION_DAYS = CONFIG.limits.dataRetentionDays;
+
+/**
+ * Purge history entries older than retention period
+ * @returns {Promise<number>} - Number of entries purged
+ */
+async function purgeOldHistoryEntries() {
+  try {
+    const storage = await chrome.storage.local.get("complianceHistory");
+    const history = storage.complianceHistory || [];
+
+    if (history.length === 0) return 0;
+
+    const cutoffDate = Date.now() - (DATA_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const filtered = history.filter((entry) => {
+      try {
+        const entryTime = new Date(entry.timestamp).getTime();
+        return entryTime > cutoffDate;
+      } catch {
+        // If timestamp is invalid, keep the entry
+        return true;
+      }
+    });
+
+    const purgedCount = history.length - filtered.length;
+
+    if (purgedCount > 0) {
+      await chrome.storage.local.set({ complianceHistory: filtered });
+      console.log(`[Privacy] Purged ${purgedCount} entries older than ${DATA_RETENTION_DAYS} days`);
+    }
+
+    return purgedCount;
+  } catch (error) {
+    console.error("Error purging old history:", error);
+    return 0;
+  }
+}
+
 async function saveToHistory(results) {
   try {
+    // Purge old entries before adding new ones (privacy/data retention)
+    await purgeOldHistoryEntries();
+
     // Ensure finalDecision is calculated
     if (!results.finalDecision) {
       results.finalDecision = calculateFinalDecision(results.checks);
@@ -1411,9 +1458,9 @@ async function saveToHistory(results) {
       fullResults: results,
     });
 
-    // Keep last 50 checks (reduced from 100 since we store full data now)
-    if (history.length > 50) {
-      history.length = 50;
+    // Keep only the configured max number of entries
+    if (history.length > CONFIG.limits.maxHistoryEntries) {
+      history.length = CONFIG.limits.maxHistoryEntries;
     }
 
     await chrome.storage.local.set({ complianceHistory: history });

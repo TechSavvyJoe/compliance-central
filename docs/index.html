@@ -55,7 +55,7 @@
     <header>
         <h1>Compliance Central</h1>
         <p>Privacy Policy</p>
-        <p class="last-updated">Last Updated: December 19, 2025</p>
+        <p class="last-updated">Last Updated: December 21, 2025</p>
     </header>
 
     <div class="section">
@@ -65,9 +65,10 @@
 
     <div class="section">
         <h2>2. Data Collection and Usage</h2>
-        <p>Compliance Central operates primarily as a client-side tool. We do not maintain a central server that collects, stores, or analyzes your personal data or the customer data you process.</p>
+        <p>Compliance Central processes data both locally and through secure backend services:</p>
         <ul>
-            <li><strong>Local Storage:</strong> All compliance search results, history, and settings are stored locally on your device using Chrome's <code>storage.local</code> and <code>storage.session</code> APIs.</li>
+            <li><strong>Local Storage:</strong> All compliance search results, history, and settings are stored locally on your device using Chrome's <code>storage.local</code> API. We do not maintain a database of your searches.</li>
+            <li><strong>Backend Processing:</strong> MDOS (Repeat Offender and Title/Lien) checks are performed through our secure backend service hosted on Fly.io. This service uses headless browser automation to query the Michigan Department of State portal on your behalf. <strong>No customer data is logged or stored on our servers</strong> - data is processed in-memory and immediately discarded after returning results.</li>
             <li><strong>No Tracking:</strong> We do not track your browsing history or usage behavior outside of the extension's specific functionality.</li>
             <li><strong>No Analytics:</strong> We do not use third-party analytics services (like Google Analytics) to track your interaction with the extension.</li>
         </ul>
@@ -75,10 +76,11 @@
 
     <div class="section">
         <h2>3. Third-Party Services</h2>
-        <p>To perform compliance checks, the extension interacts with specific public government databases directly from your browser:</p>
+        <p>To perform compliance checks, the extension interacts with the following services:</p>
         <ul>
-            <li><strong>MDOS (Michigan Department of State):</strong> The extension automates searches on the MDOS e-Services portal to retrieve Repeat Offender and Title/Lien information. This interaction occurs directly between your browser and the MDOS website.</li>
-            <li><strong>OFAC (Office of Foreign Assets Control):</strong> The extension downloads the public SDN list from OpenSanctions or the US Treasury to perform local screenings. Your search queries are matched locally and are not sent to any third-party server for processing.</li>
+            <li><strong>MDOS (Michigan Department of State):</strong> Repeat Offender and Title/Lien checks are performed via our secure backend service, which automates queries to the MDOS e-Services portal. Your search data is transmitted securely via HTTPS, processed in-memory, and not retained.</li>
+            <li><strong>OFAC (Office of Foreign Assets Control):</strong> The extension downloads the public SDN list from OpenSanctions to perform local OFAC screenings. These searches are performed entirely on your device - no data is sent to any external server.</li>
+            <li><strong>Fly.io:</strong> Our backend infrastructure is hosted on Fly.io, a secure cloud platform. No customer data is persisted on these servers.</li>
         </ul>
     </div>
 

@@ -371,6 +371,7 @@ async function handleOfacCheck(data) {
         country: m.entry.country,
       })),
       entriesSearched: entries.length,
+      lastUpdate: (await getSetting("lastUpdate")) || "Unknown",
       timestamp: new Date().toISOString(),
     };
 

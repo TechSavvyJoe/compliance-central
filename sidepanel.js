@@ -1405,7 +1405,7 @@ async function purgeOldHistoryEntries() {
 
     if (history.length === 0) return 0;
 
-    const cutoffDate = Date.now() - (DATA_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const cutoffDate = Date.now() - DATA_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const filtered = history.filter((entry) => {
       try {
         const entryTime = new Date(entry.timestamp).getTime();
@@ -1420,7 +1420,9 @@ async function purgeOldHistoryEntries() {
 
     if (purgedCount > 0) {
       await chrome.storage.local.set({ complianceHistory: filtered });
-      console.log(`[Privacy] Purged ${purgedCount} entries older than ${DATA_RETENTION_DAYS} days`);
+      console.log(
+        `[Privacy] Purged ${purgedCount} entries older than ${DATA_RETENTION_DAYS} days`
+      );
     }
 
     return purgedCount;
@@ -1727,6 +1729,11 @@ function printHistoryAll(item) {
 async function loadHistoryItem(item) {
   // Close modal
   hideModal("history");
+
+  // Set global results for printing/export
+  if (item.fullResults) {
+    currentResults = item.fullResults;
+  }
 
   // Repopulate form inputs
   if (item.fullResults && item.fullResults.customer) {
@@ -2040,16 +2047,31 @@ async function printOfacReport() {
 
   // Get SDN database status
   let dbInfo = { lastUpdate: "Unknown", entryCount: 0 };
-  try {
-    const status = await chrome.runtime.sendMessage({ type: "getDataStatus" });
-    if (status.success) {
-      dbInfo.lastUpdate = status.lastUpdate
-        ? new Date(status.lastUpdate).toLocaleDateString()
-        : "Unknown";
-      dbInfo.entryCount = status.entryCount || 0;
+
+  if (ofac.lastUpdate) {
+    // Use stored date from the check result
+    try {
+      dbInfo.lastUpdate = new Date(ofac.lastUpdate).toLocaleDateString();
+      if (dbInfo.lastUpdate === "Invalid Date")
+        dbInfo.lastUpdate = ofac.lastUpdate;
+    } catch (e) {
+      dbInfo.lastUpdate = ofac.lastUpdate;
     }
-  } catch (e) {
-    console.log("Could not get SDN status:", e);
+  } else {
+    // Fallback: Fetch current status
+    try {
+      const status = await chrome.runtime.sendMessage({
+        type: "getDataStatus",
+      });
+      if (status.success) {
+        dbInfo.lastUpdate = status.lastUpdate
+          ? new Date(status.lastUpdate).toLocaleDateString()
+          : "Unknown";
+        dbInfo.entryCount = status.entryCount || 0;
+      }
+    } catch (e) {
+      console.log("Could not get SDN status:", e);
+    }
   }
 
   const printWindow = window.open("", "_blank");

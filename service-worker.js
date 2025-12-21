@@ -149,18 +149,16 @@ async function handleRunAllChecks(data) {
         })
       : Promise.resolve();
 
-    // MDOS checks run sequentially (one after the other)
-    const mdosPromise = (async () => {
-      // 1. BUYER REPEAT OFFENDER CHECK
-      await saveState(hasCoBuyer ? 25 : 30); // Start RO
+    // MDOS checks - Run in PARALLEL for speed (each uses separate browser instance)
+    // Repeat Offender check
+    const repeatOffenderPromise = (async () => {
+      await saveState(hasCoBuyer ? 25 : 30);
       try {
-        // Add storage key to customer object for this check
         const customerWithKey = {
           ...customer,
           screenshotStorageKey: "repeatOffenderScreenshot",
         };
         const roResult = await handleRepeatOffenderCheck(customerWithKey);
-        await saveState(hasCoBuyer ? 35 : 45); // Mid-RO
 
         if (roResult.success) {
           const checkRes = roResult.result;
@@ -187,88 +185,95 @@ async function handleRunAllChecks(data) {
           status: "error",
         };
       }
-      // Save after RO check
-      await saveState(hasCoBuyer ? 45 : hasTrade ? 60 : 90);
+      await saveState(hasCoBuyer ? 45 : hasTrade ? 55 : 90);
+    })();
 
-      // 2. CO-BUYER REPEAT OFFENDER CHECK (if has co-buyer)
-      if (hasCoBuyer) {
-        await saveState(50);
-        try {
-          const coBuyerWithKey = {
-            ...customer.coBuyer,
-            screenshotStorageKey: "coBuyerRepeatOffenderScreenshot",
-          };
-          const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
-          await saveState(60);
+    // Co-Buyer Repeat Offender check (parallel with main RO)
+    const coBuyerRepeatOffenderPromise = hasCoBuyer
+      ? (async () => {
+          await saveState(30);
+          try {
+            const coBuyerWithKey = {
+              ...customer.coBuyer,
+              screenshotStorageKey: "coBuyerRepeatOffenderScreenshot",
+            };
+            const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
 
-          if (cbRoResult.success) {
-            const checkRes = cbRoResult.result;
-            checkRes.passed = checkRes.status === "eligible";
-            const cbRoStorage = await chrome.storage.local.get(
-              "coBuyerRepeatOffenderScreenshot"
-            );
-            if (cbRoStorage.coBuyerRepeatOffenderScreenshot) {
-              checkRes.screenshotData =
-                cbRoStorage.coBuyerRepeatOffenderScreenshot;
+            if (cbRoResult.success) {
+              const checkRes = cbRoResult.result;
+              checkRes.passed = checkRes.status === "eligible";
+              const cbRoStorage = await chrome.storage.local.get(
+                "coBuyerRepeatOffenderScreenshot"
+              );
+              if (cbRoStorage.coBuyerRepeatOffenderScreenshot) {
+                checkRes.screenshotData =
+                  cbRoStorage.coBuyerRepeatOffenderScreenshot;
+              }
+              results.checks.coBuyerRepeatOffender = checkRes;
+            } else {
+              results.checks.coBuyerRepeatOffender = {
+                passed: false,
+                error: cbRoResult.error,
+                status: "error",
+              };
             }
-            results.checks.coBuyerRepeatOffender = checkRes;
-          } else {
+          } catch (e) {
+            console.error("Co-Buyer Repeat Offender Error:", e);
             results.checks.coBuyerRepeatOffender = {
               passed: false,
-              error: cbRoResult.error,
+              error: e.message,
               status: "error",
             };
           }
-        } catch (e) {
-          console.error("Co-Buyer Repeat Offender Error:", e);
-          results.checks.coBuyerRepeatOffender = {
-            passed: false,
-            error: e.message,
-            status: "error",
-          };
-        }
-        await saveState(hasTrade ? 70 : 90);
-      }
+          await saveState(hasTrade ? 60 : 90);
+        })()
+      : Promise.resolve();
 
-      // 3. TITLE CHECK (after Repeat Offender completes)
-      if (hasTrade) {
-        await saveState(75);
-        try {
-          const titleResult = await handleTitleCheck({
-            vin: customer.tradeVin,
-          });
-          await saveState(85);
+    // Title Check (parallel with Repeat Offender checks)
+    const titleCheckPromise = hasTrade
+      ? (async () => {
+          await saveState(35);
+          try {
+            const titleResult = await handleTitleCheck({
+              vin: customer.tradeVin,
+            });
 
-          if (titleResult.success) {
-            const checkRes = titleResult.result;
-            const titleStorage = await chrome.storage.local.get(
-              "titleScreenshot"
-            );
-            if (titleStorage.titleScreenshot) {
-              checkRes.screenshotData = titleStorage.titleScreenshot;
+            if (titleResult.success) {
+              const checkRes = titleResult.result;
+              const titleStorage = await chrome.storage.local.get(
+                "titleScreenshot"
+              );
+              if (titleStorage.titleScreenshot) {
+                checkRes.screenshotData = titleStorage.titleScreenshot;
+              }
+              results.checks.title = checkRes;
+            } else {
+              results.checks.title = {
+                passed: false,
+                error: titleResult.error,
+                warning: true,
+              };
             }
-            results.checks.title = checkRes;
-          } else {
+          } catch (e) {
+            console.error("Title Check Error:", e);
             results.checks.title = {
               passed: false,
-              error: titleResult.error,
+              error: e.message,
               warning: true,
             };
           }
-        } catch (e) {
-          console.error("Title Check Error:", e);
-          results.checks.title = {
-            passed: false,
-            error: e.message,
-            warning: true,
-          };
-        }
-        await saveState(95);
-      }
-    })();
+          await saveState(hasCoBuyer ? 85 : 90);
+        })()
+      : Promise.resolve();
 
-    // Wait for all checks to complete
-    await Promise.all([ofacPromise, coBuyerOfacPromise, mdosPromise]);
+    // Wait for all checks to complete (all running in parallel)
+    await Promise.all([
+      ofacPromise,
+      coBuyerOfacPromise,
+      repeatOffenderPromise,
+      coBuyerRepeatOffenderPromise,
+      titleCheckPromise,
+    ]);
 
     // COMPLETE
     await chrome.storage.local.set({

@@ -49,6 +49,41 @@
   --spacing-xl: 32px;
 }
 
+/* Accessibility - Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  padding: 12px 24px;
+  background: var(--accent-primary);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 600;
+  z-index: 10000;
+  border-radius: 0 0 var(--border-radius) 0;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Focus styles for better keyboard navigation */
+button:focus,
+input:focus,
+select:focus,
+a:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Focus within for form groups */
+.form-group:focus-within label {
+  color: var(--gold);
+}
+
 /* Reset */
 * {
   margin: 0;

@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <div class="compliance-hub">
       <!-- Header -->
       <header class="hub-header">
@@ -22,7 +25,7 @@
       </header>
 
       <!-- Main Content -->
-      <main class="hub-main">
+      <main id="main-content" class="hub-main" role="main">
         <!-- Customer Information Section (Required) -->
         <section class="input-section">
           <h3 class="section-title">
@@ -40,6 +43,7 @@
                 id="firstName"
                 placeholder="John"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
 
@@ -64,6 +68,7 @@
                 id="lastName"
                 placeholder="Smith"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
 
@@ -85,7 +90,7 @@
               <label for="dob"
                 >Date of Birth <span class="required">*</span></label
               >
-              <input type="date" id="dob" />
+              <input type="date" id="dob" aria-required="true" />
             </div>
 
             <div class="form-group">
@@ -97,6 +102,7 @@
                 id="dlnPid"
                 placeholder="S123456789012"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
           </div>
@@ -128,6 +134,7 @@
                 id="cbFirstName"
                 placeholder="Jane"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
 
@@ -152,6 +159,7 @@
                 id="cbLastName"
                 placeholder="Doe"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
 
@@ -173,7 +181,7 @@
               <label for="cbDob"
                 >Date of Birth <span class="required">*</span></label
               >
-              <input type="date" id="cbDob" />
+              <input type="date" id="cbDob" aria-required="true" />
             </div>
 
             <div class="form-group">
@@ -185,6 +193,7 @@
                 id="cbDlnPid"
                 placeholder="S123456789012"
                 autocomplete="off"
+                aria-required="true"
               />
             </div>
           </div>
@@ -252,7 +261,7 @@
         </section>
 
         <!-- Progress Section (Hidden by default) -->
-        <section id="progressSection" class="progress-section hidden">
+        <section id="progressSection" class="progress-section hidden" aria-live="polite" aria-atomic="true">
           <h3 class="section-title">Check Progress</h3>
 
           <div class="check-items">
@@ -289,7 +298,7 @@
         <!-- Results Section (Hidden by default) -->
         <section id="resultsSection" class="results-section hidden">
           <!-- Final Decision -->
-          <div id="finalDecision" class="final-decision">
+          <div id="finalDecision" class="final-decision" role="status" aria-live="polite">
             <div class="decision-badge decision-approved">✅ APPROVED</div>
             <p class="decision-text">All checks passed. Ready to proceed.</p>
           </div>
@@ -421,11 +430,11 @@
       </main>
 
       <!-- History Modal -->
-      <div id="historyModal" class="modal hidden">
+      <div id="historyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>Compliance History</h3>
-            <button class="modal-close" id="closeHistoryModal">&times;</button>
+            <h3 id="historyModalTitle">Compliance History</h3>
+            <button class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
           </div>
           <div class="modal-body" id="historyList">
             <!-- History items populated by JS -->
@@ -441,11 +450,11 @@
 
 
       <!-- Screenshot Modal -->
-      <div id="screenshotModal" class="modal-overlay hidden">
+      <div id="screenshotModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="screenshotTitle">
         <div class="modal-content screenshot-modal">
           <div class="modal-header">
             <h3 id="screenshotTitle">MDOS Screenshot</h3>
-            <button id="closeScreenshotModal" class="modal-close">&times;</button>
+            <button id="closeScreenshotModal" class="modal-close" aria-label="Close screenshot modal">&times;</button>
           </div>
           <div class="modal-body">
             <img id="screenshotImage" class="screenshot-img" alt="MDOS Screenshot" />
@@ -462,8 +471,8 @@
       </div>
 
       <!-- Loading Overlay -->
-      <div id="loadingOverlay" class="loading-overlay hidden">
-        <div class="loading-spinner"></div>
+      <div id="loadingOverlay" class="loading-overlay hidden" role="alert" aria-live="assertive">
+        <div class="loading-spinner" aria-hidden="true"></div>
         <p class="loading-text" id="loadingText">Processing...</p>
       </div>
     </div>

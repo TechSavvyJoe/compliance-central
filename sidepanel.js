@@ -44,6 +44,145 @@ function buildSanitizedName(customer) {
   return name;
 }
 
+// ============================================================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================================================
+
+/**
+ * Toast notification types and their icons
+ */
+const TOAST_TYPES = {
+  error: { icon: "❌", className: "toast-error" },
+  warning: { icon: "⚠️", className: "toast-warning" },
+  success: { icon: "✅", className: "toast-success" },
+  info: { icon: "ℹ️", className: "toast-info" },
+};
+
+/**
+ * Show a toast notification (replaces alert dialogs)
+ * @param {string} message - The message to display
+ * @param {string} type - Type: 'error', 'warning', 'success', 'info'
+ * @param {number} duration - Auto-dismiss time in ms (0 = manual dismiss)
+ */
+function showToast(message, type = "info", duration = 5000) {
+  // Create container if it doesn't exist
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.setAttribute("role", "region");
+    container.setAttribute("aria-label", "Notifications");
+    container.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      max-width: 360px;
+    `;
+    document.body.appendChild(container);
+  }
+
+  const toastConfig = TOAST_TYPES[type] || TOAST_TYPES.info;
+
+  // Create toast element
+  const toast = document.createElement("div");
+  toast.className = `toast ${toastConfig.className}`;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "polite");
+  toast.style.cssText = `
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.4;
+    animation: toastSlideIn 0.3s ease-out;
+    max-width: 100%;
+    word-wrap: break-word;
+  `;
+
+  // Add type-specific border color
+  if (type === "error") toast.style.borderColor = "#dc3545";
+  else if (type === "warning") toast.style.borderColor = "#ffc107";
+  else if (type === "success") toast.style.borderColor = "#28a745";
+  else toast.style.borderColor = "#17a2b8";
+
+  // Icon
+  const icon = document.createElement("span");
+  icon.textContent = toastConfig.icon;
+  icon.style.cssText = "flex-shrink: 0; font-size: 16px;";
+
+  // Message (handle multi-line with bullet points)
+  const messageEl = document.createElement("div");
+  messageEl.style.cssText = "flex: 1; white-space: pre-wrap;";
+  messageEl.textContent = message;
+
+  // Close button
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = "×";
+  closeBtn.setAttribute("aria-label", "Dismiss notification");
+  closeBtn.style.cssText = `
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    margin-left: 8px;
+  `;
+  closeBtn.onmouseover = () => (closeBtn.style.color = "#fff");
+  closeBtn.onmouseout = () => (closeBtn.style.color = "#888");
+  closeBtn.onclick = () => dismissToast(toast);
+
+  toast.appendChild(icon);
+  toast.appendChild(messageEl);
+  toast.appendChild(closeBtn);
+  container.appendChild(toast);
+
+  // Add animation keyframes if not already added
+  if (!document.getElementById("toast-styles")) {
+    const style = document.createElement("style");
+    style.id = "toast-styles";
+    style.textContent = `
+      @keyframes toastSlideIn {
+        from { opacity: 0; transform: translateX(100%); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes toastSlideOut {
+        from { opacity: 1; transform: translateX(0); }
+        to { opacity: 0; transform: translateX(100%); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Auto-dismiss
+  if (duration > 0) {
+    setTimeout(() => dismissToast(toast), duration);
+  }
+
+  return toast;
+}
+
+/**
+ * Dismiss a toast with animation
+ */
+function dismissToast(toast) {
+  if (!toast || !toast.parentNode) return;
+  toast.style.animation = "toastSlideOut 0.3s ease-in forwards";
+  setTimeout(() => toast.remove(), 300);
+}
+
 /**
  * Set up safe cleanup for print windows
  * Ensures window closes after print OR after timeout if user cancels
@@ -340,14 +479,21 @@ function initEventListeners() {
 
   // Delegated event handler for history list buttons (prevents memory leaks)
   // Single listener handles all button types instead of attaching per-button
-  elements.historyList.addEventListener("click", (e) => {
+  // Reads from storage instead of global variable to prevent stale data
+  elements.historyList.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
 
     e.stopPropagation();
     const index = parseInt(btn.getAttribute("data-index"));
-    const history = window._historyData;
-    if (!history || index < 0 || index >= history.length) return;
+
+    // Read directly from storage instead of global variable
+    const { complianceHistory } = await chrome.storage.local.get(
+      "complianceHistory"
+    );
+    const history = complianceHistory || [];
+
+    if (index < 0 || index >= history.length) return;
 
     const item = history[index];
 
@@ -460,15 +606,131 @@ function getFormData() {
   return data;
 }
 
-function validateCustomerFields(data) {
-  const missing = [];
-  if (!data.firstName) missing.push("First Name");
-  if (!data.lastName) missing.push("Last Name");
-  if (!data.dob) missing.push("Date of Birth");
-  if (!data.dlnPid) missing.push("DLN/PID");
+/**
+ * Validate a single field against config rules
+ * @param {string} fieldName - Name of the field
+ * @param {string} value - Value to validate
+ * @param {string} label - Human-readable label for error messages
+ * @param {boolean} required - Whether field is required
+ * @returns {{valid: boolean, error: string|null}}
+ */
+function validateField(fieldName, value, label, required = true) {
+  const val = value?.trim() || "";
 
-  if (missing.length > 0) {
-    alert(`Please fill in required fields: ${missing.join(", ")}`);
+  // Check required
+  if (required && !val) {
+    return { valid: false, error: `${label} is required` };
+  }
+
+  // Skip format validation if empty and not required
+  if (!val) {
+    return { valid: true, error: null };
+  }
+
+  // Field-specific validation
+  switch (fieldName) {
+    case "firstName":
+    case "lastName":
+    case "middleName":
+      if (val.length > CONFIG.validation.nameMaxLength) {
+        return {
+          valid: false,
+          error: `${label} must be ${CONFIG.validation.nameMaxLength} characters or less`,
+        };
+      }
+      break;
+
+    case "dob":
+      if (!CONFIG.validation.dobPattern.test(val)) {
+        return {
+          valid: false,
+          error: `${label} must be in MM/DD/YYYY format`,
+        };
+      }
+      // Age validation
+      const [month, day, year] = val.split("/").map(Number);
+      const birthDate = new Date(year, month - 1, day);
+      const ageMs = Date.now() - birthDate.getTime();
+      const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
+      if (ageYears < CONFIG.validation.minAge) {
+        return {
+          valid: false,
+          error: `Customer must be at least ${CONFIG.validation.minAge} years old`,
+        };
+      }
+      if (ageYears > CONFIG.validation.maxAge) {
+        return { valid: false, error: `Please check the Date of Birth` };
+      }
+      break;
+
+    case "dlnPid":
+      if (!CONFIG.validation.dlnPattern.test(val)) {
+        return {
+          valid: false,
+          error: `${label} must be a valid Michigan DLN (letter + 12 digits) or PID (9-12 digits)`,
+        };
+      }
+      break;
+
+    case "tradeVin":
+      if (val && val.length > 0) {
+        if (CONFIG.validation.vinInvalidChars.test(val)) {
+          return {
+            valid: false,
+            error: "VIN cannot contain letters I, O, or Q",
+          };
+        }
+        if (!CONFIG.validation.vinPattern.test(val)) {
+          return {
+            valid: false,
+            error: `VIN must be exactly ${CONFIG.validation.vinLength} alphanumeric characters`,
+          };
+        }
+      }
+      break;
+  }
+
+  return { valid: true, error: null };
+}
+
+function validateCustomerFields(data) {
+  const errors = [];
+
+  // Validate main customer required fields
+  const mainFields = [
+    { name: "firstName", value: data.firstName, label: "First Name", required: true },
+    { name: "lastName", value: data.lastName, label: "Last Name", required: true },
+    { name: "dob", value: data.dob, label: "Date of Birth", required: true },
+    { name: "dlnPid", value: data.dlnPid, label: "DLN/PID", required: true },
+    { name: "tradeVin", value: data.tradeVin, label: "Trade-In VIN", required: false },
+  ];
+
+  for (const field of mainFields) {
+    const result = validateField(field.name, field.value, field.label, field.required);
+    if (!result.valid) {
+      errors.push(result.error);
+    }
+  }
+
+  // Validate co-buyer fields if co-buyer is present
+  if (data.hasCoBuyer && data.coBuyer) {
+    const cbFields = [
+      { name: "firstName", value: data.coBuyer.firstName, label: "Co-Buyer First Name", required: true },
+      { name: "lastName", value: data.coBuyer.lastName, label: "Co-Buyer Last Name", required: true },
+      { name: "dob", value: data.coBuyer.dob, label: "Co-Buyer Date of Birth", required: true },
+      { name: "dlnPid", value: data.coBuyer.dlnPid, label: "Co-Buyer DLN/PID", required: true },
+    ];
+
+    for (const field of cbFields) {
+      const result = validateField(field.name, field.value, field.label, field.required);
+      if (!result.valid) {
+        errors.push(result.error);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    showToast(`Please fix the following issues:\n\n• ${errors.join("\n• ")}`, "warning", 8000);
     return false;
   }
   return true;
@@ -636,7 +898,7 @@ async function handleRunAllChecks() {
     }
   } catch (e) {
     console.error("Start Check Error:", e);
-    alert("Could not start checks: " + e.message);
+    showToast("Could not start checks: " + e.message, "error");
     isRunning = false;
     setButtonsDisabled(false);
     elements.progressSection.classList.add("hidden");
@@ -730,7 +992,7 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
       isRunning = false;
       setButtonsDisabled(false);
       const errorMsg = changes.lastError?.newValue || "An error occurred.";
-      alert("Error: " + errorMsg);
+      showToast("Error: " + errorMsg, "error");
     }
   }
 });
@@ -742,7 +1004,7 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
 async function handleRunOfac() {
   const customerData = getFormData();
   if (!customerData.firstName || !customerData.lastName) {
-    alert("Name is required for OFAC check");
+    showToast("Name is required for OFAC check", "warning");
     return;
   }
 
@@ -753,7 +1015,7 @@ async function handleRunOfac() {
     displayIndividualResult("ofac", result);
   } catch (error) {
     hideLoading();
-    alert("OFAC check failed: " + error.message);
+    showToast("OFAC check failed: " + error.message, "error");
   }
 }
 
@@ -768,14 +1030,14 @@ async function handleRunRepeatOffender() {
     displayIndividualResult("repeatOffender", result);
   } catch (error) {
     hideLoading();
-    alert("Repeat Offender check failed: " + error.message);
+    showToast("Repeat Offender check failed: " + error.message, "error");
   }
 }
 
 async function handleRunTitle() {
   const customerData = getFormData();
   if (!customerData.tradeVin) {
-    alert("VIN is required for title check");
+    showToast("VIN is required for title check", "warning");
     return;
   }
 
@@ -786,7 +1048,7 @@ async function handleRunTitle() {
     displayIndividualResult("title", result);
   } catch (error) {
     hideLoading();
-    alert("Title check failed: " + error.message);
+    showToast("Title check failed: " + error.message, "error");
   }
 }
 
@@ -1148,11 +1410,11 @@ function displayResults(results) {
     <div class="decision-badge ${badgeClass}">
       ${badgeText}
     </div>
-    <p class="decision-text">${decision.reason}</p>
+    <p class="decision-text">${sanitizeHTML(decision.reason)}</p>
     ${
       decision.warnings?.length
         ? '<p class="decision-warnings">' +
-          decision.warnings.join("<br>") +
+          decision.warnings.map((w) => sanitizeHTML(w)).join("<br>") +
           "</p>"
         : ""
     }
@@ -1533,10 +1795,10 @@ async function clearAllHistory() {
 
     await updateHistoryCount();
 
-    alert("All history has been cleared.");
+    showToast("All history has been cleared.", "success");
   } catch (error) {
     console.error("Error clearing history:", error);
-    alert("Failed to clear history. Please try again.");
+    showToast("Failed to clear history. Please try again.", "error");
   }
 }
 
@@ -1550,9 +1812,6 @@ async function populateHistoryModal() {
         '<p class="history-empty">No compliance checks yet</p>';
       return;
     }
-
-    // Store history for later access by download functions
-    window._historyData = history;
 
     elements.historyList.innerHTML = history
       .slice(0, 50)
@@ -1602,17 +1861,17 @@ async function populateHistoryModal() {
         return `
         <div class="history-item" data-index="${index}">
           <div class="history-item-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="history-customer" style="font-weight: 600; font-size: 14px;">${
+            <span class="history-customer" style="font-weight: 600; font-size: 14px;">${sanitizeHTML(
               item.customer
-            }</span>
-            <span class="history-decision ${decisionClass}" style="padding: 2px 8px; border-radius: 4px; font-size: 11px;">${decisionIcon} ${
+            )}</span>
+            <span class="history-decision ${decisionClass}" style="padding: 2px 8px; border-radius: 4px; font-size: 11px;">${decisionIcon} ${sanitizeHTML(
           item.decision
-        }</span>
+        )}</span>
           </div>
-          
+
           <div class="history-meta" style="font-size: 11px; color: #94a3b8; margin: 6px 0;">
             ${dateStr} at ${timeStr}
-            ${item.vin ? ` • VIN: ...${item.vin.slice(-6)}` : " • No Trade-In"}
+            ${item.vin ? ` • VIN: ...${sanitizeHTML(item.vin.slice(-6))}` : " • No Trade-In"}
           </div>
           
           <div class="history-checks" style="display: flex; gap: 12px; margin: 8px 0; font-size: 11px;">
@@ -1666,9 +1925,6 @@ async function populateHistoryModal() {
       `;
       })
       .join("");
-
-    // Store history data for event delegation
-    window._historyData = history;
   } catch (error) {
     console.error("Error populating history:", error);
     elements.historyList.innerHTML =
@@ -1679,7 +1935,7 @@ async function populateHistoryModal() {
 // Print OFAC from history
 function printHistoryOfac(item) {
   if (!item.fullResults?.checks?.ofac) {
-    alert("No OFAC data saved for this entry.");
+    showToast("No OFAC data saved for this entry.", "info");
     return;
   }
   // Temporarily set currentResults for the print function
@@ -1692,7 +1948,7 @@ function printHistoryOfac(item) {
 // Print Repeat Offender from history
 function printHistoryRepeat(item) {
   if (!item.fullResults?.checks?.repeatOffender?.screenshotData) {
-    alert("No Repeat Offender screenshot saved for this entry.");
+    showToast("No Repeat Offender screenshot saved for this entry.", "info");
     return;
   }
   const originalResults = currentResults;
@@ -1704,7 +1960,7 @@ function printHistoryRepeat(item) {
 // Print Title from history
 function printHistoryTitle(item) {
   if (!item.fullResults?.checks?.title?.screenshotData) {
-    alert("No Title/Lien screenshot saved for this entry.");
+    showToast("No Title/Lien screenshot saved for this entry.", "info");
     return;
   }
   const originalResults = currentResults;
@@ -1716,7 +1972,7 @@ function printHistoryTitle(item) {
 // Print All from history
 function printHistoryAll(item) {
   if (!item.fullResults) {
-    alert("No saved results for this entry.");
+    showToast("No saved results for this entry.", "info");
     return;
   }
   const originalResults = currentResults;
@@ -1793,8 +2049,10 @@ async function loadHistoryItem(item) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   } else {
     // Legacy item
-    alert(
-      "History item loaded. Form populated. Please click 'Run All Checks' to refresh results."
+    showToast(
+      "History item loaded. Form populated. Please click 'Run All Checks' to refresh results.",
+      "info",
+      7000
     );
   }
 }
@@ -1803,13 +2061,28 @@ async function loadHistoryItem(item) {
 // MODALS
 // ============================================================================
 
+// Track the element that opened the modal for focus return
+let lastFocusedElement = null;
+
 function showModal(type) {
+  // Store the currently focused element to return focus when modal closes
+  lastFocusedElement = document.activeElement;
+
   if (type === "history") {
     populateHistoryModal();
     elements.historyModal.classList.remove("hidden");
+    // Focus the close button for keyboard users
+    const closeBtn = elements.historyModal.querySelector(".modal-close");
+    if (closeBtn) setTimeout(() => closeBtn.focus(), 100);
   } else if (type === "screenshot") {
     elements.screenshotModal.classList.remove("hidden");
+    // Focus the close button for keyboard users
+    const closeBtn = elements.screenshotModal.querySelector(".modal-close");
+    if (closeBtn) setTimeout(() => closeBtn.focus(), 100);
   }
+
+  // Add keyboard listener for Escape key
+  document.addEventListener("keydown", handleModalKeydown);
 }
 
 function hideModal(type) {
@@ -1817,6 +2090,29 @@ function hideModal(type) {
     elements.historyModal.classList.add("hidden");
   } else if (type === "screenshot") {
     elements.screenshotModal.classList.add("hidden");
+  }
+
+  // Remove keyboard listener
+  document.removeEventListener("keydown", handleModalKeydown);
+
+  // Return focus to the element that opened the modal
+  if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+    lastFocusedElement.focus();
+    lastFocusedElement = null;
+  }
+}
+
+/**
+ * Handle keyboard events for modals (Escape to close)
+ */
+function handleModalKeydown(e) {
+  if (e.key === "Escape") {
+    // Check which modal is open and close it
+    if (!elements.historyModal.classList.contains("hidden")) {
+      hideModal("history");
+    } else if (!elements.screenshotModal.classList.contains("hidden")) {
+      hideModal("screenshot");
+    }
   }
 }
 
@@ -1845,7 +2141,7 @@ function showScreenshot(type) {
     elements.screenshotImage.src = screenshotData;
     showModal("screenshot");
   } else {
-    alert("No screenshot available. The check may not have captured an image.");
+    showToast("No screenshot available. The check may not have captured an image.", "info");
   }
 }
 
@@ -1883,7 +2179,7 @@ function downloadScreenshot() {
 // Print Repeat Offender screenshot
 function printRepeatScreenshot() {
   if (!currentResults?.checks?.repeatOffender?.screenshotData) {
-    alert("No Repeat Offender screenshot available.");
+    showToast("No Repeat Offender screenshot available.", "info");
     return;
   }
 
@@ -1918,9 +2214,9 @@ function printRepeatScreenshot() {
         <div class="header">
           <h2>Michigan Repeat Offender Check</h2>
           <div class="header-info">
-            <p><strong>Customer:</strong> ${customer?.firstName || ""} ${
+            <p><strong>Customer:</strong> ${sanitizeHTML(customer?.firstName || "")} ${sanitizeHTML(
     customer?.lastName || ""
-  }</p>
+  )}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -1959,7 +2255,7 @@ function printRepeatScreenshot() {
 // Print Title/Lien screenshot
 function printTitleScreenshot() {
   if (!currentResults?.checks?.title?.screenshotData) {
-    alert("No Title/Lien screenshot available.");
+    showToast("No Title/Lien screenshot available.", "info");
     return;
   }
 
@@ -1994,7 +2290,7 @@ function printTitleScreenshot() {
         <div class="header">
           <h2>Michigan Title & Lien Check</h2>
           <div class="header-info">
-            <p><strong>VIN:</strong> ${vin}</p>
+            <p><strong>VIN:</strong> ${sanitizeHTML(vin)}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2031,7 +2327,7 @@ function printTitleScreenshot() {
 // Print OFAC report
 async function printOfacReport() {
   if (!currentResults?.checks?.ofac) {
-    alert("No OFAC results available.");
+    showToast("No OFAC results available.", "info");
     return;
   }
 
@@ -2217,7 +2513,7 @@ async function printOfacReport() {
 // Print Co-Buyer OFAC Report
 async function printCoBuyerOfacReport() {
   if (!currentResults?.checks?.coBuyerOfac) {
-    alert("No Co-Buyer OFAC results available.");
+    showToast("No Co-Buyer OFAC results available.", "info");
     return;
   }
 
@@ -2307,24 +2603,24 @@ async function printCoBuyerOfacReport() {
       <div class="subject">
         <h3>CO-BUYER SUBJECT SCREENED</h3>
         <table>
-          <tr><td><strong>First Name:</strong></td><td>${
+          <tr><td><strong>First Name:</strong></td><td>${sanitizeHTML(
             coBuyer?.firstName || ""
-          }</td></tr>
-          <tr><td><strong>Middle Name:</strong></td><td>${
+          )}</td></tr>
+          <tr><td><strong>Middle Name:</strong></td><td>${sanitizeHTML(
             coBuyer?.middleName || ""
-          }</td></tr>
-          <tr><td><strong>Last Name:</strong></td><td>${
+          )}</td></tr>
+          <tr><td><strong>Last Name:</strong></td><td>${sanitizeHTML(
             coBuyer?.lastName || ""
-          }</td></tr>
-          <tr><td><strong>Suffix:</strong></td><td>${
+          )}</td></tr>
+          <tr><td><strong>Suffix:</strong></td><td>${sanitizeHTML(
             coBuyer?.suffix || ""
-          }</td></tr>
-          <tr><td><strong>Date of Birth:</strong></td><td>${
+          )}</td></tr>
+          <tr><td><strong>Date of Birth:</strong></td><td>${sanitizeHTML(
             coBuyer?.dob || "Not Provided"
-          }</td></tr>
-          <tr><td><strong>DLN/PID:</strong></td><td>${
+          )}</td></tr>
+          <tr><td><strong>DLN/PID:</strong></td><td>${sanitizeHTML(
             coBuyer?.dlnPid || "Not Provided"
-          }</td></tr>
+          )}</td></tr>
         </table>
       </div>
 
@@ -2346,11 +2642,11 @@ async function printCoBuyerOfacReport() {
               .map(
                 (m) => `
               <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                <strong>${m.name}</strong> (Score: ${(
+                <strong>${sanitizeHTML(m.name)}</strong> (Score: ${(
                   m.similarity * 100
                 ).toFixed(1)}%)<br>
-                Type: ${m.type} | ID: ${m.id} | Program: ${m.program}<br>
-                ${m.remarks ? `Remarks: ${m.remarks}` : ""}
+                Type: ${sanitizeHTML(m.type)} | ID: ${sanitizeHTML(m.id)} | Program: ${sanitizeHTML(m.program)}<br>
+                ${m.remarks ? `Remarks: ${sanitizeHTML(m.remarks)}` : ""}
               </div>
             `
               )
@@ -2384,7 +2680,7 @@ async function printCoBuyerOfacReport() {
 async function printCoBuyerRepeatScreenshot() {
   const result = currentResults?.checks?.coBuyerRepeatOffender;
   if (!result || !result.screenshotData) {
-    alert("No Co-Buyer Repeat Offender screenshot available.");
+    showToast("No Co-Buyer Repeat Offender screenshot available.", "info");
     return;
   }
 
@@ -2427,9 +2723,9 @@ async function printCoBuyerRepeatScreenshot() {
         <div class="header">
           <h2>Michigan Repeat Offender Check (Co-Buyer)</h2>
           <div class="header-info">
-            <p><strong>Co-Buyer:</strong> ${coBuyer?.firstName || ""} ${
+            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
     coBuyer?.lastName || ""
-  } ${coBuyer?.suffix || ""}</p>
+  )} ${sanitizeHTML(coBuyer?.suffix || "")}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2475,7 +2771,7 @@ async function printCoBuyerRepeatScreenshot() {
 // Print All Reports - Single combined document with page breaks
 async function printAllReports() {
   if (!currentResults) {
-    alert("No results to print.");
+    showToast("No results to print.", "info");
     return;
   }
 
@@ -2573,13 +2869,13 @@ async function printAllReports() {
         </div>
         <div class="subject-box">
           <h3>CO-BUYER SUBJECT SCREENED</h3>
-          <p><strong>Name:</strong> ${coBuyer?.firstName || ""} ${
+          <p><strong>Name:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
       coBuyer?.middleName || ""
-    } ${coBuyer?.lastName || ""}${
-      coBuyer?.suffix ? " " + coBuyer.suffix : ""
+    )} ${sanitizeHTML(coBuyer?.lastName || "")}${
+      coBuyer?.suffix ? " " + sanitizeHTML(coBuyer.suffix) : ""
     }</p>
-          <p><strong>DOB:</strong> ${coBuyer?.dob || "Not Provided"}</p>
-          <p><strong>DLN/PID:</strong> ${coBuyer?.dlnPid || "Not Provided"}</p>
+          <p><strong>DOB:</strong> ${sanitizeHTML(coBuyer?.dob || "Not Provided")}</p>
+          <p><strong>DLN/PID:</strong> ${sanitizeHTML(coBuyer?.dlnPid || "Not Provided")}</p>
         </div>
         <div class="result-box ${cbOfac.passed ? "passed" : "failed"}">
           <h2>${cbOfac.passed ? "✓ NO MATCH FOUND" : "⚠ POTENTIAL MATCH"}</h2>
@@ -2605,9 +2901,9 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Repeat Offender Check</h2>
           <div class="header-info">
-            <p><strong>Customer:</strong> ${customer?.firstName || ""} ${
+            <p><strong>Customer:</strong> ${sanitizeHTML(customer?.firstName || "")} ${sanitizeHTML(
       customer?.lastName || ""
-    }</p>
+    )}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2630,9 +2926,9 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Repeat Offender Check (Co-Buyer)</h2>
           <div class="header-info">
-            <p><strong>Co-Buyer:</strong> ${coBuyer?.firstName || ""} ${
+            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
       coBuyer?.lastName || ""
-    }</p>
+    )}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2655,7 +2951,7 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Title & Lien Check</h2>
           <div class="header-info">
-            <p><strong>VIN:</strong> ${customer?.tradeVin || "N/A"}</p>
+            <p><strong>VIN:</strong> ${sanitizeHTML(customer?.tradeVin || "N/A")}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2772,7 +3068,7 @@ function hideLoading() {
 
 async function handleExport() {
   if (!currentResults) {
-    alert("No results to export. Please run compliance checks first.");
+    showToast("No results to export. Please run compliance checks first.", "info");
     return;
   }
 

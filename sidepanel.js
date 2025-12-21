@@ -641,15 +641,40 @@ function validateField(fieldName, value, label, required = true) {
       break;
 
     case "dob":
-      if (!CONFIG.validation.dobPattern.test(val)) {
+      // HTML date inputs return YYYY-MM-DD, also accept MM/DD/YYYY
+      let normalizedDob = val;
+      let month, day, year;
+
+      // Check for YYYY-MM-DD format (HTML date input)
+      const isoPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+      const usPattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+      if (isoPattern.test(val)) {
+        // Convert YYYY-MM-DD to MM/DD/YYYY for consistency
+        const [, y, m, d] = val.match(isoPattern);
+        year = parseInt(y);
+        month = parseInt(m);
+        day = parseInt(d);
+        normalizedDob = `${m}/${d}/${y}`;
+      } else if (usPattern.test(val)) {
+        const [, m, d, y] = val.match(usPattern);
+        month = parseInt(m);
+        day = parseInt(d);
+        year = parseInt(y);
+      } else {
         return {
           valid: false,
-          error: `${label} must be in MM/DD/YYYY format`,
+          error: `${label} must be a valid date`,
         };
       }
-      // Age validation
-      const [month, day, year] = val.split("/").map(Number);
+
+      // Validate date is real
       const birthDate = new Date(year, month - 1, day);
+      if (birthDate.getMonth() !== month - 1 || birthDate.getDate() !== day) {
+        return { valid: false, error: `${label} is not a valid date` };
+      }
+
+      // Age validation
       const ageMs = Date.now() - birthDate.getTime();
       const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
       if (ageYears < CONFIG.validation.minAge) {
@@ -698,15 +723,35 @@ function validateCustomerFields(data) {
 
   // Validate main customer required fields
   const mainFields = [
-    { name: "firstName", value: data.firstName, label: "First Name", required: true },
-    { name: "lastName", value: data.lastName, label: "Last Name", required: true },
+    {
+      name: "firstName",
+      value: data.firstName,
+      label: "First Name",
+      required: true,
+    },
+    {
+      name: "lastName",
+      value: data.lastName,
+      label: "Last Name",
+      required: true,
+    },
     { name: "dob", value: data.dob, label: "Date of Birth", required: true },
     { name: "dlnPid", value: data.dlnPid, label: "DLN/PID", required: true },
-    { name: "tradeVin", value: data.tradeVin, label: "Trade-In VIN", required: false },
+    {
+      name: "tradeVin",
+      value: data.tradeVin,
+      label: "Trade-In VIN",
+      required: false,
+    },
   ];
 
   for (const field of mainFields) {
-    const result = validateField(field.name, field.value, field.label, field.required);
+    const result = validateField(
+      field.name,
+      field.value,
+      field.label,
+      field.required
+    );
     if (!result.valid) {
       errors.push(result.error);
     }
@@ -715,14 +760,39 @@ function validateCustomerFields(data) {
   // Validate co-buyer fields if co-buyer is present
   if (data.hasCoBuyer && data.coBuyer) {
     const cbFields = [
-      { name: "firstName", value: data.coBuyer.firstName, label: "Co-Buyer First Name", required: true },
-      { name: "lastName", value: data.coBuyer.lastName, label: "Co-Buyer Last Name", required: true },
-      { name: "dob", value: data.coBuyer.dob, label: "Co-Buyer Date of Birth", required: true },
-      { name: "dlnPid", value: data.coBuyer.dlnPid, label: "Co-Buyer DLN/PID", required: true },
+      {
+        name: "firstName",
+        value: data.coBuyer.firstName,
+        label: "Co-Buyer First Name",
+        required: true,
+      },
+      {
+        name: "lastName",
+        value: data.coBuyer.lastName,
+        label: "Co-Buyer Last Name",
+        required: true,
+      },
+      {
+        name: "dob",
+        value: data.coBuyer.dob,
+        label: "Co-Buyer Date of Birth",
+        required: true,
+      },
+      {
+        name: "dlnPid",
+        value: data.coBuyer.dlnPid,
+        label: "Co-Buyer DLN/PID",
+        required: true,
+      },
     ];
 
     for (const field of cbFields) {
-      const result = validateField(field.name, field.value, field.label, field.required);
+      const result = validateField(
+        field.name,
+        field.value,
+        field.label,
+        field.required
+      );
       if (!result.valid) {
         errors.push(result.error);
       }
@@ -730,7 +800,11 @@ function validateCustomerFields(data) {
   }
 
   if (errors.length > 0) {
-    showToast(`Please fix the following issues:\n\n• ${errors.join("\n• ")}`, "warning", 8000);
+    showToast(
+      `Please fix the following issues:\n\n• ${errors.join("\n• ")}`,
+      "warning",
+      8000
+    );
     return false;
   }
   return true;
@@ -1871,7 +1945,11 @@ async function populateHistoryModal() {
 
           <div class="history-meta" style="font-size: 11px; color: #94a3b8; margin: 6px 0;">
             ${dateStr} at ${timeStr}
-            ${item.vin ? ` • VIN: ...${sanitizeHTML(item.vin.slice(-6))}` : " • No Trade-In"}
+            ${
+              item.vin
+                ? ` • VIN: ...${sanitizeHTML(item.vin.slice(-6))}`
+                : " • No Trade-In"
+            }
           </div>
           
           <div class="history-checks" style="display: flex; gap: 12px; margin: 8px 0; font-size: 11px;">
@@ -2141,7 +2219,10 @@ function showScreenshot(type) {
     elements.screenshotImage.src = screenshotData;
     showModal("screenshot");
   } else {
-    showToast("No screenshot available. The check may not have captured an image.", "info");
+    showToast(
+      "No screenshot available. The check may not have captured an image.",
+      "info"
+    );
   }
 }
 
@@ -2214,9 +2295,9 @@ function printRepeatScreenshot() {
         <div class="header">
           <h2>Michigan Repeat Offender Check</h2>
           <div class="header-info">
-            <p><strong>Customer:</strong> ${sanitizeHTML(customer?.firstName || "")} ${sanitizeHTML(
-    customer?.lastName || ""
-  )}</p>
+            <p><strong>Customer:</strong> ${sanitizeHTML(
+              customer?.firstName || ""
+            )} ${sanitizeHTML(customer?.lastName || "")}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2645,7 +2726,9 @@ async function printCoBuyerOfacReport() {
                 <strong>${sanitizeHTML(m.name)}</strong> (Score: ${(
                   m.similarity * 100
                 ).toFixed(1)}%)<br>
-                Type: ${sanitizeHTML(m.type)} | ID: ${sanitizeHTML(m.id)} | Program: ${sanitizeHTML(m.program)}<br>
+                Type: ${sanitizeHTML(m.type)} | ID: ${sanitizeHTML(
+                  m.id
+                )} | Program: ${sanitizeHTML(m.program)}<br>
                 ${m.remarks ? `Remarks: ${sanitizeHTML(m.remarks)}` : ""}
               </div>
             `
@@ -2723,9 +2806,11 @@ async function printCoBuyerRepeatScreenshot() {
         <div class="header">
           <h2>Michigan Repeat Offender Check (Co-Buyer)</h2>
           <div class="header-info">
-            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
-    coBuyer?.lastName || ""
-  )} ${sanitizeHTML(coBuyer?.suffix || "")}</p>
+            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(
+              coBuyer?.firstName || ""
+            )} ${sanitizeHTML(coBuyer?.lastName || "")} ${sanitizeHTML(
+    coBuyer?.suffix || ""
+  )}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2869,13 +2954,17 @@ async function printAllReports() {
         </div>
         <div class="subject-box">
           <h3>CO-BUYER SUBJECT SCREENED</h3>
-          <p><strong>Name:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
-      coBuyer?.middleName || ""
-    )} ${sanitizeHTML(coBuyer?.lastName || "")}${
-      coBuyer?.suffix ? " " + sanitizeHTML(coBuyer.suffix) : ""
-    }</p>
-          <p><strong>DOB:</strong> ${sanitizeHTML(coBuyer?.dob || "Not Provided")}</p>
-          <p><strong>DLN/PID:</strong> ${sanitizeHTML(coBuyer?.dlnPid || "Not Provided")}</p>
+          <p><strong>Name:</strong> ${sanitizeHTML(
+            coBuyer?.firstName || ""
+          )} ${sanitizeHTML(coBuyer?.middleName || "")} ${sanitizeHTML(
+      coBuyer?.lastName || ""
+    )}${coBuyer?.suffix ? " " + sanitizeHTML(coBuyer.suffix) : ""}</p>
+          <p><strong>DOB:</strong> ${sanitizeHTML(
+            coBuyer?.dob || "Not Provided"
+          )}</p>
+          <p><strong>DLN/PID:</strong> ${sanitizeHTML(
+            coBuyer?.dlnPid || "Not Provided"
+          )}</p>
         </div>
         <div class="result-box ${cbOfac.passed ? "passed" : "failed"}">
           <h2>${cbOfac.passed ? "✓ NO MATCH FOUND" : "⚠ POTENTIAL MATCH"}</h2>
@@ -2901,9 +2990,9 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Repeat Offender Check</h2>
           <div class="header-info">
-            <p><strong>Customer:</strong> ${sanitizeHTML(customer?.firstName || "")} ${sanitizeHTML(
-      customer?.lastName || ""
-    )}</p>
+            <p><strong>Customer:</strong> ${sanitizeHTML(
+              customer?.firstName || ""
+            )} ${sanitizeHTML(customer?.lastName || "")}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2926,9 +3015,9 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Repeat Offender Check (Co-Buyer)</h2>
           <div class="header-info">
-            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer?.firstName || "")} ${sanitizeHTML(
-      coBuyer?.lastName || ""
-    )}</p>
+            <p><strong>Co-Buyer:</strong> ${sanitizeHTML(
+              coBuyer?.firstName || ""
+            )} ${sanitizeHTML(coBuyer?.lastName || "")}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -2951,7 +3040,9 @@ async function printAllReports() {
         <div class="header">
           <h2>Michigan Title & Lien Check</h2>
           <div class="header-info">
-            <p><strong>VIN:</strong> ${sanitizeHTML(customer?.tradeVin || "N/A")}</p>
+            <p><strong>VIN:</strong> ${sanitizeHTML(
+              customer?.tradeVin || "N/A"
+            )}</p>
             <p><strong>Date:</strong> ${timestamp}</p>
           </div>
         </div>
@@ -3068,7 +3159,10 @@ function hideLoading() {
 
 async function handleExport() {
   if (!currentResults) {
-    showToast("No results to export. Please run compliance checks first.", "info");
+    showToast(
+      "No results to export. Please run compliance checks first.",
+      "info"
+    );
     return;
   }
 

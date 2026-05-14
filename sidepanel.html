@@ -7,11 +7,9 @@
     <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
-    <!-- Skip to main content link for keyboard users -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <div class="compliance-hub">
-      <!-- Header -->
       <header class="hub-header">
         <div class="header-content">
           <div class="logo">
@@ -24,54 +22,29 @@
         </div>
       </header>
 
-      <!-- Main Content -->
       <main id="main-content" class="hub-main" role="main">
-        <!-- Customer Information Section (Required) -->
         <section class="input-section">
           <h3 class="section-title">
-            <span class="section-icon">👤</span>
+            <span class="section-icon icon icon-user"></span>
             Customer Information
           </h3>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="firstName"
-                >First Name <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="firstName"
-                placeholder="John"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="firstName">First Name <span class="required">*</span></label>
+              <input type="text" id="firstName" placeholder="John" autocomplete="off" aria-required="true" />
             </div>
-
             <div class="form-group">
               <label for="middleName">Middle Name</label>
-              <input
-                type="text"
-                id="middleName"
-                placeholder="Robert"
-                autocomplete="off"
-              />
+              <input type="text" id="middleName" placeholder="Robert" autocomplete="off" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="lastName"
-                >Last Name <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="lastName"
-                placeholder="Smith"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="lastName">Last Name <span class="required">*</span></label>
+              <input type="text" id="lastName" placeholder="Smith" autocomplete="off" aria-required="true" />
             </div>
-
             <div class="form-group form-group-small">
               <label for="suffix">Suffix</label>
               <select id="suffix">
@@ -87,29 +60,16 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="dob"
-                >Date of Birth <span class="required">*</span></label
-              >
+              <label for="dob">Date of Birth <span class="required">*</span></label>
               <input type="date" id="dob" aria-required="true" />
             </div>
-
             <div class="form-group">
-              <label for="dlnPid"
-                >DLN/PID <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="dlnPid"
-                placeholder="S123456789012"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="dlnPid">DLN/PID <span class="required">*</span></label>
+              <input type="text" id="dlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" />
             </div>
           </div>
-
         </section>
 
-        <!-- Co-Buyer Toggle -->
         <div class="cobuyer-toggle">
           <label class="checkbox-label">
             <input type="checkbox" id="hasCoBuyer" />
@@ -117,52 +77,28 @@
           </label>
         </div>
 
-        <!-- Co-Buyer Section (Hidden by default) -->
         <section id="coBuyerSection" class="input-section cobuyer-section hidden">
           <h3 class="section-title">
-            <span class="section-icon">👥</span>
+            <span class="section-icon icon icon-users"></span>
             Co-Buyer Information
           </h3>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="cbFirstName"
-                >First Name <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="cbFirstName"
-                placeholder="Jane"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="cbFirstName">First Name <span class="required">*</span></label>
+              <input type="text" id="cbFirstName" placeholder="Jane" autocomplete="off" aria-required="true" />
             </div>
-
             <div class="form-group form-group-small">
               <label for="cbMiddleName">Middle</label>
-              <input
-                type="text"
-                id="cbMiddleName"
-                placeholder="M"
-                autocomplete="off"
-              />
+              <input type="text" id="cbMiddleName" placeholder="M" autocomplete="off" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="cbLastName"
-                >Last Name <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="cbLastName"
-                placeholder="Doe"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="cbLastName">Last Name <span class="required">*</span></label>
+              <input type="text" id="cbLastName" placeholder="Doe" autocomplete="off" aria-required="true" />
             </div>
-
             <div class="form-group form-group-small">
               <label for="cbSuffix">Suffix</label>
               <select id="cbSuffix">
@@ -178,110 +114,85 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label for="cbDob"
-                >Date of Birth <span class="required">*</span></label
-              >
+              <label for="cbDob">Date of Birth <span class="required">*</span></label>
               <input type="date" id="cbDob" aria-required="true" />
             </div>
-
             <div class="form-group">
-              <label for="cbDlnPid"
-                >DLN/PID <span class="required">*</span></label
-              >
-              <input
-                type="text"
-                id="cbDlnPid"
-                placeholder="S123456789012"
-                autocomplete="off"
-                aria-required="true"
-              />
+              <label for="cbDlnPid">DLN/PID <span class="required">*</span></label>
+              <input type="text" id="cbDlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" />
             </div>
           </div>
         </section>
 
-        <!-- Trade-In Section (Optional) -->
         <section class="input-section trade-section">
-          <h3 class="section-title" id="tradeSectionHeader" style="cursor: pointer;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="section-icon">🚗</span>
+          <h3 class="section-title trade-section-title" id="tradeSectionHeader">
+            <span class="trade-title-left">
+              <span class="section-icon icon icon-car"></span>
               Trade-In Vehicle
-            </div>
+            </span>
             <span class="optional-label">(Optional)</span>
-            <span class="section-toggle" style="margin-left: 8px; transition: transform 0.3s;">▼</span>
+            <span class="section-toggle icon icon-chevron"></span>
           </h3>
 
           <div id="tradeSectionContent" class="section-content collapsed">
             <div class="form-row">
               <div class="form-group">
                 <label for="tradeVin">VIN</label>
-                <input
-                  type="text"
-                  id="tradeVin"
-                  placeholder="1HGBH41JXMN109186"
-                  maxlength="17"
-                  autocomplete="off"
-                />
+                <input type="text" id="tradeVin" placeholder="1HGBH41JXMN109186" maxlength="17" autocomplete="off" />
                 <small class="helper-text">Leave blank if no trade-in</small>
               </div>
             </div>
 
             <div class="trade-hint">
-              💡 Title/lien check only runs if VIN provided
+              <span class="icon icon-file"></span>
+              Title/lien check only runs if VIN provided
             </div>
           </div>
         </section>
 
-        <!-- Action Buttons -->
         <section class="action-section">
           <div class="main-actions">
             <button id="runAllChecksBtn" class="btn-primary btn-large">
-              <span class="btn-icon">▶️</span>
+              <span class="btn-icon icon icon-play"></span>
               Run All Checks
             </button>
-            <button id="clearBtn" class="btn-secondary">
-              <span class="btn-icon">🗑️</span>
+            <button id="clearBtn" class="btn-secondary btn-ghost">
+              <span class="btn-icon icon icon-trash"></span>
               Clear
             </button>
           </div>
 
           <div class="individual-checks">
-            <button id="runOfacBtn" class="btn-secondary">
-              <span class="btn-icon">🌐</span>
+            <button id="runOfacBtn" class="btn-secondary btn-ghost">
+              <span class="btn-icon icon icon-globe"></span>
               OFAC Only
             </button>
-            <button id="runRepeatOffenderBtn" class="btn-secondary">
-              <span class="btn-icon">🚫</span>
+            <button id="runRepeatOffenderBtn" class="btn-secondary btn-ghost">
+              <span class="btn-icon icon icon-ban"></span>
               Repeat Offender
             </button>
-            <button id="runTitleBtn" class="btn-secondary" disabled>
-              <span class="btn-icon">📄</span>
+            <button id="runTitleBtn" class="btn-secondary btn-ghost" disabled>
+              <span class="btn-icon icon icon-file"></span>
               Title/Lien
             </button>
           </div>
         </section>
 
-        <!-- Progress Section (Hidden by default) -->
         <section id="progressSection" class="progress-section hidden" aria-live="polite" aria-atomic="true">
           <h3 class="section-title">Check Progress</h3>
 
           <div class="check-items">
             <div class="check-item">
-              <span class="check-name">🌐 OFAC Screening</span>
-              <span id="ofacStatus" class="status-indicator status-waiting"
-                >⏳ Waiting</span
-              >
+              <span class="check-name"><span class="check-icon icon icon-globe"></span>OFAC Screening</span>
+              <span id="ofacStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
             <div class="check-item">
-              <span class="check-name">🚫 Repeat Offender</span>
-              <span id="repeatStatus" class="status-indicator status-waiting"
-                >⏳ Waiting</span
-              >
+              <span class="check-name"><span class="check-icon icon icon-ban"></span>Repeat Offender</span>
+              <span id="repeatStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
             <div class="check-item" id="titleCheckItem">
-              <span class="check-name">📄 Title & Lien</span>
-              <span id="titleStatus" class="status-indicator status-waiting"
-                >⏳ Waiting</span
-              >
+              <span class="check-name"><span class="check-icon icon icon-file"></span>Title &amp; Lien</span>
+              <span id="titleStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
           </div>
 
@@ -295,162 +206,118 @@
           </div>
         </section>
 
-        <!-- Results Section (Hidden by default) -->
         <section id="resultsSection" class="results-section hidden">
-          <!-- Final Decision -->
-          <div id="finalDecision" class="final-decision" role="status" aria-live="polite">
-            <div class="decision-badge decision-approved">✅ APPROVED</div>
-            <p class="decision-text">All checks passed. Ready to proceed.</p>
-          </div>
+          <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
 
-          <!-- Individual Results -->
           <div class="results-grid">
-            <!-- OFAC Result -->
             <div class="result-card" id="ofacResultCard">
               <div class="result-header">
-                <h4>🌐 OFAC Screening</h4>
-                <span class="result-status status-pass" id="ofacResultStatus"
-                  >✅ Pass</span
-                >
+                <h4><span class="check-icon icon icon-globe"></span>OFAC Screening</h4>
+                <span class="result-status status-pass" id="ofacResultStatus">Pass</span>
               </div>
-              <p class="result-detail" id="ofacResultDetail">
-                No matches in SDN list
-              </p>
+              <p class="result-detail" id="ofacResultDetail">No matches in SDN list</p>
               <div class="result-actions">
                 <button class="btn-secondary btn-sm" id="printOfacBtn">
-                  🖨️ Print
+                  <span class="icon icon-printer"></span>Print
                 </button>
-
               </div>
             </div>
 
-            <!-- Repeat Offender Result -->
             <div class="result-card" id="repeatResultCard">
               <div class="result-header">
-                <h4>🚫 Repeat Offender</h4>
-                <span class="result-status status-pass" id="repeatResultStatus"
-                  >✅ Pass</span
-                >
+                <h4><span class="check-icon icon icon-ban"></span>Repeat Offender</h4>
+                <span class="result-status status-pass" id="repeatResultStatus">Pass</span>
               </div>
-              <p class="result-detail" id="repeatResultDetail">
-                No offenses found
-              </p>
+              <p class="result-detail" id="repeatResultDetail">No offenses found</p>
               <div class="result-actions">
                 <button class="btn-secondary btn-sm hidden" id="printRepeatBtn">
-                  🖨️ Print
+                  <span class="icon icon-printer"></span>Print
                 </button>
-
               </div>
             </div>
 
-            <!-- Title/Lien Result -->
             <div class="result-card" id="titleResultCard">
               <div class="result-header">
-                <h4>📄 Title & Lien</h4>
-                <span
-                  class="result-status status-skipped"
-                  id="titleResultStatus"
-                  >⏭️ No Trade</span
-                >
+                <h4><span class="check-icon icon icon-file"></span>Title &amp; Lien</h4>
+                <span class="result-status status-skipped" id="titleResultStatus">No Trade</span>
               </div>
-              <div id="titleResultDetail">
-                <p>2025 HYUNDAI SANTA FE</p>
-                <p>Title: PAPER (12/2/2025)</p>
-                <p>Lien: NO ACTIVE LIENS</p>
-                <p>No title brands</p>
-              </div>
+              <p class="result-detail" id="titleResultDetail">No trade-in provided</p>
               <div class="result-actions">
                 <button class="btn-secondary btn-sm hidden" id="printTitleBtn">
-                  🖨️ Print
+                  <span class="icon icon-printer"></span>Print
                 </button>
-
               </div>
             </div>
           </div>
 
-          <!-- Co-Buyer Results (Hidden by default) -->
           <div id="coBuyerResultsSection" class="cobuyer-results hidden">
-            <h3 class="section-subtitle">👥 Co-Buyer Results</h3>
+            <h3 class="section-subtitle"><span class="icon icon-users"></span>Co-Buyer Results</h3>
             <div class="results-grid">
-              <!-- Co-Buyer OFAC Result -->
               <div class="result-card" id="cbOfacResultCard">
                 <div class="result-header">
-                  <h4>🌐 OFAC (Co-Buyer)</h4>
-                  <span class="result-status status-pass" id="cbOfacResultStatus"
-                    >✅ Pass</span
-                  >
+                  <h4><span class="check-icon icon icon-globe"></span>OFAC (Co-Buyer)</h4>
+                  <span class="result-status status-pass" id="cbOfacResultStatus">Pass</span>
                 </div>
-                <p class="result-detail" id="cbOfacResultDetail">
-                  No matches in SDN list
-                </p>
+                <p class="result-detail" id="cbOfacResultDetail">No matches in SDN list</p>
                 <div class="result-actions">
                   <button class="btn-secondary btn-sm" id="printCbOfacBtn">
-                    🖨️ Print
+                    <span class="icon icon-printer"></span>Print
                   </button>
                 </div>
               </div>
 
-              <!-- Co-Buyer Repeat Offender Result -->
               <div class="result-card" id="cbRepeatResultCard">
                 <div class="result-header">
-                  <h4>🚫 Repeat Offender (Co-Buyer)</h4>
-                  <span class="result-status status-pass" id="cbRepeatResultStatus"
-                    >✅ Pass</span
-                  >
+                  <h4><span class="check-icon icon icon-ban"></span>Repeat Offender (Co-Buyer)</h4>
+                  <span class="result-status status-pass" id="cbRepeatResultStatus">Pass</span>
                 </div>
-                <p class="result-detail" id="cbRepeatResultDetail">
-                  No offenses found
-                </p>
+                <p class="result-detail" id="cbRepeatResultDetail">No offenses found</p>
                 <div class="result-actions">
                   <button class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
-                    🖨️ Print
+                    <span class="icon icon-printer"></span>Print
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- All Actions -->
           <div class="all-actions">
             <button id="printAllBtn" class="btn-secondary">
-              <span class="btn-icon">🖨️</span>
+              <span class="btn-icon icon icon-printer"></span>
               Print All
             </button>
-
+            <button id="downloadPdfBtn" class="btn-secondary">
+              <span class="btn-icon icon icon-download"></span>
+              Download PDF
+            </button>
           </div>
         </section>
 
-        <!-- History Section -->
         <section class="history-section">
-          <button id="viewHistoryBtn" class="btn-secondary btn-full">
-            <span class="btn-icon">📋</span>
+          <button id="viewHistoryBtn" class="btn-secondary btn-ghost btn-full">
+            <span class="btn-icon icon icon-history"></span>
             View History (<span id="historyCount">0 today</span>)
           </button>
         </section>
       </main>
 
-      <!-- History Modal -->
       <div id="historyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
         <div class="modal-content">
           <div class="modal-header">
             <h3 id="historyModalTitle">Compliance History</h3>
             <button class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
           </div>
-          <div class="modal-body" id="historyList">
-            <!-- History items populated by JS -->
-          </div>
-          <div class="modal-footer" style="padding: 15px; border-top: 1px solid #334155; text-align: center;">
-            <button id="clearAllHistoryBtn" class="btn-secondary" style="background: #dc2626; color: white; border: none;">
-              <span class="btn-icon">🗑️</span>
+          <div class="modal-body" id="historyList"></div>
+          <div class="modal-footer">
+            <button id="clearAllHistoryBtn" class="btn-secondary btn-danger">
+              <span class="btn-icon icon icon-trash"></span>
               Clear All History
             </button>
           </div>
         </div>
       </div>
 
-
-      <!-- Screenshot Modal -->
-      <div id="screenshotModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="screenshotTitle">
+      <div id="screenshotModal" class="modal-overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="screenshotTitle">
         <div class="modal-content screenshot-modal">
           <div class="modal-header">
             <h3 id="screenshotTitle">MDOS Screenshot</h3>
@@ -461,24 +328,21 @@
           </div>
           <div class="modal-actions">
             <button id="printScreenshotBtn" class="btn-primary">
-              <span class="btn-icon">🖨️</span> Print
+              <span class="btn-icon icon icon-printer"></span> Print
             </button>
             <button id="downloadScreenshotBtn" class="btn-secondary">
-              <span class="btn-icon">💾</span> Download PNG
+              <span class="btn-icon icon icon-download"></span> Download PNG
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Loading Overlay -->
       <div id="loadingOverlay" class="loading-overlay hidden" role="alert" aria-live="assertive">
         <div class="loading-spinner" aria-hidden="true"></div>
         <p class="loading-text" id="loadingText">Processing...</p>
       </div>
     </div>
 
-
     <script src="sidepanel.js" type="module"></script>
   </body>
 </html>
-

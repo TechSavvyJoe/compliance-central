@@ -1,0 +1,66 @@
+/**
+ * Toast notifications. Styles live in sidepanel.css (.toast-container, .toast, etc).
+ */
+
+import { ICONS } from "./icons.js";
+
+const TOAST_VARIANTS = {
+  error: { icon: ICONS.x, className: "toast-error" },
+  warning: { icon: ICONS.alertTriangle, className: "toast-warning" },
+  success: { icon: ICONS.check, className: "toast-success" },
+  info: { icon: ICONS.info, className: "toast-info" },
+};
+
+function getContainer() {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "toast-container";
+    container.setAttribute("role", "region");
+    container.setAttribute("aria-label", "Notifications");
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function dismissToast(toast) {
+  if (!toast || !toast.parentNode) return;
+  toast.classList.add("toast-leaving");
+  setTimeout(() => toast.remove(), 200);
+}
+
+export function showToast(message, type = "info", duration = 5000) {
+  const variant = TOAST_VARIANTS[type] || TOAST_VARIANTS.info;
+  const container = getContainer();
+
+  const toast = document.createElement("div");
+  toast.className = `toast ${variant.className}`;
+  toast.setAttribute("role", "alert");
+  toast.setAttribute("aria-live", "polite");
+
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "toast-icon";
+  iconWrap.innerHTML = variant.icon;
+
+  const messageEl = document.createElement("div");
+  messageEl.className = "toast-message";
+  messageEl.textContent = message;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast-close";
+  closeBtn.setAttribute("aria-label", "Dismiss notification");
+  closeBtn.innerHTML = ICONS.x;
+  closeBtn.onclick = () => dismissToast(toast);
+
+  toast.appendChild(iconWrap);
+  toast.appendChild(messageEl);
+  toast.appendChild(closeBtn);
+  container.appendChild(toast);
+
+  if (duration > 0) {
+    setTimeout(() => dismissToast(toast), duration);
+  }
+
+  return toast;
+}

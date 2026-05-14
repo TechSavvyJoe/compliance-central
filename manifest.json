@@ -1,21 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Compliance Central - Michigan Dealer Compliance Hub",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Unified compliance screening for Michigan auto dealers. OFAC sanctions, Repeat Offender, and Title/Lien checks in one sidebar tool.",
   "permissions": [
     "sidePanel",
-    "tabs",
-    "scripting",
     "storage",
     "alarms",
-    "activeTab",
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://dsvsesvc.sos.state.mi.us/*",
     "https://data.opensanctions.org/*",
-    "https://www.michigan.gov/*",
     "https://compliance-central-api.fly.dev/*"
   ],
   "side_panel": {
@@ -40,23 +35,10 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://dsvsesvc.sos.state.mi.us/*",
-        "https://www.michigan.gov/*"
-      ],
-      "js": ["content-scripts/mdos-navigation.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "web_accessible_resources": [
     {
-      "resources": ["lib/html2canvas.min.js"],
-      "matches": [
-        "https://dsvsesvc.sos.state.mi.us/*",
-        "https://www.michigan.gov/*"
-      ]
+      "resources": ["lib/jspdf.umd.min.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

@@ -125,13 +125,20 @@
         </section>
 
         <section class="input-section trade-section">
-          <h3 class="section-title trade-section-title" id="tradeSectionHeader">
+          <h3
+            class="section-title trade-section-title"
+            id="tradeSectionHeader"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            aria-controls="tradeSectionContent"
+          >
             <span class="trade-title-left">
               <span class="section-icon icon icon-car"></span>
               Trade-In Vehicle
             </span>
             <span class="optional-label">(Optional)</span>
-            <span class="section-toggle icon icon-chevron"></span>
+            <span class="section-toggle icon icon-chevron" aria-hidden="true"></span>
           </h3>
 
           <div id="tradeSectionContent" class="section-content collapsed">

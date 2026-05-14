@@ -15,18 +15,40 @@ const STATUS_MAP = {
   skipped: { icon: ICONS.skip, label: "Skipped", cls: "status-skipped" },
 };
 
+function renderStatus(cfg, customLabel) {
+  const label = customLabel != null ? sanitizeHTML(customLabel) : sanitizeHTML(cfg.label);
+  return `<span class="status-icon">${cfg.icon}</span>${label}`;
+}
+
 export function setCheckStatus(el, status) {
   if (!el) return;
   const cfg = STATUS_MAP[status] || { icon: "", label: status, cls: "" };
-  el.innerHTML = `<span class="status-icon">${cfg.icon}</span>${cfg.label}`;
+  el.innerHTML = renderStatus(cfg);
   el.className = "status-indicator " + cfg.cls;
 }
 
 function setResultStatus(el, statusKey, customLabel) {
   if (!el) return;
   const cfg = STATUS_MAP[statusKey] || STATUS_MAP.waiting;
-  el.innerHTML = `<span class="status-icon">${cfg.icon}</span>${customLabel || cfg.label}`;
+  el.innerHTML = renderStatus(cfg, customLabel);
   el.className = "result-status " + cfg.cls;
+}
+
+/**
+ * Toggle skeleton-loading appearance on the three result cards.
+ * Used during a Run All Checks in-flight so the UI feels predictive.
+ */
+export function setCardsLoadingState(elements, isLoading) {
+  for (const card of [
+    elements.ofacResultCard,
+    elements.repeatResultCard,
+    elements.titleResultCard,
+    elements.cbOfacResultCard,
+    elements.cbRepeatResultCard,
+  ]) {
+    if (!card) continue;
+    card.classList.toggle("is-loading", isLoading);
+  }
 }
 
 let currentProgress = 0;
@@ -89,22 +111,23 @@ function animateProgress(elements) {
     }
   }
 
-  if (
-    Math.abs(currentProgress - targetProgress) < 0.1 &&
-    targetProgress >= 100
-  ) {
+  // At target: stop the rAF loop until updateProgress sets a new target.
+  if (Math.abs(currentProgress - targetProgress) < 0.1) {
+    currentProgress = targetProgress;
     progressAnimationId = null;
-    if (elements.progressSpinner) {
+    if (targetProgress >= 100 && elements.progressSpinner) {
       setTimeout(() => {
         elements.progressSpinner.style.display = "none";
       }, 400);
     }
-  } else {
-    progressAnimationId = requestAnimationFrame(() => animateProgress(elements));
-    if (elements.progressSpinner) {
-      elements.progressSpinner.style.display = "inline-block";
-    }
+    return;
   }
+
+  // Still animating toward target.
+  if (elements.progressSpinner) {
+    elements.progressSpinner.style.display = "inline-block";
+  }
+  progressAnimationId = requestAnimationFrame(() => animateProgress(elements));
 }
 
 export function displayResults(elements, results) {
@@ -278,6 +301,7 @@ export function displayIndividualResult(elements, type, result) {
     elements.ofacResultDetail.textContent = result.passed
       ? "No matches in SDN list"
       : `${result.matches?.length || 0} potential match(es) found`;
+    elements.printOfacBtn?.classList.remove("hidden");
   } else if (type === "repeatOffender") {
     setResultStatus(
       elements.repeatResultStatus,
@@ -287,6 +311,9 @@ export function displayIndividualResult(elements, type, result) {
     elements.repeatResultDetail.textContent = result.passed
       ? "No offenses found"
       : result.status;
+    if (result.screenshotData) {
+      elements.printRepeatBtn?.classList.remove("hidden");
+    }
   } else if (type === "title") {
     setResultStatus(
       elements.titleResultStatus,
@@ -296,6 +323,9 @@ export function displayIndividualResult(elements, type, result) {
     let detail = `Title: ${result.titleBrand}`;
     if (result.hasLien) detail += `\nLien: ${result.lienHolder || "Yes"}`;
     elements.titleResultDetail.textContent = detail;
+    if (result.screenshotData) {
+      elements.printTitleBtn?.classList.remove("hidden");
+    }
   }
 }
 

@@ -8,10 +8,7 @@
 import { handleMessage } from "./src/worker/message-router.js";
 import { registerAlarmListeners } from "./src/worker/alarms.js";
 
-chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ tabId: tab.id });
-});
-
+// Chrome consumes the toolbar click to open the side panel automatically.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

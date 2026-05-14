@@ -3,6 +3,7 @@
  */
 
 import { CONFIG } from "../../lib/config.js";
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { showToast } from "./toast.js";
 
 export function getFormData(elements) {
@@ -167,20 +168,25 @@ export function validateCustomerFields(data) {
 export async function cacheFormData(elements) {
   const data = getFormData(elements);
   await chrome.storage.session.set({
-    cachedFormData: data,
-    cachedAt: Date.now(),
+    [STORAGE_KEYS.cachedFormData]: data,
+    [STORAGE_KEYS.cachedAt]: Date.now(),
   });
 }
 
 export async function loadCachedFormData(elements) {
   try {
-    const result = await chrome.storage.session.get(["cachedFormData", "cachedAt"]);
-    if (!result.cachedFormData || !result.cachedAt) return;
+    const result = await chrome.storage.session.get([
+      STORAGE_KEYS.cachedFormData,
+      STORAGE_KEYS.cachedAt,
+    ]);
+    const cached = result[STORAGE_KEYS.cachedFormData];
+    const cachedAt = result[STORAGE_KEYS.cachedAt];
+    if (!cached || !cachedAt) return;
 
-    const cacheAge = Date.now() - result.cachedAt;
+    const cacheAge = Date.now() - cachedAt;
     if (cacheAge >= CONFIG.timeouts.formCacheExpiry) return;
 
-    const data = result.cachedFormData;
+    const data = cached;
     elements.firstName.value = data.firstName || "";
     if (elements.middleName) elements.middleName.value = data.middleName || "";
     elements.lastName.value = data.lastName || "";
@@ -190,6 +196,21 @@ export async function loadCachedFormData(elements) {
     elements.tradeVin.value = data.tradeVin || "";
 
     elements.runTitleBtn.disabled = !data.tradeVin;
+
+    // Restore co-buyer section if it was checked.
+    if (data.hasCoBuyer && data.coBuyer && elements.hasCoBuyer) {
+      elements.hasCoBuyer.checked = true;
+      // Notify the toggle listener so the section unhides.
+      elements.hasCoBuyer.dispatchEvent(new Event("change"));
+
+      const co = data.coBuyer;
+      if (elements.cbFirstName) elements.cbFirstName.value = co.firstName || "";
+      if (elements.cbMiddleName) elements.cbMiddleName.value = co.middleName || "";
+      if (elements.cbLastName) elements.cbLastName.value = co.lastName || "";
+      if (elements.cbSuffix) elements.cbSuffix.value = co.suffix || "";
+      if (elements.cbDob) elements.cbDob.value = co.dob || "";
+      if (elements.cbDlnPid) elements.cbDlnPid.value = co.dlnPid || "";
+    }
   } catch (error) {
     console.error("Error loading cached form data:", error);
   }

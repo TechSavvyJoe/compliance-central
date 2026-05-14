@@ -10,6 +10,7 @@ import {
   backendRepeatOffenderCheck,
   backendTitleCheck,
 } from "../../lib/api-client.js";
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { setBadgeForStatus } from "./badge.js";
 import { addToRepeatOffenderHistory } from "./history.js";
 
@@ -21,15 +22,17 @@ export async function handleRepeatOffenderCheck(searchData) {
   }
 
   const screenshotKey =
-    searchData.screenshotStorageKey || "repeatOffenderScreenshot";
+    searchData.screenshotStorageKey || STORAGE_KEYS.repeatOffenderScreenshot;
 
   if (result.result.screenshotData) {
     await chrome.storage.local.set({
       [screenshotKey]: result.result.screenshotData,
-      lastResult: result.result,
+      [STORAGE_KEYS.lastResult]: result.result,
     });
   } else {
-    await chrome.storage.local.set({ lastResult: result.result });
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.lastResult]: result.result,
+    });
   }
 
   await setBadgeForStatus(result.result.status);
@@ -47,7 +50,7 @@ export async function handleTitleCheck(data) {
 
   if (result.result.screenshotData) {
     await chrome.storage.local.set({
-      titleScreenshot: result.result.screenshotData,
+      [STORAGE_KEYS.titleScreenshot]: result.result.screenshotData,
     });
   }
 

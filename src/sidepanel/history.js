@@ -5,6 +5,7 @@
  */
 
 import { CONFIG } from "../../lib/config.js";
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
 import { calculateFinalDecision } from "./checks.js";
@@ -14,8 +15,8 @@ const MAX_ENTRIES = CONFIG.limits.maxHistoryEntries;
 
 export async function purgeOldHistoryEntries() {
   try {
-    const storage = await chrome.storage.local.get("complianceHistory");
-    const history = storage.complianceHistory || [];
+    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+    const history = storage[STORAGE_KEYS.complianceHistory] || [];
     if (history.length === 0) return 0;
 
     const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -29,7 +30,9 @@ export async function purgeOldHistoryEntries() {
 
     const purged = history.length - filtered.length;
     if (purged > 0) {
-      await chrome.storage.local.set({ complianceHistory: filtered });
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.complianceHistory]: filtered,
+      });
     }
     return purged;
   } catch (error) {
@@ -45,8 +48,8 @@ export async function saveToHistory(results) {
       results.finalDecision = calculateFinalDecision(results.checks);
     }
 
-    const storage = await chrome.storage.local.get("complianceHistory");
-    const history = storage.complianceHistory || [];
+    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+    const history = storage[STORAGE_KEYS.complianceHistory] || [];
 
     history.unshift({
       id: Date.now(),
@@ -66,7 +69,9 @@ export async function saveToHistory(results) {
       history.length = MAX_ENTRIES;
     }
 
-    await chrome.storage.local.set({ complianceHistory: history });
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.complianceHistory]: history,
+    });
   } catch (error) {
     console.error("Error saving to history:", error);
   }
@@ -75,8 +80,8 @@ export async function saveToHistory(results) {
 export async function updateHistoryCount(historyCountEl) {
   if (!historyCountEl) return;
   try {
-    const storage = await chrome.storage.local.get("complianceHistory");
-    const history = storage.complianceHistory || [];
+    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+    const history = storage[STORAGE_KEYS.complianceHistory] || [];
     const today = new Date().toDateString();
     const todayCount = history.filter((item) => {
       try {
@@ -97,8 +102,8 @@ export async function updateHistoryCount(historyCountEl) {
 
 export async function populateHistoryModal(historyListEl) {
   try {
-    const storage = await chrome.storage.local.get("complianceHistory");
-    const history = storage.complianceHistory || [];
+    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+    const history = storage[STORAGE_KEYS.complianceHistory] || [];
 
     if (history.length === 0) {
       historyListEl.innerHTML =
@@ -195,12 +200,7 @@ export async function clearAllHistory(historyListEl, historyCountEl) {
   );
   if (!confirmed) return false;
 
-  const doubleConfirmed = confirm(
-    "Final confirmation: Delete all history entries permanently?"
-  );
-  if (!doubleConfirmed) return false;
-
-  await chrome.storage.local.remove("complianceHistory");
+  await chrome.storage.local.remove(STORAGE_KEYS.complianceHistory);
   historyListEl.innerHTML =
     '<p class="history-empty">No history entries</p>';
   await updateHistoryCount(historyCountEl);

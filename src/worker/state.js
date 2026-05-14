@@ -5,15 +5,17 @@
  * updates can't clobber each other.
  */
 
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+
 let stateUpdateLock = Promise.resolve();
 
 export async function atomicStateUpdate(updateFn) {
   stateUpdateLock = stateUpdateLock.then(async () => {
     try {
       const current = await chrome.storage.local.get([
-        "currentResults",
-        "searchProgress",
-        "searchStatus",
+        STORAGE_KEYS.currentResults,
+        STORAGE_KEYS.searchProgress,
+        STORAGE_KEYS.searchStatus,
       ]);
       const updates = updateFn(current);
       if (updates && Object.keys(updates).length > 0) {

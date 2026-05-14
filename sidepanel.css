@@ -616,10 +616,47 @@ body {
   border-radius: var(--border-radius);
   padding: var(--spacing-md);
   border: 1px solid var(--border-color);
-  transition: border-color var(--transition-base);
+  transition: border-color var(--transition-base), opacity var(--transition-base);
 }
 .result-card:hover {
   border-color: rgba(255, 203, 5, 0.2);
+}
+
+/* Skeleton loading state — shown while a Run All Checks is in flight. */
+.result-card.is-loading .result-status {
+  background: var(--bg-input);
+  color: transparent;
+  position: relative;
+  overflow: hidden;
+  min-width: 64px;
+}
+.result-card.is-loading .result-status::after,
+.result-card.is-loading .result-detail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+.result-card.is-loading .result-detail {
+  color: transparent;
+  background: var(--bg-input);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  min-height: 1.2em;
+}
+.result-card.is-loading .result-actions {
+  visibility: hidden;
+}
+@keyframes skeleton-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 .result-header {
   display: flex;

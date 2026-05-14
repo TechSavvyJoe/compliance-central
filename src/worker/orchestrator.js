@@ -7,11 +7,18 @@
  *   from the backend collide. Confirmed by commit f64281c.
  *
  * Progress weighting: OFAC 0-20%, MDOS 20-95%, finalization 95-100%.
+ * `inFlightCheck` is written before each await so the sidepanel can mark
+ * the current row as "Running" with a pulse animation.
  */
 
 import { handleOfacCheck } from "./ofac-check.js";
 import { handleRepeatOffenderCheck, handleTitleCheck } from "./mdos-check.js";
 import { atomicStateUpdate } from "./state.js";
+import {
+  STORAGE_KEYS,
+  SEARCH_STATUS,
+  IN_FLIGHT,
+} from "../../lib/storage-keys.js";
 
 export async function handleRunAllChecks(data) {
   const { customer, hasTrade } = data;
@@ -24,17 +31,22 @@ export async function handleRunAllChecks(data) {
   };
 
   await chrome.storage.local.set({
-    searchStatus: "running",
-    searchProgress: 0,
-    currentResults: results,
+    [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
+    [STORAGE_KEYS.searchProgress]: 0,
+    [STORAGE_KEYS.currentResults]: results,
+    [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
   });
 
   const saveState = async (progress) => {
     await atomicStateUpdate(() => {
-      const update = { currentResults: results };
-      if (progress !== undefined) update.searchProgress = progress;
+      const update = { [STORAGE_KEYS.currentResults]: results };
+      if (progress !== undefined) update[STORAGE_KEYS.searchProgress] = progress;
       return update;
     });
+  };
+
+  const setInFlight = async (key) => {
+    await chrome.storage.local.set({ [STORAGE_KEYS.inFlightCheck]: key });
   };
 
   try {
@@ -85,11 +97,12 @@ export async function handleRunAllChecks(data) {
       };
 
       // 1. Buyer Repeat Offender.
+      await setInFlight(IN_FLIGHT.repeatOffender);
       await updateMdosProgress(0);
       try {
         const customerWithKey = {
           ...customer,
-          screenshotStorageKey: "repeatOffenderScreenshot",
+          screenshotStorageKey: STORAGE_KEYS.repeatOffenderScreenshot,
         };
         await updateMdosProgress(0.2);
         const roResult = await handleRepeatOffenderCheck(customerWithKey);
@@ -99,10 +112,11 @@ export async function handleRunAllChecks(data) {
           const checkRes = roResult.result;
           checkRes.passed = checkRes.status === "eligible";
           const roStorage = await chrome.storage.local.get(
-            "repeatOffenderScreenshot"
+            STORAGE_KEYS.repeatOffenderScreenshot
           );
-          if (roStorage.repeatOffenderScreenshot) {
-            checkRes.screenshotData = roStorage.repeatOffenderScreenshot;
+          if (roStorage[STORAGE_KEYS.repeatOffenderScreenshot]) {
+            checkRes.screenshotData =
+              roStorage[STORAGE_KEYS.repeatOffenderScreenshot];
           }
           results.checks.repeatOffender = checkRes;
         } else {
@@ -125,10 +139,11 @@ export async function handleRunAllChecks(data) {
 
       // 2. Co-Buyer Repeat Offender.
       if (hasCoBuyer) {
+        await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
         try {
           const coBuyerWithKey = {
             ...customer.coBuyer,
-            screenshotStorageKey: "coBuyerRepeatOffenderScreenshot",
+            screenshotStorageKey: STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
           };
           await updateMdosProgress(0.2);
           const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
@@ -138,10 +153,11 @@ export async function handleRunAllChecks(data) {
             const checkRes = cbRoResult.result;
             checkRes.passed = checkRes.status === "eligible";
             const cbStorage = await chrome.storage.local.get(
-              "coBuyerRepeatOffenderScreenshot"
+              STORAGE_KEYS.coBuyerRepeatOffenderScreenshot
             );
-            if (cbStorage.coBuyerRepeatOffenderScreenshot) {
-              checkRes.screenshotData = cbStorage.coBuyerRepeatOffenderScreenshot;
+            if (cbStorage[STORAGE_KEYS.coBuyerRepeatOffenderScreenshot]) {
+              checkRes.screenshotData =
+                cbStorage[STORAGE_KEYS.coBuyerRepeatOffenderScreenshot];
             }
             results.checks.coBuyerRepeatOffender = checkRes;
           } else {
@@ -165,6 +181,7 @@ export async function handleRunAllChecks(data) {
 
       // 3. Title check.
       if (hasTrade) {
+        await setInFlight(IN_FLIGHT.title);
         try {
           await updateMdosProgress(0.2);
           const titleResult = await handleTitleCheck({
@@ -175,10 +192,10 @@ export async function handleRunAllChecks(data) {
           if (titleResult.success) {
             const checkRes = titleResult.result;
             const titleStorage = await chrome.storage.local.get(
-              "titleScreenshot"
+              STORAGE_KEYS.titleScreenshot
             );
-            if (titleStorage.titleScreenshot) {
-              checkRes.screenshotData = titleStorage.titleScreenshot;
+            if (titleStorage[STORAGE_KEYS.titleScreenshot]) {
+              checkRes.screenshotData = titleStorage[STORAGE_KEYS.titleScreenshot];
             }
             results.checks.title = checkRes;
           } else {
@@ -204,16 +221,18 @@ export async function handleRunAllChecks(data) {
     await Promise.all([ofacPromise, coBuyerOfacPromise, mdosPromise]);
 
     await chrome.storage.local.set({
-      searchStatus: "complete",
-      searchProgress: 100,
-      currentResults: results,
+      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.complete,
+      [STORAGE_KEYS.searchProgress]: 100,
+      [STORAGE_KEYS.currentResults]: results,
+      [STORAGE_KEYS.inFlightCheck]: null,
     });
     return { success: true };
   } catch (err) {
     console.error("Run-all error:", err);
     await chrome.storage.local.set({
-      searchStatus: "error",
-      lastError: err.message,
+      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
+      [STORAGE_KEYS.lastError]: err.message,
+      [STORAGE_KEYS.inFlightCheck]: null,
     });
     return { success: false, error: err.message };
   }

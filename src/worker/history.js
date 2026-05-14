@@ -6,12 +6,14 @@
  * per-check "searchHistory" feed kept by the worker.
  */
 
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+
 const MAX_LEGACY_HISTORY = 6;
 
 export async function addToRepeatOffenderHistory(searchData, result) {
   try {
-    const data = await chrome.storage.local.get("searchHistory");
-    const history = data.searchHistory || [];
+    const data = await chrome.storage.local.get(STORAGE_KEYS.searchHistory);
+    const history = data[STORAGE_KEYS.searchHistory] || [];
 
     history.unshift({
       id: Date.now(),
@@ -32,7 +34,7 @@ export async function addToRepeatOffenderHistory(searchData, result) {
       history.length = MAX_LEGACY_HISTORY;
     }
 
-    await chrome.storage.local.set({ searchHistory: history });
+    await chrome.storage.local.set({ [STORAGE_KEYS.searchHistory]: history });
   } catch (err) {
     console.error("Failed to save Repeat Offender history:", err);
   }

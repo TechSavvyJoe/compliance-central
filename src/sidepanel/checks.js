@@ -3,6 +3,8 @@
  * normalize results for the UI.
  */
 
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+
 export async function runOfacCheck(customerData) {
   const response = await chrome.runtime.sendMessage({
     type: "RUN_OFAC_CHECK",
@@ -48,10 +50,12 @@ export async function runRepeatOffenderCheck(customerData) {
   let screenshotData = response.result.screenshotData;
   if (!screenshotData) {
     try {
-      const stored = await chrome.storage.local.get("repeatOffenderScreenshot");
-      if (stored.repeatOffenderScreenshot) {
-        screenshotData = stored.repeatOffenderScreenshot;
-        chrome.storage.local.remove("repeatOffenderScreenshot");
+      const stored = await chrome.storage.local.get(
+        STORAGE_KEYS.repeatOffenderScreenshot
+      );
+      if (stored[STORAGE_KEYS.repeatOffenderScreenshot]) {
+        screenshotData = stored[STORAGE_KEYS.repeatOffenderScreenshot];
+        chrome.storage.local.remove(STORAGE_KEYS.repeatOffenderScreenshot);
       }
     } catch {
       // ignore
@@ -81,10 +85,10 @@ export async function runTitleCheck(customerData) {
   let screenshotData = result.screenshotData;
   if (!screenshotData) {
     try {
-      const stored = await chrome.storage.local.get("titleScreenshot");
-      if (stored.titleScreenshot) {
-        screenshotData = stored.titleScreenshot;
-        chrome.storage.local.remove("titleScreenshot");
+      const stored = await chrome.storage.local.get(STORAGE_KEYS.titleScreenshot);
+      if (stored[STORAGE_KEYS.titleScreenshot]) {
+        screenshotData = stored[STORAGE_KEYS.titleScreenshot];
+        chrome.storage.local.remove(STORAGE_KEYS.titleScreenshot);
       }
     } catch {
       // ignore

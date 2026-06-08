@@ -305,18 +305,81 @@ function renderHtml(name, html, w, h, outPath) {
   );
 }
 
+// Flat, transparent shield — correct for the browser toolbar (blends with
+// light/dark toolbars). The richer 3D tile below is used only for the store.
 async function renderIcons() {
   const { default: sharp } = await import("sharp");
   const svg = readFileSync(join(ROOT, "icons", "icon.svg"));
-  const sizes = [16, 32, 48, 128];
-  for (const s of sizes) {
+  for (const s of [16, 32, 48, 128]) {
     await sharp(svg, { density: 384 }).resize(s, s).png().toFile(join(ROOT, "icons", `icon${s}.png`));
   }
-  // Store + master copies.
-  await sharp(svg, { density: 512 }).resize(128, 128).png().toFile(join(IMAGES, "icons", "icon128.png"));
-  await sharp(svg, { density: 1024 }).resize(1024, 1024).png().toFile(join(IMAGES, "icons", "icon-master-1024.png"));
   await sharp(svg, { density: 1024 }).resize(512, 512).png().toFile(join(ROOT, "icons", "icon_master.png"));
-  console.log("icons: 16/32/48/128 + store 128 + master 1024/512");
+  console.log("toolbar icons: 16/32/48/128 (transparent) + master 512");
+}
+
+// Rich, opaque 3D shield tile — full-bleed background (no transparent corners,
+// so the store can't show white), volume gradient, gloss, soft drop shadows,
+// metallic gold check. Rendered by Chrome (full SVG filter support) then
+// flattened to a 24-bit PNG (no alpha).
+const STORE_ICON_SVG = `
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c2f56"/><stop offset="1" stop-color="#03152b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.30" r="0.75">
+      <stop offset="0" stop-color="#4a86c8" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#4a86c8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#3a72ad"/><stop offset="0.5" stop-color="#16487f"/><stop offset="1" stop-color="#0a2c54"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="0.54" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0.15" y2="1">
+      <stop offset="0" stop-color="#ffe884"/><stop offset="0.55" stop-color="#ffc52e"/><stop offset="1" stop-color="#ef9e00"/>
+    </linearGradient>
+    <filter id="shieldShadow" x="-40%" y="-30%" width="180%" height="190%">
+      <feDropShadow dx="0" dy="4" stdDev="3.2" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="checkShadow" x="-60%" y="-60%" width="240%" height="260%">
+      <feDropShadow dx="0" dy="2.4" stdDev="1.8" flood-color="#241200" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <g transform="translate(218,196) scale(4.6)">
+    <g filter="url(#shieldShadow)">
+      <path d="M64 0 L128 24 L128 64 C128 104 80 128 64 128 C48 128 0 104 0 64 L0 24 Z" fill="url(#body)"/>
+    </g>
+    <path d="M64 0 L128 24 L128 64 C128 104 80 128 64 128 C48 128 0 104 0 64 L0 24 Z" fill="url(#gloss)"/>
+    <path d="M64 0 L128 24 L128 64 C128 104 80 128 64 128 C48 128 0 104 0 64 L0 24 Z" fill="none" stroke="#8fbce8" stroke-opacity="0.5" stroke-width="1.6"/>
+    <path d="M32 64 L52 84 L96 40" fill="none" stroke="url(#gold)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" filter="url(#checkShadow)"/>
+    <path d="M32 64 L52 84 L96 40" fill="none" stroke="#fff6cf" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" transform="translate(0,-2.5)"/>
+  </g>
+</svg>`;
+
+const STORE_ICON_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>*{margin:0}html,body{width:1024px;height:1024px}</style></head><body>${STORE_ICON_SVG}</body></html>`;
+
+async function renderStoreIcon() {
+  const { default: sharp } = await import("sharp");
+  const htmlPath = join(BUILD, "store-icon.html");
+  writeFileSync(htmlPath, STORE_ICON_HTML);
+  const raw = join(BUILD, "store-icon-1024.png");
+  execFileSync(
+    CHROME,
+    ["--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1", "--window-size=1024,1024", `--screenshot=${raw}`, "file://" + htmlPath],
+    { stdio: "ignore" }
+  );
+  const bg = "#03152b";
+  await sharp(raw).flatten({ background: bg }).png().toFile(join(IMAGES, "icons", "icon-master-1024.png"));
+  await sharp(raw).resize(128, 128, { fit: "fill" }).flatten({ background: bg }).png().toFile(join(IMAGES, "icons", "icon128.png"));
+  console.log("store icon: opaque 3D tile — 1024 master + 128");
 }
 
 const SCREENS = [
@@ -338,6 +401,7 @@ for (const old of [
 }
 
 await renderIcons();
+await renderStoreIcon();
 for (const [name, html, w, h, dir] of SCREENS) {
   renderHtml(name, html, w, h, join(dir, name + ".png"));
   console.log("screenshot:", name);

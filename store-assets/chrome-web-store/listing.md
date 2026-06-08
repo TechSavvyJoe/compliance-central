@@ -1,30 +1,36 @@
-# Compliance Central — Chrome Web Store Listing Copy (v1.2.0)
+COMPLIANCE CENTRAL — CHROME WEB STORE LISTING COPY (v1.2.0)
 
 Paste these fields into the Chrome Web Store Developer Dashboard at submission.
-Privacy policy URL: **https://techsavvyjoe.github.io/compliance-central/**
+Privacy policy URL: https://techsavvyjoe.github.io/compliance-central/
 
----
 
-## Product name
+PRODUCT NAME
+
 Compliance Central - Michigan Dealer Compliance Hub
 
-## Short description (≤132 chars — used in manifest)
+
+SHORT DESCRIPTION (≤132 chars — used in manifest)
+
 Unified compliance screening for Michigan auto dealers. OFAC sanctions, Repeat Offender, and Title/Lien checks in one sidebar tool.
 
-## Category
+
+CATEGORY
+
 Productivity (alternate: Workflow & Planning / Business tools)
 
-## Language
+
+LANGUAGE
+
 English (United States)
 
----
 
-## Single purpose statement
+SINGLE PURPOSE STATEMENT
+
 Compliance Central lets Michigan automotive dealers screen buyers and co-buyers for OFAC sanctions, MDOS repeat-offender status, and vehicle title/lien status from a single browser side panel, and produce a printable record of the result.
 
----
 
-## Detailed description (≤4000 chars)
+DETAILED DESCRIPTION (≤4000 chars)
+
 Compliance Central — The Ultimate Tool for Michigan Auto Dealers
 
 Streamline your dealership's compliance workflow with Compliance Central, the all-in-one browser extension built specifically for Michigan automotive dealers.
@@ -69,50 +75,50 @@ Requirements:
 
 Take the headache out of compliance. Install Compliance Central today and deal with confidence.
 
----
 
-## What's new in 1.2.0
+WHAT'S NEW IN 1.2.0
+
 • New Settings panel to add your backend API key directly in the extension — no more developer tools.
 • Clearer guidance when MDOS checks need a key (OFAC keeps working without one).
 • OFAC data-freshness warning so you never screen against an outdated sanctions list.
 • More reliable "Run All Checks" (protected against double-runs; one failing check no longer hides the others).
 • Refreshed store media and privacy policy.
 
----
 
-## Permission justifications (one per permission)
-- **sidePanel** — The entire user interface is a Chrome side panel; this permission opens and renders it.
-- **storage** — Saves the dealer's compliance history, preferences, and backend API key locally on the device.
-- **unlimitedStorage** — The OFAC SDN dataset plus historical compliance records (with evidence screenshots) can exceed the default quota.
-- **alarms** — Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
-- **Host permission: https://data.opensanctions.org/** — Downloads the public OFAC SDN list used for on-device sanctions screening.
-- **Host permission: https://compliance-central-api.fly.dev/** — The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the MDOS portal.
+PERMISSION JUSTIFICATIONS (one per permission)
+
+sidePanel — The entire user interface is a Chrome side panel; this permission opens and renders it.
+storage — Saves the dealer's compliance history, preferences, and backend API key locally on the device.
+unlimitedStorage — The OFAC SDN dataset plus historical compliance records (with evidence screenshots) can exceed the default quota.
+alarms — Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
+Host permission https://data.opensanctions.org/ — Downloads the public OFAC SDN list used for on-device sanctions screening.
+Host permission https://compliance-central-api.fly.dev/ — The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the MDOS portal.
 
 (No remote code is executed; all extension code is bundled. No broad host permissions are requested.)
 
----
 
-## Data safety / privacy practices (dashboard form answers)
-**Does this item collect or use user data?** Yes.
+DATA SAFETY / PRIVACY PRACTICES (dashboard form answers)
+
+Does this item collect or use user data? Yes.
 
 Data handled (entered by the dealer about a customer):
-- Personally identifiable information — name, date of birth, government ID (Michigan DLN/PID): **Collected, transmitted (HTTPS) to the extension's backend for MDOS checks only. Not sold. Not stored server-side.**
-- Vehicle identifier (VIN): transmitted for the optional title check only.
+• Personally identifiable information — name, date of birth, government ID (Michigan DLN/PID): Collected, transmitted (HTTPS) to the extension's backend for MDOS checks only. Not sold. Not stored server-side.
+• Vehicle identifier (VIN): transmitted for the optional title check only.
 
 Certifications to check in the form:
-- ☑ Data is **not** sold to third parties.
-- ☑ Data is **not** used for purposes unrelated to the item's single purpose.
-- ☑ Data is **not** used to determine creditworthiness or for lending.
-- ☑ Data is encrypted in transit (HTTPS).
-- ☑ OFAC screening data is processed locally and never transmitted.
-- ☑ Users can request deletion / clear local data (history clear + uninstall; backend retains nothing).
+• Data is NOT sold to third parties.
+• Data is NOT used for purposes unrelated to the item's single purpose.
+• Data is NOT used to determine creditworthiness or for lending.
+• Data is encrypted in transit (HTTPS).
+• OFAC screening data is processed locally and never transmitted.
+• Users can request deletion / clear local data (history clear + uninstall; backend retains nothing).
 
 A privacy policy URL is provided (above).
 
----
 
-## Submission notes
-- This is version 1.2.0. If a prior version was never published, this is a **new** public listing; if 1.1.0 was published, upload 1.2.0 as an **update**.
-- Screenshots (1280×800) and promo tiles live in `store-assets/chrome-web-store/images/`.
-- Developer contact email is required in the account settings and is shown publicly — set a dedicated support inbox (placeholder used in code/policy: support@compliancecentral.app).
-- Replace the `Request access` URL and support email placeholders in `lib/config.js` (CONFIG.support) and the privacy policy with your real values before submitting.
+SUBMISSION NOTES
+
+• This is version 1.2.0. If a prior version was never published, this is a new public listing; if 1.1.0 was published, upload 1.2.0 as an update.
+• Screenshots (1280x800) and promo tiles live in store-assets/chrome-web-store/images/.
+• Developer contact email is required in the account settings and is shown publicly — set a dedicated support inbox (placeholder used in code/policy: support@compliancecentral.app).
+• Replace the Request access URL and support email placeholders in lib/config.js (CONFIG.support) and the privacy policy with your real values before submitting.

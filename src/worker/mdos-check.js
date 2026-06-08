@@ -25,12 +25,12 @@ export async function handleRepeatOffenderCheck(searchData) {
     searchData.screenshotStorageKey || STORAGE_KEYS.repeatOffenderScreenshot;
 
   if (result.result.screenshotData) {
-    await chrome.storage.local.set({
+    await chrome.storage.session.set({
       [screenshotKey]: result.result.screenshotData,
       [STORAGE_KEYS.lastResult]: result.result,
     });
   } else {
-    await chrome.storage.local.set({
+    await chrome.storage.session.set({
       [STORAGE_KEYS.lastResult]: result.result,
     });
   }
@@ -49,7 +49,7 @@ export async function handleTitleCheck(data) {
   }
 
   if (result.result.screenshotData) {
-    await chrome.storage.local.set({
+    await chrome.storage.session.set({
       [STORAGE_KEYS.titleScreenshot]: result.result.screenshotData,
     });
   }

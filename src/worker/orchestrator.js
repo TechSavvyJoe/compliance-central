@@ -20,17 +20,36 @@ import {
   IN_FLIGHT,
 } from "../../lib/storage-keys.js";
 
+// Single-flight guard. The MDOS portal session is single-tenant per IP, so a
+// second concurrent run would collide with the first. The sidepanel also
+// disables its buttons while running; this is the worker-side backstop.
+let runInFlight = false;
+
 export async function handleRunAllChecks(data) {
+  if (runInFlight) {
+    return { success: false, error: "A compliance run is already in progress." };
+  }
+  runInFlight = true;
+  try {
+    return await runAllChecks(data);
+  } finally {
+    runInFlight = false;
+  }
+}
+
+async function runAllChecks(data) {
   const { customer, hasTrade } = data;
 
   const results = {
     customer,
     timestamp: new Date().toISOString(),
     hasTrade,
+    runType: "full",
+    runLabel: "Run All Checks",
     checks: {},
   };
 
-  await chrome.storage.local.set({
+  await chrome.storage.session.set({
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
     [STORAGE_KEYS.searchProgress]: 0,
     [STORAGE_KEYS.currentResults]: results,
@@ -46,7 +65,7 @@ export async function handleRunAllChecks(data) {
   };
 
   const setInFlight = async (key) => {
-    await chrome.storage.local.set({ [STORAGE_KEYS.inFlightCheck]: key });
+    await chrome.storage.session.set({ [STORAGE_KEYS.inFlightCheck]: key });
   };
 
   try {
@@ -60,7 +79,11 @@ export async function handleRunAllChecks(data) {
           passed: !result.result.hasMatch,
         };
       } else {
-        results.checks.ofac = { passed: true, error: result.error };
+        results.checks.ofac = {
+          passed: false,
+          status: "error",
+          error: result.error || "OFAC screening failed",
+        };
       }
       await saveState(hasCoBuyer ? 15 : 20);
     });
@@ -73,7 +96,11 @@ export async function handleRunAllChecks(data) {
               passed: !result.result.hasMatch,
             };
           } else {
-            results.checks.coBuyerOfac = { passed: true, error: result.error };
+            results.checks.coBuyerOfac = {
+              passed: false,
+              status: "error",
+              error: result.error || "Co-Buyer OFAC screening failed",
+            };
           }
           await saveState(25);
         })
@@ -111,7 +138,7 @@ export async function handleRunAllChecks(data) {
         if (roResult.success) {
           const checkRes = roResult.result;
           checkRes.passed = checkRes.status === "eligible";
-          const roStorage = await chrome.storage.local.get(
+          const roStorage = await chrome.storage.session.get(
             STORAGE_KEYS.repeatOffenderScreenshot
           );
           if (roStorage[STORAGE_KEYS.repeatOffenderScreenshot]) {
@@ -152,7 +179,7 @@ export async function handleRunAllChecks(data) {
           if (cbRoResult.success) {
             const checkRes = cbRoResult.result;
             checkRes.passed = checkRes.status === "eligible";
-            const cbStorage = await chrome.storage.local.get(
+            const cbStorage = await chrome.storage.session.get(
               STORAGE_KEYS.coBuyerRepeatOffenderScreenshot
             );
             if (cbStorage[STORAGE_KEYS.coBuyerRepeatOffenderScreenshot]) {
@@ -191,7 +218,7 @@ export async function handleRunAllChecks(data) {
 
           if (titleResult.success) {
             const checkRes = titleResult.result;
-            const titleStorage = await chrome.storage.local.get(
+            const titleStorage = await chrome.storage.session.get(
               STORAGE_KEYS.titleScreenshot
             );
             if (titleStorage[STORAGE_KEYS.titleScreenshot]) {
@@ -218,9 +245,20 @@ export async function handleRunAllChecks(data) {
       }
     })();
 
-    await Promise.all([ofacPromise, coBuyerOfacPromise, mdosPromise]);
+    // allSettled (not all): one failing branch must not wipe the others, so
+    // partial results (e.g. OFAC passed but MDOS errored) still render.
+    await Promise.allSettled([ofacPromise, coBuyerOfacPromise, mdosPromise]);
 
-    await chrome.storage.local.set({
+    // Guard against a branch rejecting before it recorded a result.
+    if (!results.checks.ofac) {
+      results.checks.ofac = {
+        passed: false,
+        status: "error",
+        error: "OFAC screening did not complete",
+      };
+    }
+
+    await chrome.storage.session.set({
       [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.complete,
       [STORAGE_KEYS.searchProgress]: 100,
       [STORAGE_KEYS.currentResults]: results,
@@ -229,7 +267,7 @@ export async function handleRunAllChecks(data) {
     return { success: true };
   } catch (err) {
     console.error("Run-all error:", err);
-    await chrome.storage.local.set({
+    await chrome.storage.session.set({
       [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
       [STORAGE_KEYS.lastError]: err.message,
       [STORAGE_KEYS.inFlightCheck]: null,

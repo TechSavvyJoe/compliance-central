@@ -3,6 +3,7 @@
   "name": "Compliance Central - Michigan Dealer Compliance Hub",
   "version": "1.2.0",
   "description": "Unified compliance screening for Michigan auto dealers. OFAC sanctions, Repeat Offender, and Title/Lien checks in one sidebar tool.",
+  "homepage_url": "https://techsavvyjoe.github.io/compliance-central/",
   "permissions": [
     "sidePanel",
     "storage",
@@ -34,11 +35,5 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["lib/jspdf.umd.min.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

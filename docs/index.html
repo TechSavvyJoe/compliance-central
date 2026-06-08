@@ -42,6 +42,13 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             margin-bottom: 20px;
         }
+        code {
+            background: #eef2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        a { color: #003d73; }
         footer {
             text-align: center;
             margin-top: 50px;
@@ -55,57 +62,76 @@
     <header>
         <h1>Compliance Central</h1>
         <p>Privacy Policy</p>
-        <p class="last-updated">Last Updated: May 14, 2026</p>
+        <p class="last-updated">Last Updated: June 8, 2026</p>
     </header>
 
     <div class="section">
         <h2>1. Overview</h2>
-        <p><strong>Compliance Central</strong> ("we", "our", or "the extension") is a Chrome Extension designed to efficient compliance screening for Michigan Automotive Dealers. We prioritize your privacy and are committed to protecting your data. This policy explains how we handle your information.</p>
+        <p><strong>Compliance Central</strong> ("we", "our", or "the extension") is a Chrome extension that helps Michigan automotive dealers run compliance screenings &mdash; OFAC sanctions, Repeat Offender (MDOS), and Title/Lien checks &mdash; from a browser side panel. We are committed to protecting the personal information you enter. This policy explains exactly what data the extension handles, where it goes, and what is and is not retained.</p>
     </div>
 
     <div class="section">
-        <h2>2. Data Collection and Usage</h2>
-        <p>Compliance Central processes data both locally and through secure backend services:</p>
+        <h2>2. What Data the Extension Handles</h2>
+        <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. This information is used only to perform the screenings you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the compliance checks.</p>
         <ul>
-            <li><strong>Local Storage:</strong> All compliance search results, history, and settings are stored locally on your device using Chrome's <code>storage.local</code> API. We do not maintain a database of your searches.</li>
-            <li><strong>Backend Processing:</strong> MDOS (Repeat Offender and Title/Lien) checks are performed through our secure backend service hosted on Fly.io. This service uses headless browser automation to query the Michigan Department of State portal on your behalf. <strong>No customer data is logged or stored on our servers</strong> - data is processed in-memory and immediately discarded after returning results.</li>
-            <li><strong>No Tracking:</strong> We do not track your browsing history or usage behavior outside of the extension's specific functionality.</li>
-            <li><strong>No Analytics:</strong> We do not use third-party analytics services (like Google Analytics) to track your interaction with the extension.</li>
+            <li><strong>Stored only on your device:</strong> your compliance history and settings are saved locally using Chrome's <code>storage</code> API. We do not maintain a server-side database of your searches.</li>
+            <li><strong>No tracking or analytics:</strong> the extension does not track your browsing, and does not use Google Analytics or any third-party advertising or analytics network.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>3. Third-Party Services</h2>
-        <p>To perform compliance checks, the extension interacts with the following services:</p>
+        <h2>3. Data Transmitted for MDOS Checks</h2>
+        <p>The <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks are performed by our secure backend service hosted on Fly.io, which queries the Michigan Department of State (MDOS) portal on your behalf using automated browsing.</p>
         <ul>
-            <li><strong>MDOS (Michigan Department of State):</strong> Repeat Offender and Title/Lien checks are performed via our secure backend service, which automates queries to the MDOS e-Services portal. Your search data is transmitted securely via HTTPS, processed in-memory, and not retained.</li>
-            <li><strong>OFAC (Office of Foreign Assets Control):</strong> The extension downloads the public SDN list from OpenSanctions to perform local OFAC screenings. These searches are performed entirely on your device - no data is sent to any external server.</li>
-            <li><strong>Fly.io:</strong> Our backend infrastructure is hosted on Fly.io, a secure cloud platform. No customer data is persisted on these servers.</li>
+            <li>For these two checks only, the buyer/co-buyer <strong>name, date of birth, and DLN/PID</strong> (and the <strong>VIN</strong> for a title check) are transmitted to our backend over an encrypted HTTPS connection.</li>
+            <li>The backend processes this data <strong>in memory</strong> to obtain the official MDOS result and screenshot, then <strong>returns the result and immediately discards the data</strong>. It is not written to a database or log.</li>
+            <li>Access to the backend requires a per-install API key that you configure in the extension's Settings. The key is stored only on your device.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>4. Permissions</h2>
-        <p>The extension requires specific permissions to function:</p>
+        <h2>4. OFAC Screening (Local Only)</h2>
+        <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the public OFAC SDN list from OpenSanctions and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
+    </div>
+
+    <div class="section">
+        <h2>5. Third-Party Services</h2>
         <ul>
-            <li><code>storage</code>: To save your settings and search history locally.</li>
-            <li><code>host_permissions</code>: To interact with the MDOS portal and download OFAC data updates.</li>
-            <li><code>scripting</code>: To automate form filling on the MDOS portal (e.g., entering VINs for title checks).</li>
+            <li><strong>OpenSanctions</strong> (<code>data.opensanctions.org</code>): provides the public OFAC SDN list the extension downloads for local screening. Only the list is downloaded &mdash; no customer data is sent.</li>
+            <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
+            <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and not persisted.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>5. Your Rights</h2>
-        <p>Since all data is stored locally on your device, you have complete control over it:</p>
+        <h2>6. Permissions</h2>
+        <p>The extension requests only the permissions it needs:</p>
         <ul>
-            <li>You can clear your search history at any time using the "Clear History" button within the extension.</li>
-            <li>You can remove all extension data by uninstalling the extension from Chrome.</li>
+            <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
+            <li><code>storage</code> &mdash; to save your compliance history, settings, and API key locally.</li>
+            <li><code>unlimitedStorage</code> &mdash; to hold the OFAC sanctions dataset and your historical records.</li>
+            <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
+            <li>Host access to <code>data.opensanctions.org</code> (OFAC list download) and <code>compliance-central-api.fly.dev</code> (MDOS backend).</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>6. Contact Us</h2>
-        <p>If you have any questions about this Privacy Policy or the extension, please contact us via the Chrome Web Store support page.</p>
+        <h2>7. Your Rights and Choices</h2>
+        <ul>
+            <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
+            <li>Remove your API key at any time from Settings.</li>
+            <li>Uninstalling the extension removes all locally stored data.</li>
+        </ul>
+    </div>
+
+    <div class="section" id="get-access">
+        <h2>8. Getting Access (Backend API Key)</h2>
+        <p>OFAC screening works immediately with no setup. To enable the Repeat Offender and Title/Lien checks, a dealer account and backend API key are required. To request access, contact us at the email below and we will provision a key for your dealership.</p>
+    </div>
+
+    <div class="section">
+        <h2>9. Contact Us</h2>
+        <p>Questions about this policy, the extension, or backend access? Email <a href="mailto:support@compliancecentral.app">support@compliancecentral.app</a> or use the Chrome Web Store support page for this listing.</p>
     </div>
 
     <footer>

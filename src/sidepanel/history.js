@@ -21,11 +21,9 @@ export async function purgeOldHistoryEntries() {
 
     const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const filtered = history.filter((entry) => {
-      try {
-        return new Date(entry.timestamp).getTime() > cutoff;
-      } catch {
-        return true;
-      }
+      const t = new Date(entry.timestamp).getTime();
+      if (Number.isNaN(t)) return false; // drop entries with corrupt timestamps
+      return t > cutoff;
     });
 
     const purged = history.length - filtered.length;
@@ -44,25 +42,30 @@ export async function purgeOldHistoryEntries() {
 export async function saveToHistory(results) {
   try {
     await purgeOldHistoryEntries();
-    if (!results.finalDecision) {
-      results.finalDecision = calculateFinalDecision(results.checks);
-    }
+    const finalDecision = historyDecision(results);
 
     const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
     const history = storage[STORAGE_KEYS.complianceHistory] || [];
+    const checks = results.checks || {};
+    const archivedResults = archiveResultsForHistory({
+      ...results,
+      finalDecision,
+    });
 
     history.unshift({
       id: Date.now(),
       customer: `${results.customer.firstName} ${results.customer.lastName}`,
       vin: results.customer.tradeVin || null,
       timestamp: results.timestamp,
-      decision: results.finalDecision?.level || "UNKNOWN",
+      decision: finalDecision.level,
+      runType: results.runType || "full",
+      runLabel: results.runLabel || "Run All Checks",
       checks: {
-        ofac: results.checks.ofac?.passed,
-        repeatOffender: results.checks.repeatOffender?.passed,
-        title: results.checks.title?.passed,
+        ofac: checks.ofac?.passed,
+        repeatOffender: checks.repeatOffender?.passed,
+        title: checks.title?.passed,
       },
-      fullResults: results,
+      fullResults: archivedResults,
     });
 
     if (history.length > MAX_ENTRIES) {
@@ -75,6 +78,28 @@ export async function saveToHistory(results) {
   } catch (error) {
     console.error("Error saving to history:", error);
   }
+}
+
+function historyDecision(results) {
+  if (results.runType === "individual") {
+    return {
+      approved: false,
+      level: "PARTIAL",
+      reason: `${results.runLabel || "Individual check"} completed`,
+    };
+  }
+
+  if (results.finalDecision) return results.finalDecision;
+  return calculateFinalDecision(results.checks || {});
+}
+
+export function archiveResultsForHistory(results) {
+  return {
+    ...results,
+    runType: results.runType || "full",
+    runLabel: results.runLabel || "Run All Checks",
+    checks: results.checks || {},
+  };
 }
 
 export async function updateHistoryCount(historyCountEl) {
@@ -126,7 +151,7 @@ export async function populateHistoryModal(historyListEl) {
         if (item.decision === "DENIED") {
           decisionClass = "status-fail";
           decisionIcon = ICONS.x;
-        } else if (item.decision === "REVIEW") {
+        } else if (item.decision === "REVIEW" || item.decision === "PARTIAL") {
           decisionClass = "status-warning";
           decisionIcon = ICONS.alertTriangle;
         }
@@ -156,8 +181,10 @@ export async function populateHistoryModal(historyListEl) {
         const hasRepeat = !!full?.checks?.repeatOffender?.screenshotData;
         const hasTitle = !!full?.checks?.title?.screenshotData;
 
-        const printBtn = (cls, label) =>
-          `<button class="btn-sm ${cls}" data-index="${index}"><span class="icon-inline">${ICONS.printer}</span>${label}</button>`;
+        const actionBtn = (cls, label, icon) =>
+          `<button class="btn-sm ${cls}" data-index="${index}"><span class="icon-inline">${icon}</span>${label}</button>`;
+        const printBtn = (cls, label) => actionBtn(cls, label, ICONS.printer);
+        const downloadBtn = (cls, label) => actionBtn(cls, label, ICONS.download);
 
         return `
         <div class="history-item" data-index="${index}">
@@ -167,6 +194,7 @@ export async function populateHistoryModal(historyListEl) {
           </div>
           <div class="history-meta">
             ${dateStr} at ${timeStr}
+            ${item.runType === "individual" ? ` &middot; ${sanitizeHTML(item.runLabel || "Partial")}` : ""}
             ${item.vin ? ` &middot; VIN: ...${sanitizeHTML(item.vin.slice(-6))}` : " &middot; No Trade-In"}
           </div>
           <div class="history-checks">
@@ -176,12 +204,20 @@ export async function populateHistoryModal(historyListEl) {
           </div>
           <div class="history-actions">
             <button class="btn-sm history-view-btn" data-index="${index}"><span class="icon-inline">${ICONS.eye}</span>View &amp; Restore</button>
-            ${hasOfac ? printBtn("history-print-ofac", "OFAC") : ""}
-            ${hasRepeat ? printBtn("history-print-repeat", "Repeat") : ""}
-            ${hasTitle ? printBtn("history-print-title", "Title") : ""}
+            ${hasOfac ? printBtn("history-print-ofac", "Print OFAC") : ""}
+            ${hasOfac ? downloadBtn("history-download-ofac", "OFAC PDF") : ""}
+            ${hasRepeat ? printBtn("history-print-repeat", "Print Repeat") : ""}
+            ${hasRepeat ? downloadBtn("history-download-repeat", "Repeat PDF") : ""}
+            ${hasTitle ? printBtn("history-print-title", "Print Title") : ""}
+            ${hasTitle ? downloadBtn("history-download-title", "Title PDF") : ""}
             ${
               hasOfac || hasRepeat || hasTitle
                 ? `<button class="btn-sm history-print-all" data-index="${index}"><span class="icon-inline">${ICONS.printer}</span>Print All</button>`
+                : ""
+            }
+            ${
+              hasOfac || hasRepeat || hasTitle
+                ? `<button class="btn-sm history-download-all" data-index="${index}"><span class="icon-inline">${ICONS.download}</span>All PDF</button>`
                 : ""
             }
           </div>

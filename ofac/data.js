@@ -8,11 +8,23 @@
 const SDN_CSV_URL =
   "https://data.opensanctions.org/datasets/latest/us_ofac_sdn/targets.simple.csv";
 
+// Cap the SDN download so a slow/hung CDN can't freeze screening indefinitely.
+const SDN_FETCH_TIMEOUT_MS = 60000;
+
 async function fetchSDNCSV() {
-  const response = await fetch(SDN_CSV_URL, {
-    method: "GET",
-    headers: { Accept: "text/csv, text/plain, */*" },
-  });
+  let response;
+  try {
+    response = await fetch(SDN_CSV_URL, {
+      method: "GET",
+      headers: { Accept: "text/csv, text/plain, */*" },
+      signal: AbortSignal.timeout(SDN_FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      throw new Error("SDN download timed out. Check your internet connection.");
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     throw new Error(`SDN download failed: HTTP ${response.status}`);

@@ -12,14 +12,14 @@ let stateUpdateLock = Promise.resolve();
 export async function atomicStateUpdate(updateFn) {
   stateUpdateLock = stateUpdateLock.then(async () => {
     try {
-      const current = await chrome.storage.local.get([
+      const current = await chrome.storage.session.get([
         STORAGE_KEYS.currentResults,
         STORAGE_KEYS.searchProgress,
         STORAGE_KEYS.searchStatus,
       ]);
       const updates = updateFn(current);
       if (updates && Object.keys(updates).length > 0) {
-        await chrome.storage.local.set(updates);
+        await chrome.storage.session.set(updates);
       }
     } catch (e) {
       console.error("[State] Atomic update error:", e);

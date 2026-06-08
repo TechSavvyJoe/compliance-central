@@ -459,7 +459,7 @@ export function printRepeatScreenshot(currentResults) {
         `<strong>Customer:</strong> ${sanitizeHTML(c?.firstName || "")} ${sanitizeHTML(c?.lastName || "")}`,
       ],
       screenshotData: screenshot,
-      orientation: "landscape",
+      orientation: "portrait",
     }),
     true
   );
@@ -479,7 +479,7 @@ export function printCoBuyerRepeatScreenshot(currentResults) {
         `<strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer.firstName || "")} ${sanitizeHTML(coBuyer.lastName || "")} ${sanitizeHTML(coBuyer.suffix || "")}`,
       ],
       screenshotData: screenshot,
-      orientation: "landscape",
+      orientation: "portrait",
     }),
     true
   );
@@ -511,7 +511,12 @@ export function printAllReports(currentResults) {
   openAndPrint(combinedAllReportHTML(currentResults), true);
 }
 
+
 // ---------- PDF download (jsPDF) ----------
+//
+// Goal: produce PDFs that visually mirror the print-window HTML reports — same
+// official letterhead, same colour palette, same certification footer. All
+// drawn programmatically in jsPDF so we avoid html2canvas/html2pdf bloat.
 
 async function loadJsPDF() {
   if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
@@ -528,19 +533,687 @@ async function loadJsPDF() {
   });
 }
 
-function fmtSummaryLine(label, value) {
-  return `${label}: ${value || "—"}`;
+// Colour palette mirrors the print HTML reports.
+const PALETTE = {
+  navy: [30, 58, 95],
+  navyDark: [12, 30, 56],
+  muted: [100, 116, 139],
+  border: [205, 213, 220],
+  cardBg: [248, 250, 252],
+  yellowBg: [254, 252, 232],
+  yellowBorder: [253, 224, 71],
+  successBg: [209, 250, 229],
+  successBorder: [16, 185, 129],
+  successText: [6, 95, 70],
+  dangerBg: [254, 226, 226],
+  dangerBorder: [239, 68, 68],
+  dangerText: [153, 27, 27],
+  warnBg: [254, 243, 199],
+  warnBorder: [245, 158, 11],
+  warnText: [146, 64, 14],
+  body: [55, 65, 81],
+  ink: [17, 24, 39],
+};
+
+async function createPdfContext() {
+  const JsPDF = await loadJsPDF();
+  const doc = new JsPDF({ unit: "pt", format: "letter" });
+  return {
+    doc,
+    pageWidth: doc.internal.pageSize.getWidth(),
+    pageHeight: doc.internal.pageSize.getHeight(),
+    margin: 48,
+    y: 48,
+  };
 }
 
+function setFill(doc, rgb) { doc.setFillColor(rgb[0], rgb[1], rgb[2]); }
+function setDraw(doc, rgb) { doc.setDrawColor(rgb[0], rgb[1], rgb[2]); }
+function setText(doc, rgb) { doc.setTextColor(rgb[0], rgb[1], rgb[2]); }
+
+function ensureSpace(ctx, needed) {
+  if (ctx.y + needed > ctx.pageHeight - ctx.margin) {
+    ctx.doc.addPage();
+    ctx.y = ctx.margin;
+  }
+}
+
+function writeText(ctx, text, opts = {}) {
+  const {
+    fontSize = 10,
+    bold = false,
+    italic = false,
+    color = PALETTE.ink,
+    align = "left",
+    lineHeight = 1.35,
+    maxWidth,
+  } = opts;
+  const { doc, pageWidth, margin } = ctx;
+  doc.setFontSize(fontSize);
+  doc.setFont(
+    "helvetica",
+    bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal"
+  );
+  setText(doc, color);
+
+  const width = maxWidth || pageWidth - margin * 2;
+  const lines = doc.splitTextToSize(String(text), width);
+  for (const line of lines) {
+    ensureSpace(ctx, fontSize * lineHeight);
+    const x =
+      align === "center"
+        ? pageWidth / 2
+        : align === "right"
+        ? pageWidth - margin
+        : margin;
+    doc.text(line, x, ctx.y + fontSize, { align });
+    ctx.y += fontSize * lineHeight;
+  }
+}
+
+function drawDivider(ctx, opts = {}) {
+  const { color = PALETTE.border, gapAbove = 6, gapBelow = 10 } = opts;
+  ctx.y += gapAbove;
+  ensureSpace(ctx, 4);
+  setDraw(ctx.doc, color);
+  ctx.doc.setLineWidth(0.5);
+  ctx.doc.line(
+    ctx.margin,
+    ctx.y,
+    ctx.pageWidth - ctx.margin,
+    ctx.y
+  );
+  ctx.y += gapBelow;
+}
+
+/**
+ * Draws the official "U.S. DEPARTMENT OF THE TREASURY / OFAC" letterhead
+ * with the navy double border, two-column meta row, and divider.
+ */
+function drawOfficialHeader(ctx, opts = {}) {
+  const {
+    eyebrow = "U.S. DEPARTMENT OF THE TREASURY",
+    title = "Office of Foreign Assets Control (OFAC)",
+    subtitle = "Specially Designated Nationals and Blocked Persons List (SDN) Screening Report",
+    meta = [],
+  } = opts;
+  const { doc, pageWidth, margin } = ctx;
+
+  const headerHeight = 110;
+  ensureSpace(ctx, headerHeight + 8);
+
+  // Outer double border.
+  setDraw(doc, PALETTE.navy);
+  doc.setLineWidth(1.6);
+  doc.rect(margin, ctx.y, pageWidth - margin * 2, headerHeight);
+  doc.setLineWidth(0.5);
+  doc.rect(
+    margin + 4,
+    ctx.y + 4,
+    pageWidth - margin * 2 - 8,
+    headerHeight - 8
+  );
+
+  const innerLeft = margin + 14;
+  const innerWidth = pageWidth - margin * 2 - 28;
+  let yy = ctx.y + 22;
+
+  // Eyebrow (department name).
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  setText(doc, PALETTE.ink);
+  doc.text(eyebrow, pageWidth / 2, yy, { align: "center" });
+  yy += 16;
+
+  // Main title (OFAC).
+  doc.setFontSize(15);
+  setText(doc, PALETTE.navy);
+  doc.text(title, pageWidth / 2, yy, { align: "center" });
+  yy += 12;
+
+  // Italic subtitle.
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  setText(doc, PALETTE.muted);
+  const subLines = doc.splitTextToSize(subtitle, innerWidth);
+  for (const line of subLines) {
+    doc.text(line, pageWidth / 2, yy, { align: "center" });
+    yy += 11;
+  }
+
+  // Divider inside header.
+  yy += 4;
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.4);
+  doc.line(innerLeft, yy, innerLeft + innerWidth, yy);
+  yy += 12;
+
+  // Meta two-column row.
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  setText(doc, PALETTE.body);
+  if (meta.length) {
+    const half = innerWidth / 2;
+    const left = meta.filter((m) => m.side !== "right");
+    const right = meta.filter((m) => m.side === "right");
+    let ly = yy;
+    let ry = yy;
+    for (const item of left) {
+      doc.setFont("helvetica", "bold");
+      doc.text(item.label + ":", innerLeft, ly);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        String(item.value || "—"),
+        innerLeft + doc.getTextWidth(item.label + ": "),
+        ly
+      );
+      ly += 11;
+    }
+    for (const item of right) {
+      doc.setFont("helvetica", "bold");
+      const labelWidth = doc.getTextWidth(item.label + ": ");
+      const valWidth = doc.getTextWidth(String(item.value || "—"));
+      const rightEdge = innerLeft + innerWidth;
+      doc.text(item.label + ":", rightEdge - labelWidth - valWidth, ry);
+      doc.setFont("helvetica", "normal");
+      doc.text(String(item.value || "—"), rightEdge - valWidth, ry);
+      ry += 11;
+    }
+  }
+
+  ctx.y += headerHeight + 14;
+}
+
+/**
+ * Simpler title bar for non-OFAC reports (Repeat Offender, Title & Lien).
+ */
+function drawCheckHeader(ctx, opts) {
+  const { title, meta = [] } = opts;
+  const { doc, pageWidth, margin } = ctx;
+
+  ensureSpace(ctx, 56);
+
+  setFill(doc, PALETTE.cardBg);
+  doc.rect(margin, ctx.y, pageWidth - margin * 2, 46, "F");
+  setDraw(doc, PALETTE.navy);
+  doc.setLineWidth(0.8);
+  doc.line(margin, ctx.y + 46, pageWidth - margin * 2 + margin, ctx.y + 46);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  setText(doc, PALETTE.navy);
+  doc.text(title, margin + 12, ctx.y + 18);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  setText(doc, PALETTE.muted);
+  let metaY = ctx.y + 32;
+  const metaText = meta
+    .filter(Boolean)
+    .map((m) => (m.value ? `${m.label}: ${m.value}` : null))
+    .filter(Boolean)
+    .join("   ·   ");
+  if (metaText) {
+    doc.text(metaText, margin + 12, metaY);
+  }
+
+  ctx.y += 56;
+}
+
+function drawSubjectBox(ctx, opts) {
+  const { title = "SUBJECT SCREENED", rows = [] } = opts;
+  const { doc, pageWidth, margin } = ctx;
+
+  const rowHeight = 16;
+  const padding = 12;
+  const totalH = padding * 2 + 22 + rows.length * rowHeight;
+  ensureSpace(ctx, totalH + 8);
+
+  setFill(doc, PALETTE.cardBg);
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 4, 4, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  setText(doc, PALETTE.muted);
+  doc.text(title, margin + padding, ctx.y + padding + 10);
+
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.4);
+  doc.line(
+    margin + padding,
+    ctx.y + padding + 16,
+    pageWidth - margin - padding,
+    ctx.y + padding + 16
+  );
+
+  let rowY = ctx.y + padding + 16 + rowHeight - 4;
+  for (const r of rows) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    setText(doc, PALETTE.body);
+    doc.text(r.label + ":", margin + padding, rowY);
+    doc.setFont("helvetica", "normal");
+    setText(doc, PALETTE.ink);
+    doc.text(String(r.value || "—"), margin + padding + 130, rowY);
+    rowY += rowHeight;
+  }
+
+  ctx.y += totalH + 14;
+}
+
+function drawResultBox(ctx, opts) {
+  const { variant = "pass", title, subtitle, extraLines = [] } = opts;
+  const { doc, pageWidth, margin } = ctx;
+
+  const palettes = {
+    pass: {
+      bg: PALETTE.successBg,
+      border: PALETTE.successBorder,
+      text: PALETTE.successText,
+    },
+    fail: {
+      bg: PALETTE.dangerBg,
+      border: PALETTE.dangerBorder,
+      text: PALETTE.dangerText,
+    },
+    warn: {
+      bg: PALETTE.warnBg,
+      border: PALETTE.warnBorder,
+      text: PALETTE.warnText,
+    },
+  };
+  const palette = palettes[variant] || palettes.pass;
+
+  const padding = 20;
+  const titleH = 28;
+  const subH = subtitle ? 16 : 0;
+  const extraH = extraLines.length * 14;
+  const totalH = padding * 2 + titleH + subH + extraH;
+  ensureSpace(ctx, totalH + 12);
+
+  setFill(doc, palette.bg);
+  setDraw(doc, palette.border);
+  doc.setLineWidth(2);
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 6, 6, "FD");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  setText(doc, palette.text);
+  doc.text(title, pageWidth / 2, ctx.y + padding + 20, { align: "center" });
+
+  if (subtitle) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(subtitle, pageWidth / 2, ctx.y + padding + titleH + 12, {
+      align: "center",
+    });
+  }
+
+  if (extraLines.length) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    setText(doc, palette.text);
+    let ly = ctx.y + padding + titleH + subH + 12;
+    for (const line of extraLines) {
+      doc.text(line, pageWidth / 2, ly, { align: "center" });
+      ly += 14;
+    }
+  }
+
+  ctx.y += totalH + 14;
+}
+
+function drawCertification(ctx, text) {
+  const { doc, pageWidth, margin } = ctx;
+  const padding = 12;
+  const lineHeight = 11;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  const lines = doc.splitTextToSize(text, pageWidth - margin * 2 - padding * 2);
+  const totalH = padding * 2 + lines.length * lineHeight;
+  ensureSpace(ctx, totalH + 8);
+
+  setFill(doc, PALETTE.yellowBg);
+  setDraw(doc, PALETTE.yellowBorder);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 4, 4, "FD");
+
+  setText(doc, PALETTE.warnText);
+  doc.setFont("helvetica", "bold");
+  doc.text("COMPLIANCE CERTIFICATION", margin + padding, ctx.y + padding + 9);
+  doc.setFont("helvetica", "normal");
+  let ly = ctx.y + padding + 22;
+  for (const line of lines) {
+    doc.text(line, margin + padding, ly);
+    ly += lineHeight;
+  }
+
+  ctx.y += totalH + 14;
+}
+
+function drawFooter(ctx, lines) {
+  const { doc, pageWidth, pageHeight, margin } = ctx;
+  const yStart = pageHeight - margin - 6 - lines.length * 11;
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.4);
+  doc.line(margin, yStart, pageWidth - margin, yStart);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  setText(doc, PALETTE.muted);
+  let ly = yStart + 12;
+  for (const line of lines) {
+    doc.text(line, pageWidth / 2, ly, { align: "center" });
+    ly += 10;
+  }
+}
+
+function drawScreenshotPage(ctx, dataUrl, opts = {}) {
+  if (!dataUrl) return;
+  const { doc, pageWidth, pageHeight, margin } = ctx;
+  const usableW = pageWidth - margin * 2;
+  const maxH = pageHeight - ctx.y - margin - (opts.reserveFooter ? 36 : 0);
+
+  try {
+    const imgProps = doc.getImageProperties(dataUrl);
+    const ratio = imgProps.height / imgProps.width;
+    let renderW = usableW;
+    let renderH = renderW * ratio;
+    if (renderH > maxH) {
+      renderH = maxH;
+      renderW = renderH / ratio;
+    }
+    // Border around screenshot.
+    setDraw(doc, PALETTE.border);
+    doc.setLineWidth(0.5);
+    const x = margin + (usableW - renderW) / 2;
+    doc.addImage(dataUrl, "PNG", x, ctx.y, renderW, renderH);
+    doc.rect(x, ctx.y, renderW, renderH);
+    ctx.y += renderH + 10;
+  } catch (err) {
+    console.error("PDF image error:", err);
+    writeText(ctx, "Screenshot could not be embedded.", {
+      fontSize: 9,
+      color: PALETTE.warnText,
+    });
+  }
+}
+
+// ---------- Shared assembly helpers ----------
+
+async function getSdnLastUpdate(ofac) {
+  let lastUpdate = ofac?.lastUpdate;
+  if (lastUpdate) {
+    try {
+      const d = new Date(lastUpdate);
+      if (!Number.isNaN(d.getTime())) return d.toLocaleDateString();
+    } catch {
+      // fallthrough
+    }
+    return lastUpdate;
+  }
+  try {
+    const status = await chrome.runtime.sendMessage({ type: "getDataStatus" });
+    if (status?.success && status.lastUpdate) {
+      return new Date(status.lastUpdate).toLocaleDateString();
+    }
+  } catch {
+    // ignore
+  }
+  return "Unknown";
+}
+
+function safeFileName(parts) {
+  return parts
+    .filter(Boolean)
+    .join("_")
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Za-z0-9_-]/g, "")
+    .slice(0, 80);
+}
+
+function nowStamp() {
+  return new Date().toLocaleString();
+}
+
+function nowScreeningDate() {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+const STANDARD_FOOTER = [
+  "Data Source: OFAC SDN List via OpenSanctions  ·  auto-refreshed daily.",
+  "Generated by Compliance Central — Michigan Dealer Compliance Hub.",
+];
+
+const MDOS_FOOTER = [
+  "Source: Michigan Department of State (MDOS) Portal  ·  Compliance Central.",
+];
+
+// ---------- OFAC PDF section ----------
+
+async function drawOfacSection(ctx, customer, ofac, opts = {}) {
+  const lastUpdate = await getSdnLastUpdate(ofac);
+  const entries = ofac.entriesSearched
+    ? ofac.entriesSearched.toLocaleString()
+    : "N/A";
+
+  drawOfficialHeader(ctx, {
+    meta: [
+      { label: "Report Generated", value: nowStamp() },
+      { label: "Screening Date", value: nowScreeningDate() },
+      { label: "Database Updated", value: lastUpdate, side: "right" },
+      { label: "Entries Searched", value: entries, side: "right" },
+    ],
+  });
+
+  const rows = [
+    { label: "Full Name", value: subjectFullName(customer) },
+    { label: "Date of Birth", value: customer.dob },
+    { label: "Driver License / PID", value: customer.dlnPid },
+  ];
+  if (customer.tradeVin) {
+    rows.push({ label: "Trade-In VIN", value: customer.tradeVin });
+  }
+  drawSubjectBox(ctx, {
+    title: opts.subjectLabel || "SUBJECT SCREENED",
+    rows,
+  });
+
+  drawResultBox(ctx, {
+    variant: ofac.passed ? "pass" : "fail",
+    title: ofac.passed ? "NO MATCH FOUND" : "POTENTIAL MATCH",
+    subtitle: ofac.passed
+      ? "Subject is NOT listed on the OFAC SDN List"
+      : "REVIEW REQUIRED — Potential match found",
+    extraLines:
+      !ofac.passed && ofac.matches?.length
+        ? ofac.matches
+            .slice(0, 5)
+            .map(
+              (m) =>
+                `${m.name} — Score ${m.score}%   ·   Type ${m.type}`
+            )
+        : [],
+  });
+
+  drawCertification(
+    ctx,
+    "This screening was performed against the OFAC SDN List under U.S. Treasury regulations requiring screening of customers prior to consummating a financial transaction. This report serves as documented evidence of compliance efforts."
+  );
+
+  drawFooter(ctx, STANDARD_FOOTER);
+}
+
+function subjectFullName(customer) {
+  if (!customer) return "—";
+  const name = buildSanitizedName(customer)
+    .replace(/&amp;/g, "&")
+    .replace(/&#039;/g, "'")
+    .replace(/&quot;/g, '"');
+  return name;
+}
+
+// ---------- MDOS screenshot sections (Repeat Offender, Title) ----------
+
+function drawMdosScreenshotSection(ctx, opts) {
+  const { title, meta, screenshot } = opts;
+  drawCheckHeader(ctx, { title, meta });
+  drawScreenshotPage(ctx, ensureDataUrl(screenshot), { reserveFooter: true });
+  drawFooter(ctx, MDOS_FOOTER);
+}
+
+// ---------- Public downloaders ----------
+
+export async function downloadOfacReportPDF(currentResults) {
+  if (!currentResults?.checks?.ofac) {
+    showToast("No OFAC results to download.", "info");
+    return;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext();
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    return;
+  }
+  await drawOfacSection(ctx, currentResults.customer, currentResults.checks.ofac);
+  ctx.doc.save(
+    `OFAC_${safeFileName([
+      currentResults.customer?.firstName,
+      currentResults.customer?.lastName,
+    ])}_${Date.now()}.pdf`
+  );
+}
+
+export async function downloadCoBuyerOfacReportPDF(currentResults) {
+  const cbOfac = currentResults?.checks?.coBuyerOfac;
+  const coBuyer = currentResults?.customer?.coBuyer;
+  if (!cbOfac || !coBuyer) {
+    showToast("No Co-Buyer OFAC results to download.", "info");
+    return;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext();
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    return;
+  }
+  await drawOfacSection(ctx, coBuyer, cbOfac, {
+    subjectLabel: "CO-BUYER SUBJECT SCREENED",
+  });
+  ctx.doc.save(
+    `OFAC_CoBuyer_${safeFileName([
+      coBuyer.firstName,
+      coBuyer.lastName,
+    ])}_${Date.now()}.pdf`
+  );
+}
+
+export async function downloadRepeatOffenderPDF(currentResults) {
+  const ro = currentResults?.checks?.repeatOffender;
+  if (!ro?.screenshotData) {
+    showToast("No Repeat Offender screenshot to download.", "info");
+    return;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext();
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    return;
+  }
+  const c = currentResults.customer;
+  drawMdosScreenshotSection(ctx, {
+    title: "Michigan Repeat Offender Check",
+    meta: [
+      { label: "Customer", value: subjectFullName(c) },
+      { label: "Date", value: nowStamp() },
+    ],
+    screenshot: ro.screenshotData,
+  });
+  ctx.doc.save(
+    `RepeatOffender_${safeFileName([c?.firstName, c?.lastName])}_${Date.now()}.pdf`
+  );
+}
+
+export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
+  const ro = currentResults?.checks?.coBuyerRepeatOffender;
+  const co = currentResults?.customer?.coBuyer;
+  if (!ro?.screenshotData || !co) {
+    showToast("No Co-Buyer Repeat Offender screenshot to download.", "info");
+    return;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext();
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    return;
+  }
+  drawMdosScreenshotSection(ctx, {
+    title: "Michigan Repeat Offender Check (Co-Buyer)",
+    meta: [
+      { label: "Co-Buyer", value: subjectFullName(co) },
+      { label: "Date", value: nowStamp() },
+    ],
+    screenshot: ro.screenshotData,
+  });
+  ctx.doc.save(
+    `RepeatOffender_CoBuyer_${safeFileName([co.firstName, co.lastName])}_${Date.now()}.pdf`
+  );
+}
+
+export async function downloadTitleReportPDF(currentResults) {
+  const title = currentResults?.checks?.title;
+  if (!title?.screenshotData) {
+    showToast("No Title/Lien screenshot to download.", "info");
+    return;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext();
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    return;
+  }
+  const vin = currentResults.customer?.tradeVin || "N/A";
+  drawMdosScreenshotSection(ctx, {
+    title: "Michigan Title & Lien Check",
+    meta: [
+      { label: "VIN", value: vin },
+      { label: "Date", value: nowStamp() },
+    ],
+    screenshot: title.screenshotData,
+  });
+  ctx.doc.save(`Title_${safeFileName([vin])}_${Date.now()}.pdf`);
+}
+
+/**
+ * Combined "Download PDF" — every check that ran, stitched into one PDF
+ * with the same official styling as the per-check downloads.
+ */
 export async function downloadAllReportsPDF(currentResults) {
   if (!currentResults) {
     showToast("No results to download.", "info");
     return;
   }
 
-  let JsPDF;
+  let ctx;
   try {
-    JsPDF = await loadJsPDF();
+    ctx = await createPdfContext();
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
@@ -549,190 +1222,76 @@ export async function downloadAllReportsPDF(currentResults) {
 
   const customer = currentResults.customer;
   const checks = currentResults.checks || {};
-  const decision = currentResults.finalDecision;
-  const timestamp = new Date().toLocaleString();
-  const safeName = `${customer.firstName || ""}_${customer.lastName || ""}`
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^A-Za-z0-9_-]/g, "");
 
-  const doc = new JsPDF({ unit: "pt", format: "letter" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 36;
-  let y = margin;
-
-  const writeLine = (text, opts = {}) => {
-    const fontSize = opts.fontSize || 11;
-    doc.setFontSize(fontSize);
-    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
-    if (opts.color) doc.setTextColor(...opts.color);
-    else doc.setTextColor(0, 0, 0);
-    const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
-    for (const line of lines) {
-      if (y > pageHeight - margin) {
-        doc.addPage();
-        y = margin;
-      }
-      doc.text(line, margin, y);
-      y += fontSize * 1.3;
-    }
+  let firstPage = true;
+  const beginSection = () => {
+    if (!firstPage) ctx.doc.addPage();
+    ctx.y = ctx.margin;
+    firstPage = false;
   };
 
-  const drawSeparator = () => {
-    if (y > pageHeight - margin - 10) {
-      doc.addPage();
-      y = margin;
-      return;
-    }
-    doc.setDrawColor(200);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 12;
-  };
-
-  // Cover.
-  writeLine("Compliance Central — Deal Jacket", { fontSize: 18, bold: true, color: [30, 58, 95] });
-  writeLine(timestamp, { fontSize: 10, color: [100, 100, 100] });
-  y += 8;
-
-  drawSeparator();
-  writeLine("Customer", { fontSize: 13, bold: true, color: [30, 58, 95] });
-  writeLine(fmtSummaryLine("Name", buildSanitizedName(customer).replace(/&amp;/g, "&")));
-  writeLine(fmtSummaryLine("Date of Birth", customer.dob));
-  writeLine(fmtSummaryLine("DLN / PID", customer.dlnPid));
-  if (customer.tradeVin) writeLine(fmtSummaryLine("Trade VIN", customer.tradeVin));
-
-  if (customer.coBuyer && customer.hasCoBuyer) {
-    y += 6;
-    writeLine("Co-Buyer", { fontSize: 13, bold: true, color: [30, 58, 95] });
-    const co = customer.coBuyer;
-    writeLine(
-      fmtSummaryLine("Name", `${co.firstName || ""} ${co.middleName || ""} ${co.lastName || ""} ${co.suffix || ""}`.replace(/\s+/g, " ").trim())
-    );
-    writeLine(fmtSummaryLine("Date of Birth", co.dob));
-    writeLine(fmtSummaryLine("DLN / PID", co.dlnPid));
-  }
-
-  y += 8;
-  drawSeparator();
-  writeLine("Decision", { fontSize: 13, bold: true, color: [30, 58, 95] });
-  if (decision) {
-    const color =
-      decision.level === "APPROVED"
-        ? [6, 95, 70]
-        : decision.level === "REVIEW"
-        ? [146, 64, 14]
-        : [153, 27, 27];
-    writeLine(decision.level, { fontSize: 18, bold: true, color });
-    writeLine(decision.reason, { fontSize: 11 });
-    if (decision.warnings?.length) {
-      for (const w of decision.warnings) writeLine("• " + w, { fontSize: 10, color: [146, 64, 14] });
-    }
-  }
-
-  y += 8;
-  drawSeparator();
-  writeLine("Check Results", { fontSize: 13, bold: true, color: [30, 58, 95] });
-
-  const passColor = [6, 95, 70];
-  const failColor = [153, 27, 27];
-  const warnColor = [146, 64, 14];
-
+  // OFAC (buyer).
   if (checks.ofac) {
-    writeLine("OFAC (Buyer)", { fontSize: 12, bold: true });
-    writeLine(
-      checks.ofac.passed ? "Pass — no SDN matches" : `Failed — ${checks.ofac.matches?.length || 0} potential match(es)`,
-      { fontSize: 10, color: checks.ofac.passed ? passColor : failColor }
-    );
-    if (!checks.ofac.passed && checks.ofac.matches?.length) {
-      for (const m of checks.ofac.matches.slice(0, 5)) {
-        writeLine(`• ${m.name} — score ${m.score}, type ${m.type}`, { fontSize: 9 });
-      }
-    }
-    y += 4;
+    beginSection();
+    await drawOfacSection(ctx, customer, checks.ofac);
   }
 
-  if (checks.coBuyerOfac) {
-    writeLine("OFAC (Co-Buyer)", { fontSize: 12, bold: true });
-    writeLine(
-      checks.coBuyerOfac.passed ? "Pass — no SDN matches" : `Failed — ${checks.coBuyerOfac.matches?.length || 0} potential match(es)`,
-      { fontSize: 10, color: checks.coBuyerOfac.passed ? passColor : failColor }
-    );
-    y += 4;
+  // OFAC (co-buyer).
+  if (checks.coBuyerOfac && customer.coBuyer) {
+    beginSection();
+    await drawOfacSection(ctx, customer.coBuyer, checks.coBuyerOfac, {
+      subjectLabel: "CO-BUYER SUBJECT SCREENED",
+    });
   }
 
-  if (checks.repeatOffender) {
-    writeLine("Repeat Offender (Buyer)", { fontSize: 12, bold: true });
-    if (checks.repeatOffender.status === "error") {
-      writeLine(`Error: ${checks.repeatOffender.error || "Unknown"}`, { fontSize: 10, color: warnColor });
-    } else {
-      writeLine(
-        checks.repeatOffender.passed ? "Pass — eligible" : `Failed — ${checks.repeatOffender.status}`,
-        { fontSize: 10, color: checks.repeatOffender.passed ? passColor : failColor }
-      );
-    }
-    y += 4;
+  // Repeat Offender (buyer).
+  if (checks.repeatOffender?.screenshotData) {
+    beginSection();
+    drawMdosScreenshotSection(ctx, {
+      title: "Michigan Repeat Offender Check",
+      meta: [
+        { label: "Customer", value: subjectFullName(customer) },
+        { label: "Date", value: nowStamp() },
+      ],
+      screenshot: checks.repeatOffender.screenshotData,
+    });
   }
 
-  if (checks.coBuyerRepeatOffender) {
-    writeLine("Repeat Offender (Co-Buyer)", { fontSize: 12, bold: true });
-    writeLine(
-      checks.coBuyerRepeatOffender.passed
-        ? "Pass — eligible"
-        : `Failed — ${checks.coBuyerRepeatOffender.status}`,
-      { fontSize: 10, color: checks.coBuyerRepeatOffender.passed ? passColor : failColor }
-    );
-    y += 4;
+  // Repeat Offender (co-buyer).
+  if (checks.coBuyerRepeatOffender?.screenshotData && customer.coBuyer) {
+    beginSection();
+    drawMdosScreenshotSection(ctx, {
+      title: "Michigan Repeat Offender Check (Co-Buyer)",
+      meta: [
+        { label: "Co-Buyer", value: subjectFullName(customer.coBuyer) },
+        { label: "Date", value: nowStamp() },
+      ],
+      screenshot: checks.coBuyerRepeatOffender.screenshotData,
+    });
   }
 
-  if (checks.title) {
-    writeLine("Title & Lien", { fontSize: 12, bold: true });
-    if (checks.title.error) {
-      writeLine(`Error: ${checks.title.error}`, { fontSize: 10, color: warnColor });
-    } else {
-      writeLine(
-        `Brand: ${checks.title.titleBrand || "CLEAN"}${checks.title.titleType ? " — Type: " + checks.title.titleType : ""}`,
-        { fontSize: 10 }
-      );
-      writeLine(`Lien: ${checks.title.lienStatus || "Unknown"}`, { fontSize: 10 });
-      if (checks.title.year && checks.title.make && checks.title.model) {
-        writeLine(`Vehicle: ${checks.title.year} ${checks.title.make} ${checks.title.model}`, { fontSize: 10 });
-      }
-    }
+  // Title & Lien.
+  if (checks.title?.screenshotData) {
+    beginSection();
+    drawMdosScreenshotSection(ctx, {
+      title: "Michigan Title & Lien Check",
+      meta: [
+        { label: "VIN", value: customer?.tradeVin || "N/A" },
+        { label: "Date", value: nowStamp() },
+      ],
+      screenshot: checks.title.screenshotData,
+    });
   }
 
-  // Embed screenshots on separate pages.
-  const embedScreenshot = async (label, base64) => {
-    if (!base64) return;
-    const dataUrl = ensureDataUrl(base64);
-    doc.addPage();
-    y = margin;
-    writeLine(label, { fontSize: 14, bold: true, color: [30, 58, 95] });
-    y += 4;
-    try {
-      const imgProps = doc.getImageProperties(dataUrl);
-      const usableW = pageWidth - margin * 2;
-      const ratio = imgProps.height / imgProps.width;
-      let renderW = usableW;
-      let renderH = renderW * ratio;
-      const maxH = pageHeight - margin * 2 - 32;
-      if (renderH > maxH) {
-        renderH = maxH;
-        renderW = renderH / ratio;
-      }
-      doc.addImage(dataUrl, "PNG", margin, y, renderW, renderH);
-    } catch (err) {
-      console.error("PDF image error:", err);
-      writeLine("Screenshot could not be embedded.", { fontSize: 10, color: warnColor });
-    }
-  };
+  if (firstPage) {
+    showToast("Nothing to include in the PDF yet.", "info");
+    return;
+  }
 
-  await embedScreenshot("Repeat Offender (Buyer)", checks.repeatOffender?.screenshotData);
-  await embedScreenshot(
-    "Repeat Offender (Co-Buyer)",
-    checks.coBuyerRepeatOffender?.screenshotData
+  ctx.doc.save(
+    `Compliance_${safeFileName([
+      customer?.firstName,
+      customer?.lastName,
+    ])}_${Date.now()}.pdf`
   );
-  await embedScreenshot("Title & Lien", checks.title?.screenshotData);
-
-  doc.save(`compliance-${safeName || "report"}-${Date.now()}.pdf`);
 }

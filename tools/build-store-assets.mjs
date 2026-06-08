@@ -1,0 +1,351 @@
+/**
+ * Build all Chrome Web Store media for Compliance Central.
+ *
+ *   node tools/build-store-assets.mjs
+ *
+ * - Icons (transparent shield) are rasterized from icons/icon.svg with sharp.
+ * - Screenshots (1280x800) and promo tiles are authored as self-contained HTML
+ *   and rendered to PNG by headless Google Chrome at an exact 1:1 pixel size.
+ *
+ * Requires: Google Chrome (macOS) and the `sharp` package.
+ */
+
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
+const BUILD = join(ROOT, "store-assets", ".build");
+const IMAGES = join(ROOT, "store-assets", "chrome-web-store", "images");
+const CHROME =
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
+mkdirSync(BUILD, { recursive: true });
+mkdirSync(join(IMAGES, "icons"), { recursive: true });
+mkdirSync(join(IMAGES, "screenshots"), { recursive: true });
+mkdirSync(join(IMAGES, "promotional"), { recursive: true });
+
+// ---------- brand ----------
+const C = {
+  navy: "#00274c",
+  navy2: "#003d73",
+  appbg: "#0a1628",
+  appbg2: "#0f2137",
+  card: "#122a45",
+  input: "#1a3654",
+  gold: "#ffcb05",
+  white: "#ffffff",
+  text2: "#b8c9db",
+  muted: "#6b8299",
+  success: "#22c55e",
+  warning: "#f59e0b",
+  border: "rgba(255,255,255,0.10)",
+};
+
+const shield = (size, stroke = 14) => `
+<svg width="${size}" height="${size}" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g${size}" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="${C.navy}"/><stop offset="1" stop-color="${C.navy2}"/>
+  </linearGradient></defs>
+  <path d="M64 0 L128 24 L128 64 C128 104 80 128 64 128 C48 128 0 104 0 64 L0 24 Z" fill="url(#g${size})"/>
+  <path d="M32 64 L52 84 L96 40" stroke="${C.gold}" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
+
+// ---------- shared CSS ----------
+const baseCss = `
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:${C.white}}
+.stage{width:1280px;height:800px;display:flex;position:relative;overflow:hidden;
+  background:radial-gradient(1100px 560px at 92% -8%, rgba(255,203,5,.10), transparent 60%),
+             linear-gradient(160deg, ${C.appbg} 0%, ${C.appbg2} 58%, ${C.appbg} 100%)}
+.copy{width:592px;padding:88px 0 88px 72px;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.brandrow{display:flex;align-items:center;gap:14px}
+.brandname{font-size:20px;font-weight:700;letter-spacing:.3px}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${C.gold}}
+.headline{font-size:46px;line-height:1.07;font-weight:800;letter-spacing:-1.2px}
+.headline .a{color:${C.gold}}
+.sub{font-size:18px;color:${C.text2};line-height:1.55;max-width:430px}
+.bullets{display:flex;flex-direction:column;gap:12px;margin-top:8px}
+.bullet{display:flex;align-items:center;gap:12px;font-size:16px;color:#dce7f2}
+.bdot{width:24px;height:24px;border-radius:50%;background:rgba(255,203,5,.16);color:${C.gold};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
+.panelwrap{flex:1;display:flex;align-items:center;justify-content:center;padding-right:56px}
+.panel{width:406px;height:664px;background:${C.appbg};border:1px solid ${C.border};border-radius:22px;box-shadow:0 34px 80px rgba(0,0,0,.6);overflow:hidden;display:flex;flex-direction:column}
+.phead{background:linear-gradient(135deg, ${C.navy}, ${C.navy2});padding:13px 15px;display:flex;align-items:center;gap:11px}
+.phead h1{font-size:15px;font-weight:700;line-height:1.1}
+.phead .psub{font-size:9px;letter-spacing:1.4px;text-transform:uppercase;opacity:.82;margin-top:1px}
+.gear{margin-left:auto;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;color:#fff}
+.pbody{padding:15px;display:flex;flex-direction:column;gap:11px;overflow:hidden;flex:1}
+.sectitle{font-size:12px;font-weight:700;color:${C.text2};letter-spacing:.3px;display:flex;align-items:center;gap:7px}
+.field{background:${C.input};border:1px solid ${C.border};border-radius:9px;padding:9px 11px;font-size:13px;color:#fff}
+.flabel{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:${C.muted};margin-bottom:5px}
+.row2{display:flex;gap:9px}
+.row2>div{flex:1}
+.decision{border-radius:12px;padding:14px;text-align:center}
+.decision.ok{background:rgba(34,197,94,.13);border:1px solid ${C.success}}
+.dbadge{display:inline-flex;align-items:center;gap:8px;font-size:18px;font-weight:800;letter-spacing:.5px}
+.dbadge.ok{color:${C.success}}
+.dtext{font-size:11px;color:${C.text2};margin-top:6px}
+.rcard{background:${C.card};border:1px solid ${C.border};border-radius:11px;padding:11px 12px}
+.rhead{display:flex;align-items:center;justify-content:space-between}
+.rname{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;display:inline-flex;align-items:center;gap:5px}
+.pill.pass{color:${C.success};background:rgba(34,197,94,.14)}
+.pill.warn{color:${C.warning};background:rgba(245,158,11,.14)}
+.pill.muted{color:${C.muted};background:rgba(107,130,153,.16)}
+.rdetail{font-size:11px;color:${C.muted};margin-top:5px}
+.btnrow{display:flex;gap:7px;margin-top:9px}
+.btn{font-size:10.5px;font-weight:600;padding:6px 10px;border-radius:7px;background:rgba(255,255,255,.06);border:1px solid ${C.border};color:${C.text2};display:inline-flex;align-items:center;gap:5px}
+.btn.gold{background:${C.gold};color:#1a1a1a;border-color:${C.gold}}
+.ico{display:inline-flex}
+.ico svg{display:block}
+`;
+
+const I = {
+  globe: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+  ban: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>`,
+  file: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  check: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  shieldcheck: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`,
+  printer: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
+  download: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  gear: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  key: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3"/></svg>`,
+  calendar: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>`,
+  history: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>`,
+};
+
+const pHead = () => `
+<div class="phead">
+  ${shield(34)}
+  <div><h1>Compliance Central</h1><div class="psub">Michigan Dealer Compliance Hub</div></div>
+  <div class="gear">${I.gear}</div>
+</div>`;
+
+const rcard = (icon, name, pill, pillCls, detail, btns = "") => `
+<div class="rcard">
+  <div class="rhead">
+    <span class="rname"><span class="ico" style="color:${C.text2}">${icon}</span>${name}</span>
+    <span class="pill ${pillCls}">${pill}</span>
+  </div>
+  <div class="rdetail">${detail}</div>
+  ${btns}
+</div>`;
+
+const evBtns = `<div class="btnrow"><span class="btn"><span class="ico">${I.printer}</span>Print</span><span class="btn gold"><span class="ico">${I.download}</span>Download PDF</span></div>`;
+
+const stage = (copy, panelBody) => `<!doctype html><html><head><meta charset="utf-8"><style>${baseCss}</style></head>
+<body><div class="stage"><div class="copy">${copy}</div>
+<div class="panelwrap"><div class="panel">${pHead()}<div class="pbody">${panelBody}</div></div></div></div></body></html>`;
+
+const copyBlock = (eyebrow, headlineHtml, sub, bullets) => `
+  <div class="brandrow">${shield(40)}<span class="brandname">Compliance Central</span></div>
+  <div class="eyebrow">${eyebrow}</div>
+  <div class="headline">${headlineHtml}</div>
+  <div class="sub">${sub}</div>
+  <div class="bullets">${bullets
+    .map((b) => `<div class="bullet"><span class="bdot">${I.check}</span>${b}</div>`)
+    .join("")}</div>`;
+
+// ---------- screenshots ----------
+const screen01 = stage(
+  copyBlock(
+    "One customer, every check",
+    `Run all your checks.<br>Get <span class="a">one clear decision.</span>`,
+    "OFAC sanctions, Repeat Offender, and Title/Lien — together in a single side-panel run, with a printable Deal Jacket.",
+    ["Approved / Review / Denied at a glance", "Print or save a PDF for the deal file", "Co-buyer screened in the same run"]
+  ),
+  `
+  <div class="decision ok"><div class="dbadge ok"><span class="ico">${I.shieldcheck}</span>APPROVED</div>
+    <div class="dtext">All checks passed — clear to proceed</div></div>
+  ${rcard(I.globe, "OFAC Screening", "Pass", "pass", "No matches in SDN list", evBtns)}
+  ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible per MDOS response", evBtns)}
+  ${rcard(I.file, "Title &amp; Lien", "Clear", "pass", "2021 Ford F-150 · Clean · No liens", evBtns)}
+  `
+);
+
+const screen02 = stage(
+  copyBlock(
+    "No account required",
+    `OFAC sanctions screening,<br><span class="a">100% on your device.</span>`,
+    "Match buyers against the U.S. Treasury OFAC SDN list instantly. Nothing about your customer ever leaves your computer for this check.",
+    ["Works the moment you install", "Daily auto-refresh of the sanctions list", "Fuzzy name + alias matching"]
+  ),
+  `
+  <div class="sectitle">${I.globe} OFAC Only</div>
+  ${rcard(I.globe, "OFAC Screening", "Pass", "pass", "No matches across 17,400+ SDN entries", evBtns)}
+  <div class="rcard" style="border-style:dashed">
+    <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>Runs locally — no API key needed</div>
+    <div class="rdetail">Repeat Offender &amp; Title checks connect to your backend; add a key in Settings to enable them.</div>
+  </div>
+  ${rcard(I.ban, "Repeat Offender", "Setup", "warn", "Add your API key in Settings to enable")}
+  `
+);
+
+const screen03 = stage(
+  copyBlock(
+    "Connect in seconds",
+    `Add your key once.<br><span class="a">Unlock every check.</span>`,
+    "A simple Settings panel connects your dealership's secure backend — no developer tools, no copy-pasting into storage.",
+    ["Paste your key and save", "Key stored only on your device", "Request access right from Settings"]
+  ),
+  `
+  <div class="sectitle">${I.key} Backend API Key</div>
+  <div class="rdetail" style="margin:0">OFAC works with no setup. Repeat Offender and Title/Lien checks require a key.</div>
+  <div><div class="flabel">API Key</div><div class="field" style="font-family:ui-monospace,Menlo,monospace">cc_live_•••••••••••••••••••••</div></div>
+  <div class="pill pass" style="width:max-content">● Connected — MDOS checks enabled</div>
+  <div class="btnrow"><span class="btn gold" style="padding:8px 14px">Save Key</span><span class="btn" style="padding:8px 14px">Clear</span></div>
+  <div class="rdetail">Don't have a key yet? <span style="color:${C.gold}">Request access</span> or email support.</div>
+  `
+);
+
+const screen04 = stage(
+  copyBlock(
+    "Fast, accurate entry",
+    `Enter a date of birth<br><span class="a">in two taps.</span>`,
+    "A decade-based picker makes older customers quick to enter — no endless scrolling, no typos in the deal file.",
+    ["Jump by decade, then pick the year", "Type MM/DD/YYYY or use the calendar", "Validated age and format checks"]
+  ),
+  `
+  <div class="row2"><div><div class="flabel">First Name</div><div class="field">John</div></div>
+    <div><div class="flabel">Last Name</div><div class="field">Anderson</div></div></div>
+  <div><div class="flabel">Date of Birth</div><div class="field" style="display:flex;align-items:center;justify-content:space-between">03/14/1962<span class="ico" style="color:${C.gold}">${I.calendar}</span></div></div>
+  <div class="rcard" style="padding:13px">
+    <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:${C.text2};margin-bottom:10px"><span>◀</span><span>1960 – 1969</span><span>▶</span></div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+      ${[1960,1961,1962,1963,1964,1965,1966,1967,1968,1969]
+        .map((y) => `<div style="text-align:center;font-size:12px;font-weight:600;padding:9px 0;border-radius:8px;${y===1962?`background:${C.gold};color:#1a1a1a`:`background:rgba(255,255,255,.05);color:${C.text2}`}">${y}</div>`)
+        .join("")}
+    </div>
+  </div>
+  `
+);
+
+const histItem = (name, decision, cls, meta) => `
+<div class="rcard" style="padding:11px 12px">
+  <div class="rhead"><span class="rname" style="font-size:13px">${name}</span><span class="pill ${cls}">${decision}</span></div>
+  <div class="rdetail">${meta}</div>
+  <div class="btnrow"><span class="btn"><span class="ico">${I.printer}</span>Print All</span><span class="btn"><span class="ico">${I.download}</span>All PDF</span></div>
+</div>`;
+
+const screen05 = stage(
+  copyBlock(
+    "Documented &amp; printable",
+    `Every check, kept<br><span class="a">for your records.</span>`,
+    "Recent screenings stay on your device so you can re-open, re-print, or export the evidence — including the official MDOS screenshot — anytime.",
+    ["Re-print or export past deals", "Official MDOS screenshots saved", "Stored locally, cleared on demand"]
+  ),
+  `
+  <div class="sectitle">${I.history} Compliance History &nbsp;<span style="color:${C.muted};font-weight:500">· 3 today, 41 total</span></div>
+  ${histItem("John Anderson", "APPROVED", "pass", "Today 9:14 AM · VIN ···09186")}
+  ${histItem("Maria Gomez", "APPROVED", "pass", "Today 8:51 AM · No Trade-In")}
+  ${histItem("R. Whitfield", "REVIEW", "warn", "Yesterday 4:32 PM · Salvage title")}
+  ${histItem("D. Coleman", "APPROVED", "pass", "Yesterday 2:05 PM · VIN ···44120")}
+  `
+);
+
+// ---------- promo tiles ----------
+const promoSmall = `<!doctype html><html><head><meta charset="utf-8"><style>${baseCss}
+.tile{width:440px;height:280px;background:radial-gradient(420px 240px at 84% -10%, rgba(255,203,5,.16), transparent 62%),linear-gradient(135deg,${C.navy} 0%,${C.navy2} 100%);padding:30px 34px;display:flex;flex-direction:column;justify-content:space-between}
+.chip{font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;gap:7px}
+</style></head><body>
+<div class="tile">
+  <div style="display:flex;align-items:center;gap:12px">${shield(46)}<div style="font-size:22px;font-weight:800;letter-spacing:-.3px">Compliance Central</div></div>
+  <div><div style="font-size:25px;font-weight:800;line-height:1.12;letter-spacing:-.6px">Michigan dealer compliance,<br><span style="color:${C.gold}">all in one side panel.</span></div></div>
+  <div style="display:flex;gap:9px">
+    <span class="chip"><span class="ico">${I.globe}</span>OFAC</span>
+    <span class="chip"><span class="ico">${I.ban}</span>Repeat Offender</span>
+    <span class="chip"><span class="ico">${I.file}</span>Title/Lien</span>
+  </div>
+</div></body></html>`;
+
+const promoMarquee = `<!doctype html><html><head><meta charset="utf-8"><style>${baseCss}
+.m{width:1400px;height:560px;background:radial-gradient(900px 520px at 96% -10%, rgba(255,203,5,.14), transparent 60%),linear-gradient(135deg,${C.navy} 0%,${C.navy2} 100%);display:flex;align-items:center;padding:0 90px;position:relative;overflow:hidden}
+.left{width:58%;display:flex;flex-direction:column;gap:24px}
+.chip{font-size:15px;font-weight:700;padding:9px 16px;border-radius:24px;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;gap:9px}
+.mpanel{position:absolute;right:84px;top:64px;width:330px;height:432px;background:${C.appbg};border:1px solid ${C.border};border-radius:20px;box-shadow:0 40px 90px rgba(0,0,0,.5);overflow:hidden;transform:rotate(2deg)}
+</style></head><body>
+<div class="m">
+  <div class="left">
+    <div style="display:flex;align-items:center;gap:16px">${shield(58)}<div style="font-size:30px;font-weight:800;letter-spacing:-.5px">Compliance Central</div></div>
+    <div style="font-size:54px;font-weight:800;line-height:1.05;letter-spacing:-1.6px">OFAC, Repeat Offender &amp;<br>Title checks &mdash; <span style="color:${C.gold}">one click.</span></div>
+    <div style="font-size:19px;color:${C.text2};max-width:560px;line-height:1.5">Screen buyers, generate a printable Deal Jacket, and keep every result documented — built for Michigan auto dealers.</div>
+    <div style="display:flex;gap:12px">
+      <span class="chip"><span class="ico">${I.globe}</span>OFAC sanctions</span>
+      <span class="chip"><span class="ico">${I.ban}</span>Repeat Offender</span>
+      <span class="chip"><span class="ico">${I.file}</span>Title &amp; Lien</span>
+    </div>
+  </div>
+  <div class="mpanel">${pHead()}<div class="pbody">
+    <div class="decision ok"><div class="dbadge ok"><span class="ico">${I.shieldcheck}</span>APPROVED</div><div class="dtext">All checks passed</div></div>
+    ${rcard(I.globe, "OFAC", "Pass", "pass", "No SDN matches")}
+    ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible")}
+    ${rcard(I.file, "Title &amp; Lien", "Clear", "pass", "Clean · No liens")}
+  </div></div>
+</div></body></html>`;
+
+// ---------- render ----------
+function renderHtml(name, html, w, h, outPath) {
+  const htmlPath = join(BUILD, name + ".html");
+  writeFileSync(htmlPath, html);
+  execFileSync(
+    CHROME,
+    [
+      "--headless=new",
+      "--disable-gpu",
+      "--hide-scrollbars",
+      "--force-device-scale-factor=1",
+      `--window-size=${w},${h}`,
+      `--screenshot=${outPath}`,
+      "file://" + htmlPath,
+    ],
+    { stdio: "ignore" }
+  );
+}
+
+async function renderIcons() {
+  const { default: sharp } = await import("sharp");
+  const svg = readFileSync(join(ROOT, "icons", "icon.svg"));
+  const sizes = [16, 32, 48, 128];
+  for (const s of sizes) {
+    await sharp(svg, { density: 384 }).resize(s, s).png().toFile(join(ROOT, "icons", `icon${s}.png`));
+  }
+  // Store + master copies.
+  await sharp(svg, { density: 512 }).resize(128, 128).png().toFile(join(IMAGES, "icons", "icon128.png"));
+  await sharp(svg, { density: 1024 }).resize(1024, 1024).png().toFile(join(IMAGES, "icons", "icon-master-1024.png"));
+  await sharp(svg, { density: 1024 }).resize(512, 512).png().toFile(join(ROOT, "icons", "icon_master.png"));
+  console.log("icons: 16/32/48/128 + store 128 + master 1024/512");
+}
+
+const SCREENS = [
+  ["01-run-all-approved-1280x800", screen01, 1280, 800, join(IMAGES, "screenshots")],
+  ["02-ofac-only-local-1280x800", screen02, 1280, 800, join(IMAGES, "screenshots")],
+  ["03-settings-api-key-1280x800", screen03, 1280, 800, join(IMAGES, "screenshots")],
+  ["04-dob-decade-picker-1280x800", screen04, 1280, 800, join(IMAGES, "screenshots")],
+  ["05-compliance-history-1280x800", screen05, 1280, 800, join(IMAGES, "screenshots")],
+];
+
+// Remove the three stale screenshots from the prior version.
+for (const old of [
+  "01-run-all-results-and-pdf-actions-1280x800.png",
+  "02-history-recordkeeping-actions-1280x800.png",
+  "03-date-of-birth-year-selector-1280x800.png",
+]) {
+  const p = join(IMAGES, "screenshots", old);
+  if (existsSync(p)) rmSync(p);
+}
+
+await renderIcons();
+for (const [name, html, w, h, dir] of SCREENS) {
+  renderHtml(name, html, w, h, join(dir, name + ".png"));
+  console.log("screenshot:", name);
+}
+renderHtml("small-promo-440x280", promoSmall, 440, 280, join(IMAGES, "promotional", "small-promo-440x280.png"));
+console.log("promo: small 440x280");
+renderHtml("marquee-promo-1400x560", promoMarquee, 1400, 560, join(IMAGES, "promotional", "marquee-promo-1400x560.png"));
+console.log("promo: marquee 1400x560");
+
+rmSync(BUILD, { recursive: true, force: true });
+console.log("done.");

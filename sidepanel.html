@@ -19,10 +19,15 @@
             <h1>Compliance Central</h1>
             <span class="subtitle">Michigan Dealer Compliance Hub</span>
           </div>
+          <button id="settingsBtn" class="header-action-btn" aria-label="Open settings" title="Settings">
+            <span class="icon icon-settings"></span>
+          </button>
         </div>
       </header>
 
       <main id="main-content" class="hub-main" role="main">
+        <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
+
         <section class="input-section">
           <h3 class="section-title">
             <span class="section-icon icon icon-user"></span>
@@ -61,7 +66,21 @@
           <div class="form-row">
             <div class="form-group">
               <label for="dob">Date of Birth <span class="required">*</span></label>
-              <input type="date" id="dob" aria-required="true" />
+              <div class="date-input-shell">
+                <input
+                  type="text"
+                  id="dob"
+                  placeholder="MM/DD/YYYY"
+                  inputmode="numeric"
+                  autocomplete="bday"
+                  aria-required="true"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                />
+                <button type="button" class="date-picker-toggle" aria-label="Open Date of Birth calendar">
+                  <span class="icon icon-calendar"></span>
+                </button>
+              </div>
             </div>
             <div class="form-group">
               <label for="dlnPid">DLN/PID <span class="required">*</span></label>
@@ -115,7 +134,21 @@
           <div class="form-row">
             <div class="form-group">
               <label for="cbDob">Date of Birth <span class="required">*</span></label>
-              <input type="date" id="cbDob" aria-required="true" />
+              <div class="date-input-shell">
+                <input
+                  type="text"
+                  id="cbDob"
+                  placeholder="MM/DD/YYYY"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  aria-required="true"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                />
+                <button type="button" class="date-picker-toggle" aria-label="Open Co-Buyer Date of Birth calendar">
+                  <span class="icon icon-calendar"></span>
+                </button>
+              </div>
             </div>
             <div class="form-group">
               <label for="cbDlnPid">DLN/PID <span class="required">*</span></label>
@@ -227,6 +260,9 @@
                 <button class="btn-secondary btn-sm" id="printOfacBtn">
                   <span class="icon icon-printer"></span>Print
                 </button>
+                <button class="btn-secondary btn-sm" id="downloadOfacBtn">
+                  <span class="icon icon-download"></span>Download PDF
+                </button>
               </div>
             </div>
 
@@ -235,10 +271,13 @@
                 <h4><span class="check-icon icon icon-ban"></span>Repeat Offender</h4>
                 <span class="result-status status-pass" id="repeatResultStatus">Pass</span>
               </div>
-              <p class="result-detail" id="repeatResultDetail">No offenses found</p>
+              <p class="result-detail" id="repeatResultDetail">Eligible per MDOS repeat-offender response</p>
               <div class="result-actions">
                 <button class="btn-secondary btn-sm hidden" id="printRepeatBtn">
                   <span class="icon icon-printer"></span>Print
+                </button>
+                <button class="btn-secondary btn-sm hidden" id="downloadRepeatBtn">
+                  <span class="icon icon-download"></span>Download PDF
                 </button>
               </div>
             </div>
@@ -252,6 +291,9 @@
               <div class="result-actions">
                 <button class="btn-secondary btn-sm hidden" id="printTitleBtn">
                   <span class="icon icon-printer"></span>Print
+                </button>
+                <button class="btn-secondary btn-sm hidden" id="downloadTitleBtn">
+                  <span class="icon icon-download"></span>Download PDF
                 </button>
               </div>
             </div>
@@ -270,6 +312,9 @@
                   <button class="btn-secondary btn-sm" id="printCbOfacBtn">
                     <span class="icon icon-printer"></span>Print
                   </button>
+                  <button class="btn-secondary btn-sm" id="downloadCbOfacBtn">
+                    <span class="icon icon-download"></span>Download PDF
+                  </button>
                 </div>
               </div>
 
@@ -278,10 +323,13 @@
                   <h4><span class="check-icon icon icon-ban"></span>Repeat Offender (Co-Buyer)</h4>
                   <span class="result-status status-pass" id="cbRepeatResultStatus">Pass</span>
                 </div>
-                <p class="result-detail" id="cbRepeatResultDetail">No offenses found</p>
+                <p class="result-detail" id="cbRepeatResultDetail">Eligible per MDOS repeat-offender response</p>
                 <div class="result-actions">
                   <button class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
                     <span class="icon icon-printer"></span>Print
+                  </button>
+                  <button class="btn-secondary btn-sm hidden" id="downloadCbRepeatBtn">
+                    <span class="icon icon-download"></span>Download PDF
                   </button>
                 </div>
               </div>
@@ -340,6 +388,50 @@
             <button id="downloadScreenshotBtn" class="btn-secondary">
               <span class="btn-icon icon icon-download"></span> Download PNG
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="settingsModalTitle">Settings</h3>
+            <button class="modal-close" id="closeSettingsModal" aria-label="Close settings">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="settings-group">
+              <h4 class="settings-heading"><span class="icon icon-key"></span>Backend API Key</h4>
+              <p class="settings-help">
+                OFAC sanctions screening works instantly with no setup.
+                <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks connect to the
+                secure Compliance Central backend and require an API key.
+              </p>
+              <label class="settings-label" for="apiKeyInput">API Key</label>
+              <div class="api-key-row">
+                <input
+                  type="password"
+                  id="apiKeyInput"
+                  class="settings-input"
+                  placeholder="cc_live_…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide API key">
+                  <span class="icon icon-eye"></span>
+                </button>
+              </div>
+              <p id="apiKeyStatus" class="settings-status disconnected">Not connected — OFAC works now; MDOS checks need a key.</p>
+              <div class="settings-actions">
+                <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save Key</button>
+                <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Clear</button>
+              </div>
+              <p class="settings-help settings-help-muted">
+                Don't have a key yet?
+                <a id="getAccessLink" href="#" target="_blank" rel="noopener noreferrer">Request access</a>
+                or email <a id="supportEmailLink" href="#">support</a>.
+                Your key is stored only on this device.
+              </p>
+            </div>
           </div>
         </div>
       </div>

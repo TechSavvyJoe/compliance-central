@@ -4,6 +4,7 @@
 
 import { CONFIG } from "../../lib/config.js";
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { getDateInputValue, setDateInputValue } from "./date-picker.js";
 import { showToast } from "./toast.js";
 
 export function getFormData(elements) {
@@ -14,7 +15,7 @@ export function getFormData(elements) {
     middleName: elements.middleName?.value.trim() || "",
     lastName: elements.lastName.value.trim(),
     suffix: elements.suffix?.value || "",
-    dob: elements.dob.value,
+    dob: getDateInputValue(elements.dob),
     dlnPid: elements.dlnPid.value.trim(),
     tradeVin: elements.tradeVin.value.trim().toUpperCase(),
     hasCoBuyer,
@@ -26,7 +27,7 @@ export function getFormData(elements) {
       middleName: elements.cbMiddleName?.value.trim() || "",
       lastName: elements.cbLastName?.value.trim() || "",
       suffix: elements.cbSuffix?.value || "",
-      dob: elements.cbDob?.value || "",
+      dob: getDateInputValue(elements.cbDob),
       dlnPid: elements.cbDlnPid?.value.trim() || "",
     };
   }
@@ -34,7 +35,7 @@ export function getFormData(elements) {
   return data;
 }
 
-function validateField(fieldName, value, label, required = true) {
+export function validateField(fieldName, value, label, required = true) {
   const val = value?.trim() || "";
 
   if (required && !val) {
@@ -79,6 +80,10 @@ function validateField(fieldName, value, label, required = true) {
         birthDate.getDate() !== day
       ) {
         return { valid: false, error: `${label} is not a valid date` };
+      }
+
+      if (birthDate.getTime() > Date.now()) {
+        return { valid: false, error: `${label} cannot be in the future` };
       }
 
       const ageYears =
@@ -191,7 +196,7 @@ export async function loadCachedFormData(elements) {
     if (elements.middleName) elements.middleName.value = data.middleName || "";
     elements.lastName.value = data.lastName || "";
     if (elements.suffix) elements.suffix.value = data.suffix || "";
-    elements.dob.value = data.dob || "";
+    setDateInputValue(elements.dob, data.dob || "");
     elements.dlnPid.value = data.dlnPid || "";
     elements.tradeVin.value = data.tradeVin || "";
 
@@ -208,7 +213,7 @@ export async function loadCachedFormData(elements) {
       if (elements.cbMiddleName) elements.cbMiddleName.value = co.middleName || "";
       if (elements.cbLastName) elements.cbLastName.value = co.lastName || "";
       if (elements.cbSuffix) elements.cbSuffix.value = co.suffix || "";
-      if (elements.cbDob) elements.cbDob.value = co.dob || "";
+      setDateInputValue(elements.cbDob, co.dob || "");
       if (elements.cbDlnPid) elements.cbDlnPid.value = co.dlnPid || "";
     }
   } catch (error) {

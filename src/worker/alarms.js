@@ -1,18 +1,32 @@
 /**
- * Daily OFAC SDN refresh alarm.
+ * Daily OFAC SDN refresh alarm — fires every morning at 6:00 AM local time.
+ *
+ * If Chrome is closed at 6 AM, the alarm fires on next startup (assuming the
+ * data is stale, which onStartup also checks via needsUpdate).
  */
 
 import { initDB } from "../../ofac/storage.js";
 import { handleGetDataStatus, performSDNUpdate } from "./ofac-check.js";
 
 const UPDATE_ALARM_NAME = "ofac-sdn-update";
-const UPDATE_INTERVAL_HOURS = 24;
+const UPDATE_HOUR_LOCAL = 6;
+
+/** Timestamp (ms since epoch) of the next 6:00 AM local time. */
+function nextRefreshTimestamp() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(UPDATE_HOUR_LOCAL, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next.getTime();
+}
 
 export async function setupUpdateAlarm() {
   await chrome.alarms.clear(UPDATE_ALARM_NAME);
   chrome.alarms.create(UPDATE_ALARM_NAME, {
-    delayInMinutes: UPDATE_INTERVAL_HOURS * 60,
-    periodInMinutes: UPDATE_INTERVAL_HOURS * 60,
+    when: nextRefreshTimestamp(),
+    periodInMinutes: 24 * 60,
   });
 }
 

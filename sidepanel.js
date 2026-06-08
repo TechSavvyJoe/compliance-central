@@ -21,9 +21,14 @@ import {
   loadCachedFormData,
 } from "./src/sidepanel/form.js";
 import {
+  initDatePickers,
+  setDateInputValue,
+} from "./src/sidepanel/date-picker.js";
+import {
   runOfacCheck,
   runRepeatOffenderCheck,
   runTitleCheck,
+  clearTransientScreenshots,
 } from "./src/sidepanel/checks.js";
 import {
   resetProgress,
@@ -33,7 +38,13 @@ import {
   displayIndividualResult,
   setButtonsDisabled,
   setCardsLoadingState,
+  setSdnWarning,
 } from "./src/sidepanel/results.js";
+import {
+  initSettings,
+  openSettings,
+  hasBackendApiKey,
+} from "./src/sidepanel/settings.js";
 import {
   purgeOldHistoryEntries,
   saveToHistory,
@@ -48,6 +59,11 @@ import {
   printCoBuyerRepeatScreenshot,
   printTitleScreenshot,
   printAllReports,
+  downloadOfacReportPDF,
+  downloadCoBuyerOfacReportPDF,
+  downloadRepeatOffenderPDF,
+  downloadCoBuyerRepeatOffenderPDF,
+  downloadTitleReportPDF,
   downloadAllReportsPDF,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
@@ -56,6 +72,7 @@ import {
   setCurrentResults,
   loadPersistedResults,
   mergeIntoCurrentResults,
+  persistCurrentResults,
   getIsRunning,
   setIsRunning,
 } from "./src/sidepanel/state.js";
@@ -117,6 +134,9 @@ const elements = {
   printOfacBtn: $("printOfacBtn"),
   printRepeatBtn: $("printRepeatBtn"),
   printTitleBtn: $("printTitleBtn"),
+  downloadOfacBtn: $("downloadOfacBtn"),
+  downloadRepeatBtn: $("downloadRepeatBtn"),
+  downloadTitleBtn: $("downloadTitleBtn"),
   printAllBtn: $("printAllBtn"),
   downloadPdfBtn: $("downloadPdfBtn"),
 
@@ -130,6 +150,8 @@ const elements = {
   cbRepeatResultDetail: $("cbRepeatResultDetail"),
   printCbOfacBtn: $("printCbOfacBtn"),
   printCbRepeatBtn: $("printCbRepeatBtn"),
+  downloadCbOfacBtn: $("downloadCbOfacBtn"),
+  downloadCbRepeatBtn: $("downloadCbRepeatBtn"),
 
   // History
   historyCount: $("historyCount"),
@@ -149,6 +171,21 @@ const elements = {
   // Loading
   loadingOverlay: $("loadingOverlay"),
   loadingText: $("loadingText"),
+
+  // SDN data warning
+  sdnWarning: $("sdnWarning"),
+
+  // Settings
+  settingsBtn: $("settingsBtn"),
+  settingsModal: $("settingsModal"),
+  closeSettingsModal: $("closeSettingsModal"),
+  apiKeyInput: $("apiKeyInput"),
+  apiKeyStatus: $("apiKeyStatus"),
+  saveApiKeyBtn: $("saveApiKeyBtn"),
+  clearApiKeyBtn: $("clearApiKeyBtn"),
+  toggleApiKeyVisibility: $("toggleApiKeyVisibility"),
+  getAccessLink: $("getAccessLink"),
+  supportEmailLink: $("supportEmailLink"),
 };
 
 // Maps IN_FLIGHT keys to their progress-row status indicators.
@@ -170,12 +207,16 @@ function applyIcons() {
     ["icon-globe", ICONS.globe],
     ["icon-ban", ICONS.ban],
     ["icon-file", ICONS.fileText],
+    ["icon-calendar", ICONS.calendar],
     ["icon-play", ICONS.play],
     ["icon-trash", ICONS.trash],
     ["icon-history", ICONS.history],
     ["icon-printer", ICONS.printer],
     ["icon-download", ICONS.download],
     ["icon-chevron", ICONS.chevron],
+    ["icon-settings", ICONS.settings],
+    ["icon-key", ICONS.key],
+    ["icon-eye", ICONS.eye],
   ];
   for (const [cls, svg] of iconMap) {
     document.querySelectorAll("." + cls).forEach((el) => {
@@ -198,14 +239,64 @@ function hideLoading() {
 
 // ---------- Initialization ----------
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
+  // Critical path — must run synchronously so the UI is interactive.
   applyIcons();
+  initDatePickers([elements.dob, elements.cbDob]);
   initEventListeners();
-  await loadCachedFormData(elements);
-  await applyPersistedResults();
-  await updateHistoryCount(elements.historyCount);
-  await purgeOldHistoryEntries();
+
+  initSettings(elements);
+
+  // Independent async tasks — run in parallel, don't block paint.
+  loadCachedFormData(elements);
+  applyPersistedResults();
+  updateHistoryCount(elements.historyCount);
+  checkSdnDataStatus();
+
+  // Truly background — purge old history entries when idle.
+  const scheduleIdle = window.requestIdleCallback || ((fn) => setTimeout(fn, 250));
+  scheduleIdle(() => {
+    purgeOldHistoryEntries();
+  });
 });
+
+// ---------- OFAC data freshness banner ----------
+
+const SDN_STALE_DAYS = 7;
+
+async function checkSdnDataStatus() {
+  try {
+    const status = await chrome.runtime.sendMessage({ type: "getDataStatus" });
+    if (!status?.success) return;
+
+    if (status.updateStatus === "error") {
+      setSdnWarning(
+        elements,
+        "OFAC sanctions list failed to refresh. Screening may use older data — open the extension while online to retry."
+      );
+      return;
+    }
+
+    const ageDays = status.lastUpdate
+      ? (Date.now() - new Date(status.lastUpdate).getTime()) / 86400000
+      : Infinity;
+
+    if (!status.lastUpdate || status.entryCount === 0) {
+      // First run: data will download on the first OFAC check; no warning needed.
+      setSdnWarning(elements, null);
+    } else if (ageDays > SDN_STALE_DAYS) {
+      const days = Math.floor(ageDays);
+      setSdnWarning(
+        elements,
+        `OFAC sanctions list is ${days} days old. Reconnect to the internet so it can refresh before screening.`
+      );
+    } else {
+      setSdnWarning(elements, null);
+    }
+  } catch {
+    // Worker not ready / no data yet — leave the banner hidden.
+  }
+}
 
 async function applyPersistedResults() {
   const persisted = await loadPersistedResults();
@@ -220,18 +311,18 @@ async function applyPersistedResults() {
     if (results) {
       const checks = results.checks || {};
       if (checks.ofac) {
-        setCheckStatus(elements.ofacStatus, checks.ofac.passed ? "pass" : "fail");
+        setCheckStatus(elements.ofacStatus, statusForCheck(checks.ofac));
       }
       if (checks.repeatOffender) {
         setCheckStatus(
           elements.repeatStatus,
-          checks.repeatOffender.passed ? "pass" : "fail"
+          statusForCheck(checks.repeatOffender)
         );
       }
       if (checks.title) {
         setCheckStatus(
           elements.titleStatus,
-          checks.title.passed ? "pass" : "warning"
+          statusForCheck(checks.title, "warning")
         );
       }
     }
@@ -239,11 +330,19 @@ async function applyPersistedResults() {
     // Pick up an in-flight indicator on first paint.
     try {
       const { [STORAGE_KEYS.inFlightCheck]: inFlight } =
-        await chrome.storage.local.get(STORAGE_KEYS.inFlightCheck);
+        await chrome.storage.session.get(STORAGE_KEYS.inFlightCheck);
       applyInFlight(inFlight);
     } catch {
       // ignore
     }
+    return;
+  }
+
+  if (persisted.state === "individual" && persisted.results) {
+    setCurrentResults(persisted.results);
+    displayStoredIndividualResult(persisted.results);
+    elements.resultsSection.classList.remove("hidden");
+    elements.progressSection.classList.add("hidden");
     return;
   }
 
@@ -259,6 +358,23 @@ function applyInFlight(key) {
   const factory = IN_FLIGHT_TO_STATUS_EL[key];
   if (factory) {
     setCheckStatus(factory(), "running");
+  }
+}
+
+function statusForCheck(check, failStatus = "fail") {
+  if (!check) return "waiting";
+  if (check.error || check.status === "error") return "warning";
+  return check.passed ? "pass" : failStatus;
+}
+
+function displayStoredIndividualResult(results) {
+  const checks = results.checks || {};
+  if (checks.ofac) {
+    displayIndividualResult(elements, "ofac", checks.ofac);
+  } else if (checks.repeatOffender) {
+    displayIndividualResult(elements, "repeatOffender", checks.repeatOffender);
+  } else if (checks.title) {
+    displayIndividualResult(elements, "title", checks.title);
   }
 }
 
@@ -302,12 +418,20 @@ function initEventListeners() {
       loadHistoryItem(item);
     } else if (btn.classList.contains("history-print-ofac")) {
       withTempResults(item.fullResults, () => printOfacReport(item.fullResults));
+    } else if (btn.classList.contains("history-download-ofac")) {
+      withTempResults(item.fullResults, () => downloadOfacReportPDF(item.fullResults));
     } else if (btn.classList.contains("history-print-repeat")) {
       withTempResults(item.fullResults, () => printRepeatScreenshot(item.fullResults));
+    } else if (btn.classList.contains("history-download-repeat")) {
+      withTempResults(item.fullResults, () => downloadRepeatOffenderPDF(item.fullResults));
     } else if (btn.classList.contains("history-print-title")) {
       withTempResults(item.fullResults, () => printTitleScreenshot(item.fullResults));
+    } else if (btn.classList.contains("history-download-title")) {
+      withTempResults(item.fullResults, () => downloadTitleReportPDF(item.fullResults));
     } else if (btn.classList.contains("history-print-all")) {
       withTempResults(item.fullResults, () => printAllReports(item.fullResults));
+    } else if (btn.classList.contains("history-download-all")) {
+      withTempResults(item.fullResults, () => downloadAllReportsPDF(item.fullResults));
     }
   });
 
@@ -329,12 +453,31 @@ function initEventListeners() {
     printTitleScreenshot(getCurrentResults())
   );
 
+  // Per-check download buttons
+  elements.downloadOfacBtn?.addEventListener("click", () =>
+    downloadOfacReportPDF(getCurrentResults())
+  );
+  elements.downloadRepeatBtn?.addEventListener("click", () =>
+    downloadRepeatOffenderPDF(getCurrentResults())
+  );
+  elements.downloadTitleBtn?.addEventListener("click", () =>
+    downloadTitleReportPDF(getCurrentResults())
+  );
+
   // Co-Buyer print buttons
   elements.printCbOfacBtn?.addEventListener("click", () =>
     printCoBuyerOfacReport(getCurrentResults())
   );
   elements.printCbRepeatBtn?.addEventListener("click", () =>
     printCoBuyerRepeatScreenshot(getCurrentResults())
+  );
+
+  // Co-Buyer download buttons
+  elements.downloadCbOfacBtn?.addEventListener("click", () =>
+    downloadCoBuyerOfacReportPDF(getCurrentResults())
+  );
+  elements.downloadCbRepeatBtn?.addEventListener("click", () =>
+    downloadCoBuyerRepeatOffenderPDF(getCurrentResults())
   );
 
   // Bulk actions
@@ -396,12 +539,16 @@ function withTempResults(temp, fn) {
 
 // ---------- Friendly error messages ----------
 
+function isMissingKeyError(err) {
+  const msg = err?.message || err?.code || String(err || "");
+  return msg === MISSING_API_KEY || err?.code === MISSING_API_KEY;
+}
+
 function describeError(err) {
-  const msg = err?.message || err?.code || String(err);
-  if (msg === MISSING_API_KEY || err?.code === MISSING_API_KEY) {
-    return "Backend API key not configured. Set chrome.storage.local.backendApiKey to enable MDOS checks.";
+  if (isMissingKeyError(err)) {
+    return "Backend account not connected. Add your API key in Settings to enable Repeat Offender & Title checks. (OFAC works without a key.)";
   }
-  return msg;
+  return err?.message || err?.code || String(err);
 }
 
 // ---------- Action handlers ----------
@@ -411,8 +558,17 @@ async function handleRunAllChecks() {
   if (!validateCustomerFields(customerData)) return;
   if (getIsRunning()) return;
 
+  if (!(await hasBackendApiKey())) {
+    showToast(
+      "No API key set — OFAC will run, but Repeat Offender & Title checks need a key (open Settings).",
+      "info",
+      6000
+    );
+  }
+
   setIsRunning(true);
   setButtonsDisabled(elements, true);
+  await clearTransientScreenshots();
 
   const hasTrade = !!customerData.tradeVin;
 
@@ -457,8 +613,15 @@ async function handleRunOfac() {
   showLoading("Running OFAC screening...");
   try {
     const result = await runOfacCheck(customerData);
-    mergeIntoCurrentResults(customerData, "ofac", result);
+    const results = mergeIntoCurrentResults(customerData, "ofac", result, {
+      replace: true,
+      runType: "individual",
+      runLabel: "OFAC Only",
+    });
     displayIndividualResult(elements, "ofac", result);
+    await persistCurrentResults();
+    await saveToHistory(results);
+    await updateHistoryCount(elements.historyCount);
   } catch (error) {
     showToast("OFAC check failed: " + describeError(error), "error");
   } finally {
@@ -472,12 +635,26 @@ async function handleRunRepeatOffender() {
   if (!validateCustomerFields(customerData)) return;
   setButtonsDisabled(elements, true);
   showLoading("Checking Repeat Offender status...");
+  await clearTransientScreenshots();
   try {
     const result = await runRepeatOffenderCheck(customerData);
-    mergeIntoCurrentResults(customerData, "repeatOffender", result);
+    const results = mergeIntoCurrentResults(
+      customerData,
+      "repeatOffender",
+      result,
+      {
+        replace: true,
+        runType: "individual",
+        runLabel: "Repeat Offender",
+      }
+    );
     displayIndividualResult(elements, "repeatOffender", result);
+    await persistCurrentResults();
+    await saveToHistory(results);
+    await updateHistoryCount(elements.historyCount);
   } catch (error) {
     showToast("Repeat Offender check failed: " + describeError(error), "error");
+    if (isMissingKeyError(error)) openSettings();
   } finally {
     hideLoading();
     setButtonsDisabled(elements, false);
@@ -492,12 +669,21 @@ async function handleRunTitle() {
   }
   setButtonsDisabled(elements, true);
   showLoading("Checking Title & Lien status...");
+  await clearTransientScreenshots();
   try {
     const result = await runTitleCheck(customerData);
-    mergeIntoCurrentResults(customerData, "title", result);
+    const results = mergeIntoCurrentResults(customerData, "title", result, {
+      replace: true,
+      runType: "individual",
+      runLabel: "Title/Lien",
+    });
     displayIndividualResult(elements, "title", result);
+    await persistCurrentResults();
+    await saveToHistory(results);
+    await updateHistoryCount(elements.historyCount);
   } catch (error) {
     showToast("Title check failed: " + describeError(error), "error");
+    if (isMissingKeyError(error)) openSettings();
   } finally {
     hideLoading();
     setButtonsDisabled(elements, false);
@@ -507,7 +693,7 @@ async function handleRunTitle() {
 function handleClear() {
   setIsRunning(false);
   setButtonsDisabled(elements, false);
-  chrome.storage.local.set({
+  chrome.storage.session.set({
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     [STORAGE_KEYS.searchProgress]: 0,
     [STORAGE_KEYS.inFlightCheck]: null,
@@ -518,7 +704,7 @@ function handleClear() {
   elements.middleName.value = "";
   elements.lastName.value = "";
   elements.suffix.value = "";
-  elements.dob.value = "";
+  setDateInputValue(elements.dob, "");
   elements.dlnPid.value = "";
   elements.tradeVin.value = "";
 
@@ -527,7 +713,7 @@ function handleClear() {
   if (elements.cbMiddleName) elements.cbMiddleName.value = "";
   if (elements.cbLastName) elements.cbLastName.value = "";
   if (elements.cbSuffix) elements.cbSuffix.value = "";
-  if (elements.cbDob) elements.cbDob.value = "";
+  setDateInputValue(elements.cbDob, "");
   if (elements.cbDlnPid) elements.cbDlnPid.value = "";
   if (elements.hasCoBuyer) elements.hasCoBuyer.checked = false;
   elements.coBuyerSection?.classList.add("hidden");
@@ -535,16 +721,28 @@ function handleClear() {
   chrome.storage.session.remove([
     STORAGE_KEYS.cachedFormData,
     STORAGE_KEYS.cachedAt,
+    STORAGE_KEYS.currentResults,
+    STORAGE_KEYS.searchStatus,
+    STORAGE_KEYS.searchProgress,
+    STORAGE_KEYS.inFlightCheck,
+    STORAGE_KEYS.lastError,
     STORAGE_KEYS.repeatOffenderScreenshot,
+    STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
     STORAGE_KEYS.titleScreenshot,
+    STORAGE_KEYS.lastResult,
   ]);
 
   setCurrentResults(null);
   chrome.storage.local.remove([
     STORAGE_KEYS.currentResults,
+    STORAGE_KEYS.searchStatus,
+    STORAGE_KEYS.searchProgress,
+    STORAGE_KEYS.inFlightCheck,
+    STORAGE_KEYS.lastError,
     STORAGE_KEYS.repeatOffenderScreenshot,
     STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
     STORAGE_KEYS.titleScreenshot,
+    STORAGE_KEYS.lastResult,
   ]);
   chrome.action.setBadgeText({ text: "" });
 
@@ -575,7 +773,7 @@ function loadHistoryItem(item) {
     elements.middleName.value = cust.middleName || "";
     elements.lastName.value = cust.lastName || "";
     elements.suffix.value = cust.suffix || "";
-    elements.dob.value = cust.dob || "";
+    setDateInputValue(elements.dob, cust.dob || "");
     elements.dlnPid.value = cust.dlnPid || "";
     elements.tradeVin.value = cust.tradeVin || "";
 
@@ -588,7 +786,7 @@ function loadHistoryItem(item) {
       elements.cbMiddleName.value = cust.coBuyer.middleName || "";
       elements.cbLastName.value = cust.coBuyer.lastName || "";
       elements.cbSuffix.value = cust.coBuyer.suffix || "";
-      elements.cbDob.value = cust.coBuyer.dob || "";
+      setDateInputValue(elements.cbDob, cust.coBuyer.dob || "");
       elements.cbDlnPid.value = cust.coBuyer.dlnPid || "";
     }
   } else if (item.customer) {
@@ -600,7 +798,11 @@ function loadHistoryItem(item) {
   }
 
   if (item.fullResults) {
-    displayResults(elements, item.fullResults);
+    if (item.fullResults.runType === "individual") {
+      displayStoredIndividualResult(item.fullResults);
+    } else {
+      displayResults(elements, item.fullResults);
+    }
     elements.progressSection.classList.add("hidden");
     elements.resultsSection.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -642,7 +844,7 @@ function downloadScreenshotModal() {
 // ---------- Storage listener (worker -> UI sync) ----------
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
-  if (namespace !== "local") return;
+  if (namespace !== "session") return;
 
   // Each branch independently try/catch'd so one bad update doesn't break others.
 
@@ -669,18 +871,18 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       setCurrentResults(next);
       const checks = next.checks || {};
       if (checks.ofac) {
-        setCheckStatus(elements.ofacStatus, checks.ofac.passed ? "pass" : "fail");
+        setCheckStatus(elements.ofacStatus, statusForCheck(checks.ofac));
       }
       if (checks.repeatOffender) {
         setCheckStatus(
           elements.repeatStatus,
-          checks.repeatOffender.passed ? "pass" : "fail"
+          statusForCheck(checks.repeatOffender)
         );
       }
       if (checks.title) {
         setCheckStatus(
           elements.titleStatus,
-          checks.title.passed ? "pass" : "warning"
+          statusForCheck(checks.title, "warning")
         );
       }
     } catch (e) {

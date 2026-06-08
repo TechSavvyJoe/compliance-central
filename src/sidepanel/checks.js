@@ -5,6 +5,23 @@
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 
+/**
+ * Remove any leftover MDOS screenshots from a prior run in this session.
+ * Guards against a stale screenshot being attached to a new check after an
+ * extension reload (session storage survives a reload within the same window).
+ */
+export async function clearTransientScreenshots() {
+  try {
+    await chrome.storage.session.remove([
+      STORAGE_KEYS.repeatOffenderScreenshot,
+      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
+      STORAGE_KEYS.titleScreenshot,
+    ]);
+  } catch {
+    // ignore
+  }
+}
+
 export async function runOfacCheck(customerData) {
   const response = await chrome.runtime.sendMessage({
     type: "RUN_OFAC_CHECK",
@@ -50,12 +67,12 @@ export async function runRepeatOffenderCheck(customerData) {
   let screenshotData = response.result.screenshotData;
   if (!screenshotData) {
     try {
-      const stored = await chrome.storage.local.get(
+      const stored = await chrome.storage.session.get(
         STORAGE_KEYS.repeatOffenderScreenshot
       );
       if (stored[STORAGE_KEYS.repeatOffenderScreenshot]) {
         screenshotData = stored[STORAGE_KEYS.repeatOffenderScreenshot];
-        chrome.storage.local.remove(STORAGE_KEYS.repeatOffenderScreenshot);
+        chrome.storage.session.remove(STORAGE_KEYS.repeatOffenderScreenshot);
       }
     } catch {
       // ignore
@@ -85,10 +102,10 @@ export async function runTitleCheck(customerData) {
   let screenshotData = result.screenshotData;
   if (!screenshotData) {
     try {
-      const stored = await chrome.storage.local.get(STORAGE_KEYS.titleScreenshot);
+      const stored = await chrome.storage.session.get(STORAGE_KEYS.titleScreenshot);
       if (stored[STORAGE_KEYS.titleScreenshot]) {
         screenshotData = stored[STORAGE_KEYS.titleScreenshot];
-        chrome.storage.local.remove(STORAGE_KEYS.titleScreenshot);
+        chrome.storage.session.remove(STORAGE_KEYS.titleScreenshot);
       }
     } catch {
       // ignore
@@ -117,8 +134,53 @@ export async function runTitleCheck(customerData) {
 }
 
 export function calculateFinalDecision(checks) {
-  const ofacPass = checks.ofac?.passed ?? false;
-  const repeatPass = checks.repeatOffender?.passed ?? false;
+  if (!checks.ofac) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "OFAC screening has not been completed",
+    };
+  }
+
+  if (checks.ofac.error || checks.coBuyerOfac?.error) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "OFAC screening could not be completed - review before proceeding",
+    };
+  }
+
+  if (!checks.repeatOffender) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "Repeat Offender check has not been completed",
+    };
+  }
+
+  if (
+    checks.repeatOffender.error ||
+    checks.repeatOffender.status === "error" ||
+    checks.coBuyerRepeatOffender?.error ||
+    checks.coBuyerRepeatOffender?.status === "error"
+  ) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "Repeat Offender check could not be completed - review before proceeding",
+    };
+  }
+
+  if (checks.title?.error) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "Title/Lien check could not be completed - review trade documents before proceeding",
+    };
+  }
+
+  const ofacPass = checks.ofac.passed;
+  const repeatPass = checks.repeatOffender.passed;
   const cbOfacPass = checks.coBuyerOfac ? checks.coBuyerOfac.passed : true;
   const cbRepeatPass = checks.coBuyerRepeatOffender
     ? checks.coBuyerRepeatOffender.passed

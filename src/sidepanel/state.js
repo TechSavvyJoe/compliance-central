@@ -28,14 +28,20 @@ export function setIsRunning(value) {
  * Merge a single-check result into `currentResults` for later printing.
  * Used by individual check handlers (OFAC Only, Repeat Offender, Title).
  */
-export function mergeIntoCurrentResults(customer, checkKey, result) {
+export function mergeIntoCurrentResults(customer, checkKey, result, options = {}) {
   const cur =
-    currentResults || {
-      customer,
-      checks: {},
-      timestamp: new Date().toISOString(),
-    };
+    options.replace || !currentResults
+      ? {
+          customer,
+          checks: {},
+          timestamp: new Date().toISOString(),
+          runType: options.runType || "individual",
+          runLabel: options.runLabel || "Individual Check",
+        }
+      : currentResults;
   cur.customer = customer;
+  cur.runType = options.runType || cur.runType || "individual";
+  cur.runLabel = options.runLabel || cur.runLabel || "Individual Check";
   cur.checks = cur.checks || {};
   cur.checks[checkKey] = result;
   currentResults = cur;
@@ -45,8 +51,9 @@ export function mergeIntoCurrentResults(customer, checkKey, result) {
 export async function persistCurrentResults() {
   if (!currentResults) return;
   try {
-    await chrome.storage.local.set({
+    await chrome.storage.session.set({
       [STORAGE_KEYS.currentResults]: currentResults,
+      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     });
   } catch (error) {
     console.error("Error persisting results:", error);
@@ -64,7 +71,7 @@ export async function persistCurrentResults() {
  */
 export async function loadPersistedResults() {
   try {
-    const storage = await chrome.storage.local.get([
+    const storage = await chrome.storage.session.get([
       STORAGE_KEYS.currentResults,
       STORAGE_KEYS.searchStatus,
       STORAGE_KEYS.searchProgress,
@@ -75,7 +82,7 @@ export async function loadPersistedResults() {
       if (startTime) {
         const elapsed = Date.now() - new Date(startTime).getTime();
         if (elapsed > CONFIG.timeouts.stuckSearchTimeout) {
-          await chrome.storage.local.set({
+          await chrome.storage.session.set({
             [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
             [STORAGE_KEYS.searchProgress]: 0,
           });
@@ -97,10 +104,13 @@ export async function loadPersistedResults() {
       const hoursDiff = (Date.now() - resultTime.getTime()) / 3600000;
       if (hoursDiff < 8) {
         currentResults = storage[STORAGE_KEYS.currentResults];
+        if (currentResults.runType === "individual") {
+          return { state: "individual", results: currentResults };
+        }
         return { state: "complete", results: currentResults };
       }
       currentResults = null;
-      await chrome.storage.local.remove([
+      await chrome.storage.session.remove([
         STORAGE_KEYS.currentResults,
         STORAGE_KEYS.searchStatus,
         STORAGE_KEYS.searchProgress,

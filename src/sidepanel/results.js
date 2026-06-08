@@ -5,6 +5,32 @@
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
 import { calculateFinalDecision } from "./checks.js";
+import { MISSING_API_KEY } from "../../lib/api-client.js";
+
+const MISSING_KEY_DETAIL =
+  "Backend account not connected — add your API key in Settings to enable this check.";
+
+/** Map raw check errors to user-facing copy (e.g. the missing-key case). */
+function friendlyCheckError(message, fallback) {
+  if (message === MISSING_API_KEY) return MISSING_KEY_DETAIL;
+  return message || fallback;
+}
+
+/**
+ * Show or hide the OFAC-data freshness banner. Pass a message to show it,
+ * or null/empty to hide it.
+ */
+export function setSdnWarning(elements, message) {
+  const el = elements.sdnWarning;
+  if (!el) return;
+  if (!message) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `<span class="icon">${ICONS.alertTriangle}</span><span>${sanitizeHTML(message)}</span>`;
+  el.classList.remove("hidden");
+}
 
 const STATUS_MAP = {
   waiting: { icon: ICONS.hourglass, label: "Waiting", cls: "status-waiting" },
@@ -14,6 +40,8 @@ const STATUS_MAP = {
   warning: { icon: ICONS.alertTriangle, label: "Review", cls: "status-warning" },
   skipped: { icon: ICONS.skip, label: "Skipped", cls: "status-skipped" },
 };
+
+const REPEAT_ELIGIBLE_DETAIL = "Eligible per MDOS repeat-offender response";
 
 function renderStatus(cfg, customLabel) {
   const label = customLabel != null ? sanitizeHTML(customLabel) : sanitizeHTML(cfg.label);
@@ -32,6 +60,115 @@ function setResultStatus(el, statusKey, customLabel) {
   const cfg = STATUS_MAP[statusKey] || STATUS_MAP.waiting;
   el.innerHTML = renderStatus(cfg, customLabel);
   el.className = "result-status " + cfg.cls;
+}
+
+function checkStatusKey(check, failKey = "fail") {
+  if (!check) return "waiting";
+  if (check.error || check.status === "error") return "warning";
+  return check.passed ? "pass" : failKey;
+}
+
+function setActionVisibility(button, visible) {
+  button?.classList.toggle("hidden", !visible);
+}
+
+function prepareFullResultsView(elements) {
+  elements.ofacResultCard?.classList.remove("hidden");
+  elements.repeatResultCard?.classList.remove("hidden");
+  elements.titleResultCard?.classList.remove("hidden");
+  elements.cbOfacResultCard?.classList.remove("hidden");
+  elements.cbRepeatResultCard?.classList.remove("hidden");
+
+  for (const button of [
+    elements.printOfacBtn,
+    elements.downloadOfacBtn,
+    elements.printRepeatBtn,
+    elements.downloadRepeatBtn,
+    elements.printTitleBtn,
+    elements.downloadTitleBtn,
+    elements.printCbOfacBtn,
+    elements.downloadCbOfacBtn,
+    elements.printCbRepeatBtn,
+    elements.downloadCbRepeatBtn,
+  ]) {
+    setActionVisibility(button, false);
+  }
+}
+
+function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
+  if (!ofac) {
+    setResultStatus(statusEl, "skipped", "Not Run");
+    if (detailEl) detailEl.textContent = "OFAC screening has not run";
+    setActionVisibility(printBtn, false);
+    setActionVisibility(downloadBtn, false);
+    return;
+  }
+
+  if (ofac.error || ofac.status === "error") {
+    setResultStatus(statusEl, "warning", "Error");
+    if (detailEl) {
+      detailEl.textContent = ofac.error || "OFAC screening could not be completed";
+    }
+    setActionVisibility(printBtn, false);
+    setActionVisibility(downloadBtn, false);
+    return;
+  }
+
+  setResultStatus(
+    statusEl,
+    ofac.passed ? "pass" : "fail",
+    ofac.passed ? "Pass" : "Match"
+  );
+  if (detailEl) {
+    detailEl.textContent = ofac.passed
+      ? "No matches in SDN list"
+      : `${ofac.matches?.length || 0} potential match(es) found`;
+  }
+  setActionVisibility(printBtn, true);
+  setActionVisibility(downloadBtn, true);
+}
+
+function repeatOffenderDetail(result) {
+  if (result?.passed) return REPEAT_ELIGIBLE_DETAIL;
+  return result?.message || result?.status || "Review MDOS repeat-offender response";
+}
+
+function showPartialNotice(elements, label) {
+  if (!elements.finalDecision) return;
+  elements.finalDecision.innerHTML = `
+    <div class="decision-badge decision-review">
+      <span class="decision-icon">${ICONS.alertTriangle}</span>
+      PARTIAL CHECK
+    </div>
+    <p class="decision-text">${sanitizeHTML(label)} completed. Print or download this result for your records.</p>
+  `;
+}
+
+function hideAllResultCards(elements) {
+  for (const card of [
+    elements.ofacResultCard,
+    elements.repeatResultCard,
+    elements.titleResultCard,
+    elements.cbOfacResultCard,
+    elements.cbRepeatResultCard,
+  ]) {
+    card?.classList.add("hidden");
+  }
+  elements.coBuyerResultsSection?.classList.add("hidden");
+  for (const button of [
+    elements.printOfacBtn,
+    elements.downloadOfacBtn,
+    elements.printRepeatBtn,
+    elements.downloadRepeatBtn,
+    elements.printTitleBtn,
+    elements.downloadTitleBtn,
+    elements.printCbOfacBtn,
+    elements.downloadCbOfacBtn,
+    elements.printCbRepeatBtn,
+    elements.downloadCbRepeatBtn,
+  ]) {
+    setActionVisibility(button, false);
+  }
 }
 
 /**
@@ -131,6 +268,7 @@ function animateProgress(elements) {
 }
 
 export function displayResults(elements, results) {
+  prepareFullResultsView(elements);
   if (!results.finalDecision) {
     results.finalDecision = calculateFinalDecision(results.checks);
   }
@@ -141,10 +279,10 @@ export function displayResults(elements, results) {
     badgeClass = "decision-approved";
     badgeIcon = ICONS.shieldCheck;
     badgeText = "APPROVED";
-  } else if (decision.level === "REVIEW") {
+  } else if (decision.level === "REVIEW" || decision.level === "PARTIAL") {
     badgeClass = "decision-review";
     badgeIcon = ICONS.alertTriangle;
-    badgeText = "REVIEW REQUIRED";
+    badgeText = decision.level === "PARTIAL" ? "PARTIAL CHECK" : "REVIEW REQUIRED";
   } else {
     badgeClass = "decision-denied";
     badgeIcon = ICONS.x;
@@ -167,35 +305,39 @@ export function displayResults(elements, results) {
   `;
 
   // Buyer OFAC.
-  if (results.checks.ofac) {
-    setResultStatus(
-      elements.ofacResultStatus,
-      results.checks.ofac.passed ? "pass" : "fail",
-      results.checks.ofac.passed ? "Pass" : "Match"
-    );
-    elements.ofacResultDetail.textContent = results.checks.ofac.passed
-      ? "No matches in SDN list"
-      : `${results.checks.ofac.matches?.length || 0} potential match(es) found`;
-  }
+  renderOfacResult(
+    elements.ofacResultStatus,
+    elements.ofacResultDetail,
+    elements.printOfacBtn,
+    elements.downloadOfacBtn,
+    results.checks.ofac
+  );
 
   // Buyer Repeat Offender.
   if (results.checks.repeatOffender) {
     const ro = results.checks.repeatOffender;
-    if (ro.status === "error") {
-      setResultStatus(elements.repeatResultStatus, "warning", "Error");
-      elements.repeatResultDetail.textContent =
-        ro.error || "Unknown error occurred";
+    if (ro.error || ro.status === "error") {
+      const isKey = ro.error === MISSING_API_KEY;
+      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Setup" : "Error");
+      elements.repeatResultDetail.textContent = friendlyCheckError(
+        ro.error,
+        "Unknown error occurred"
+      );
     } else {
       setResultStatus(
         elements.repeatResultStatus,
-        ro.passed ? "pass" : "fail",
+        checkStatusKey(ro),
         ro.passed ? "Pass" : "Found"
       );
-      elements.repeatResultDetail.textContent = ro.passed
-        ? "No offenses found"
-        : ro.status;
+      elements.repeatResultDetail.textContent = repeatOffenderDetail(ro);
     }
-    elements.printRepeatBtn?.classList.remove("hidden");
+    setActionVisibility(elements.printRepeatBtn, !ro.error && ro.status !== "error");
+    setActionVisibility(elements.downloadRepeatBtn, !!ro.screenshotData);
+  } else {
+    setResultStatus(elements.repeatResultStatus, "skipped", "Not Run");
+    elements.repeatResultDetail.textContent = "Repeat Offender check has not run";
+    setActionVisibility(elements.printRepeatBtn, false);
+    setActionVisibility(elements.downloadRepeatBtn, false);
   }
 
   // Title.
@@ -203,10 +345,14 @@ export function displayResults(elements, results) {
     const title = results.checks.title;
 
     if (title.error) {
-      setResultStatus(elements.titleResultStatus, "warning", "Check Failed");
-      elements.titleResultDetail.textContent =
-        title.error || "Unable to complete Title check";
+      const isKey = title.error === MISSING_API_KEY;
+      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Setup" : "Check Failed");
+      elements.titleResultDetail.textContent = friendlyCheckError(
+        title.error,
+        "Unable to complete Title check"
+      );
       elements.printTitleBtn?.classList.add("hidden");
+      elements.downloadTitleBtn?.classList.add("hidden");
     } else {
       let statusKey, statusLabel;
       if (title.passed) {
@@ -246,11 +392,15 @@ export function displayResults(elements, results) {
         lines.length > 0 ? lines.join("\n") : "Title information retrieved";
 
       elements.printTitleBtn?.classList.remove("hidden");
+      if (title.screenshotData) {
+        elements.downloadTitleBtn?.classList.remove("hidden");
+      }
     }
   } else {
     setResultStatus(elements.titleResultStatus, "skipped", "No Trade");
     elements.titleResultDetail.textContent = "No trade-in provided";
     elements.printTitleBtn?.classList.add("hidden");
+    elements.downloadTitleBtn?.classList.add("hidden");
   }
 
   // Co-Buyer.
@@ -260,29 +410,42 @@ export function displayResults(elements, results) {
   if (hasCoBuyer && elements.coBuyerResultsSection) {
     elements.coBuyerResultsSection.classList.remove("hidden");
 
-    if (results.checks.coBuyerOfac) {
-      const cbOfac = results.checks.coBuyerOfac;
-      setResultStatus(
-        elements.cbOfacResultStatus,
-        cbOfac.passed ? "pass" : "fail",
-        cbOfac.passed ? "Pass" : "Match"
-      );
-      elements.cbOfacResultDetail.textContent = cbOfac.passed
-        ? "No matches in SDN list"
-        : `${cbOfac.matches?.length || 0} potential match(es) found`;
-    }
+    renderOfacResult(
+      elements.cbOfacResultStatus,
+      elements.cbOfacResultDetail,
+      elements.printCbOfacBtn,
+      elements.downloadCbOfacBtn,
+      results.checks.coBuyerOfac
+    );
 
     if (results.checks.coBuyerRepeatOffender) {
       const cbRO = results.checks.coBuyerRepeatOffender;
-      setResultStatus(
-        elements.cbRepeatResultStatus,
-        cbRO.passed ? "pass" : "fail",
-        cbRO.passed ? "Pass" : "Found"
+      if (cbRO.error || cbRO.status === "error") {
+        const isKey = cbRO.error === MISSING_API_KEY;
+        setResultStatus(elements.cbRepeatResultStatus, "warning", isKey ? "Setup" : "Error");
+        elements.cbRepeatResultDetail.textContent = friendlyCheckError(
+          cbRO.error,
+          "Unknown error occurred"
+        );
+      } else {
+        setResultStatus(
+          elements.cbRepeatResultStatus,
+          checkStatusKey(cbRO),
+          cbRO.passed ? "Pass" : "Found"
+        );
+        elements.cbRepeatResultDetail.textContent = repeatOffenderDetail(cbRO);
+      }
+      setActionVisibility(
+        elements.printCbRepeatBtn,
+        !cbRO.error && cbRO.status !== "error"
       );
-      elements.cbRepeatResultDetail.textContent = cbRO.passed
-        ? "No offenses found"
-        : cbRO.status;
-      elements.printCbRepeatBtn?.classList.remove("hidden");
+      setActionVisibility(elements.downloadCbRepeatBtn, !!cbRO.screenshotData);
+    } else {
+      setResultStatus(elements.cbRepeatResultStatus, "skipped", "Not Run");
+      elements.cbRepeatResultDetail.textContent =
+        "Co-Buyer Repeat Offender check has not run";
+      setActionVisibility(elements.printCbRepeatBtn, false);
+      setActionVisibility(elements.downloadCbRepeatBtn, false);
     }
   } else if (elements.coBuyerResultsSection) {
     elements.coBuyerResultsSection.classList.add("hidden");
@@ -290,42 +453,63 @@ export function displayResults(elements, results) {
 }
 
 export function displayIndividualResult(elements, type, result) {
+  hideAllResultCards(elements);
   elements.resultsSection.classList.remove("hidden");
+  showPartialNotice(elements, {
+    ofac: "OFAC Only",
+    repeatOffender: "Repeat Offender",
+    title: "Title/Lien",
+  }[type] || "Individual Check");
 
   if (type === "ofac") {
-    setResultStatus(
+    elements.ofacResultCard?.classList.remove("hidden");
+    renderOfacResult(
       elements.ofacResultStatus,
-      result.passed ? "pass" : "fail",
-      result.passed ? "Pass" : "Match"
+      elements.ofacResultDetail,
+      elements.printOfacBtn,
+      elements.downloadOfacBtn,
+      result
     );
-    elements.ofacResultDetail.textContent = result.passed
-      ? "No matches in SDN list"
-      : `${result.matches?.length || 0} potential match(es) found`;
-    elements.printOfacBtn?.classList.remove("hidden");
   } else if (type === "repeatOffender") {
-    setResultStatus(
-      elements.repeatResultStatus,
-      result.passed ? "pass" : "fail",
-      result.passed ? "Pass" : "Found"
-    );
-    elements.repeatResultDetail.textContent = result.passed
-      ? "No offenses found"
-      : result.status;
-    if (result.screenshotData) {
-      elements.printRepeatBtn?.classList.remove("hidden");
+    elements.repeatResultCard?.classList.remove("hidden");
+    if (result.error || result.status === "error") {
+      const isKey = result.error === MISSING_API_KEY;
+      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Setup" : "Error");
+      elements.repeatResultDetail.textContent = friendlyCheckError(
+        result.error,
+        "Repeat Offender check could not be completed"
+      );
+    } else {
+      setResultStatus(
+        elements.repeatResultStatus,
+        checkStatusKey(result),
+        result.passed ? "Pass" : "Found"
+      );
+      elements.repeatResultDetail.textContent = repeatOffenderDetail(result);
     }
+    setActionVisibility(elements.printRepeatBtn, !result.error && result.status !== "error");
+    setActionVisibility(elements.downloadRepeatBtn, !!result.screenshotData);
   } else if (type === "title") {
-    setResultStatus(
-      elements.titleResultStatus,
-      result.passed ? "pass" : "warning",
-      result.passed ? "Clear" : "Review"
-    );
-    let detail = `Title: ${result.titleBrand}`;
-    if (result.hasLien) detail += `\nLien: ${result.lienHolder || "Yes"}`;
-    elements.titleResultDetail.textContent = detail;
-    if (result.screenshotData) {
-      elements.printTitleBtn?.classList.remove("hidden");
+    elements.titleResultCard?.classList.remove("hidden");
+    if (result.error) {
+      const isKey = result.error === MISSING_API_KEY;
+      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Setup" : "Check Failed");
+      elements.titleResultDetail.textContent = friendlyCheckError(
+        result.error,
+        "Unable to complete Title check"
+      );
+    } else {
+      setResultStatus(
+        elements.titleResultStatus,
+        result.passed ? "pass" : "warning",
+        result.passed ? "Clear" : "Review"
+      );
+      let detail = `Title: ${result.titleBrand}`;
+      if (result.hasLien) detail += `\nLien: ${result.lienHolder || "Yes"}`;
+      elements.titleResultDetail.textContent = detail;
     }
+    setActionVisibility(elements.printTitleBtn, !result.error);
+    setActionVisibility(elements.downloadTitleBtn, !!result.screenshotData);
   }
 }
 

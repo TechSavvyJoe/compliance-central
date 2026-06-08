@@ -1,6 +1,17 @@
 COMPLIANCE CENTRAL — CHROME WEB STORE LISTING COPY (v1.2.0)
 
-Paste these fields into the Chrome Web Store Developer Dashboard at submission.
+⚠️ THIS IS A REFERENCE DOC — DO NOT PASTE THE WHOLE THING INTO ANY FIELD.
+Each section below goes in a DIFFERENT place in the dashboard:
+
+  • Store listing tab → "Description" box  → paste ONLY the file `description.txt`
+                                              (the DETAILED DESCRIPTION section).
+  • Store listing tab → Category            → Productivity (or Tools).
+  • Store listing tab → Language            → English (United States).
+  • Privacy tab → "Single purpose"          → the SINGLE PURPOSE STATEMENT.
+  • Privacy tab → permission justifications → the PERMISSION JUSTIFICATIONS (one box each).
+  • Privacy tab → data usage / disclosures  → the DATA SAFETY answers.
+  • Privacy tab → "Privacy policy" URL      → https://techsavvyjoe.github.io/compliance-central/
+
 Privacy policy URL: https://techsavvyjoe.github.io/compliance-central/
 
 

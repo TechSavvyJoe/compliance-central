@@ -25,30 +25,49 @@ Compliance Central lets Michigan automotive dealers screen buyers and co-buyers 
 ---
 
 ## Detailed description (≤4000 chars)
-Compliance Central brings the three checks every Michigan auto dealer needs into one fast, organized side panel — no juggling tabs, portals, or spreadsheets.
+Compliance Central — The Ultimate Tool for Michigan Auto Dealers
 
-WHAT IT CHECKS
-• OFAC Sanctions Screening — Matches the buyer (and co-buyer) against the U.S. Treasury OFAC SDN list. Runs entirely on your device, so no customer data leaves your computer for this check.
-• Repeat Offender (MDOS) — Confirms the customer's eligibility through the Michigan Department of State portal.
-• Title & Lien — Looks up a trade-in VIN for title brand, title status, and active liens.
+Streamline your dealership's compliance workflow with Compliance Central, the all-in-one browser extension built specifically for Michigan automotive dealers.
 
-WHY DEALERS USE IT
-• One screen, one click. Enter the customer once and run all three checks together, or run any check on its own.
-• A clean "Deal Jacket." Every run produces a clear APPROVED / REVIEW / DENIED decision you can print or save as a PDF for your records.
-• Built-in history. Recent checks are kept locally so you can re-open, re-print, or export the evidence later.
-• Fast date entry. A decade-based date-of-birth picker makes entering older customers quick and accurate.
-• Co-buyer support. Screen a co-buyer in the same run.
+Stop juggling multiple tabs and manual searches. Compliance Central lives in your browser's side panel, so you can run critical screenings — OFAC, Repeat Offender, and Title/Lien — in seconds without ever navigating away from your DMS or work screen.
 
-HOW IT WORKS
-OFAC screening works immediately with no setup. The Repeat Offender and Title/Lien checks connect to the secure Compliance Central backend (which queries the MDOS portal for you) and require a dealer API key — enter it once in Settings. Need a key? Use the "Request access" link in Settings.
+Key Features:
 
-PRIVACY
-• OFAC screening is 100% local — no customer data is transmitted.
-• For MDOS checks, the name, date of birth, DLN/PID, and VIN are sent over HTTPS to our backend, used to obtain the official result, and then discarded — never stored or logged on our servers.
-• No tracking. No analytics. No ads.
+✅ Unified Compliance Dashboard — Run every essential check from one intuitive interface. Enter customer and trade-in data once and screen the buyer (and co-buyer) in a single click.
+
+✅ Instant OFAC Screening — 100% On-Device — Real-time checks against the U.S. Treasury's Specially Designated Nationals (SDN) list. OFAC runs entirely on your computer — no account, no setup, and no customer data ever leaves your device. Advanced fuzzy + alias matching improves accuracy so real matches aren't missed.
+
+✅ Repeat Offender Checks — Verifies a customer's Michigan Department of State (MDOS) Repeat Offender eligibility. Our secure backend queries the MDOS portal on your behalf and returns the official result plus a screenshot for your records.
+
+✅ Title & Lien Verification — Instantly retrieve key trade-in details:
+• Title Brand (Clean, Salvage, Rebuilt, etc.)
+• Active Liens & Lienholder Information
+• Vehicle Weight & Model Year
+
+✅ Professional "Deal Jacket" Reports — Generate a timestamped proof-of-compliance report in one click. Print or save as a PDF for the deal jacket. Recent checks are kept locally so you can re-open, re-print, or export them anytime.
+
+✅ Privacy-Conscious by Design
+• OFAC screening is processed entirely on your device — nothing is transmitted.
+• For Repeat Offender and Title checks, the customer's name, date of birth, DLN/PID (and VIN) are sent over encrypted HTTPS to our secure backend, used to obtain the official MDOS result, then immediately discarded — never stored or logged on our servers.
+• No tracking. No analytics. We never sell your data.
 Full policy: https://techsavvyjoe.github.io/compliance-central/
 
-Built for Michigan dealerships that want their OFAC, repeat-offender, and title/lien compliance in one place — accurate, documented, and fast.
+How It Works:
+1. Open the Compliance Central side panel.
+2. First time only: open Settings and add your backend API key to enable MDOS checks — OFAC works right away without one.
+3. Enter the Buyer/Co-Buyer information and Trade-In VIN.
+4. Click "Run All Checks."
+5. View clear Approved / Review / Denied results instantly.
+6. Click "Print All" to document your compliance.
+
+Perfect for: F&I Managers · Sales Managers · Title Clerks · Compliance Officers
+
+Requirements:
+• Google Chrome.
+• OFAC screening: works immediately — no account required.
+• Repeat Offender & Title/Lien checks: a Compliance Central backend API key (request access from the Settings panel).
+
+Take the headache out of compliance. Install Compliance Central today and deal with confidence.
 
 ---
 

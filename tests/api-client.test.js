@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  MISSING_API_KEY,
   backendRepeatOffenderCheck,
   backendTitleCheck,
   isBackendAvailable,
 } from "../lib/api-client.js";
+import { CONFIG } from "../lib/config.js";
 
 function stubStorage(key) {
   globalThis.chrome = {
@@ -20,13 +20,16 @@ function stubStorage(key) {
   };
 }
 
-test("a check with no API key rejects with the MISSING_API_KEY code", async () => {
-  stubStorage(null);
-  delete globalThis.fetch; // must fail before any network call
-  await assert.rejects(
-    () => backendRepeatOffenderCheck({ firstName: "A", lastName: "B" }),
-    (err) => err.message === MISSING_API_KEY && err.code === MISSING_API_KEY
-  );
+test("with no saved override, requests use the built-in default key", async () => {
+  stubStorage(null); // no per-install override saved
+  let sentKey = null;
+  globalThis.fetch = async (_url, opts) => {
+    sentKey = opts.headers["x-api-key"];
+    return { ok: true, json: async () => ({ success: true, status: "eligible", passed: true }) };
+  };
+  const res = await backendRepeatOffenderCheck({ firstName: "A", lastName: "B" });
+  assert.equal(sentKey, CONFIG.backend.defaultApiKey);
+  assert.equal(res.success, true);
 });
 
 test("a backend HTTP error surfaces the server's error message", async () => {

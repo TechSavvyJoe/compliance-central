@@ -1,10 +1,10 @@
 /**
- * Settings panel — manage the per-install backend API key.
+ * Settings panel — optional backend key override.
  *
- * OFAC screening runs locally and needs no key. The Repeat Offender and
- * Title/Lien checks call the secure backend, which requires an API key the
- * dealer obtains separately. This panel lets the user paste/save/clear that
- * key without touching DevTools, and points them at how to get one.
+ * All checks work out of the box: OFAC runs locally, and Repeat Offender /
+ * Title-Lien use a built-in backend key shipped with the extension (CONFIG.
+ * backend.defaultApiKey). This panel lets advanced users override that with
+ * their own key, stored only on this device.
  */
 
 import { CONFIG } from "../../lib/config.js";
@@ -12,17 +12,26 @@ import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { showModal, hideModal } from "./modals.js";
 import { showToast } from "./toast.js";
 
+// The effective key: a user's saved override if present, otherwise the
+// built-in key shipped with the extension (so everything works with no setup).
 export async function getBackendApiKey() {
+  const override = await getStoredOverride();
+  if (override) return override;
+  return CONFIG.backend.defaultApiKey || "";
+}
+
+export async function hasBackendApiKey() {
+  return !!(await getBackendApiKey());
+}
+
+// Only the user-saved override (ignores the built-in default).
+async function getStoredOverride() {
   try {
     const r = await chrome.storage.local.get(STORAGE_KEYS.backendApiKey);
     return r[STORAGE_KEYS.backendApiKey] || "";
   } catch {
     return "";
   }
-}
-
-export async function hasBackendApiKey() {
-  return !!(await getBackendApiKey());
 }
 
 let els = null;
@@ -53,22 +62,21 @@ export async function openSettings() {
 }
 
 async function refreshKeyStatus() {
-  const key = await getBackendApiKey();
+  const override = await getStoredOverride();
   if (els.apiKeyInput) {
-    els.apiKeyInput.value = key;
+    els.apiKeyInput.value = override;
     els.apiKeyInput.type = "password";
   }
-  setStatus(key);
+  setStatus(!!(await getBackendApiKey()));
 }
 
-function setStatus(key) {
+function setStatus(active) {
   if (!els.apiKeyStatus) return;
-  if (key) {
-    els.apiKeyStatus.textContent = "Connected — MDOS checks enabled.";
+  if (active) {
+    els.apiKeyStatus.textContent = "All checks active — no setup needed.";
     els.apiKeyStatus.className = "settings-status connected";
   } else {
-    els.apiKeyStatus.textContent =
-      "Not connected — OFAC works now; MDOS checks need a key.";
+    els.apiKeyStatus.textContent = "Not connected.";
     els.apiKeyStatus.className = "settings-status disconnected";
   }
 }
@@ -76,13 +84,13 @@ function setStatus(key) {
 async function saveKey() {
   const key = (els.apiKeyInput?.value || "").trim();
   if (!key) {
-    showToast("Enter an API key first.", "warning");
+    showToast("Enter a key to override the built-in access.", "warning");
     return;
   }
   try {
     await chrome.storage.local.set({ [STORAGE_KEYS.backendApiKey]: key });
-    setStatus(key);
-    showToast("API key saved. MDOS checks are now enabled.", "success");
+    setStatus(true);
+    showToast("Custom backend key saved.", "success");
   } catch {
     showToast("Could not save the key. Please try again.", "error");
   }
@@ -95,8 +103,8 @@ async function clearKey() {
     // ignore
   }
   if (els.apiKeyInput) els.apiKeyInput.value = "";
-  setStatus("");
-  showToast("API key cleared.", "info");
+  setStatus(!!(await getBackendApiKey()));
+  showToast("Reverted to built-in access.", "info");
 }
 
 function toggleVisibility() {

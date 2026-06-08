@@ -26,18 +26,15 @@ Key Features:
 Full policy: https://techsavvyjoe.github.io/compliance-central/
 
 How It Works:
-1. Open the Compliance Central side panel.
-2. First time only: open Settings and add your backend API key to enable MDOS checks — OFAC works right away without one.
-3. Enter the Buyer/Co-Buyer information and Trade-In VIN.
-4. Click "Run All Checks."
-5. View clear Approved / Review / Denied results instantly.
-6. Click "Print All" to document your compliance.
+1. Open the Compliance Central side panel — every check is ready, no account or setup.
+2. Enter the Buyer/Co-Buyer information and Trade-In VIN.
+3. Click "Run All Checks."
+4. View clear Approved / Review / Denied results instantly.
+5. Click "Print All" to document your compliance.
 
 Perfect for: F&I Managers · Sales Managers · Title Clerks · Compliance Officers
 
 Requirements:
-• Google Chrome.
-• OFAC screening: works immediately — no account required.
-• Repeat Offender & Title/Lien checks: a Compliance Central backend API key (request access from the Settings panel).
+• Google Chrome. That's it — every check is included free, with no account, API key, or setup.
 
 Take the headache out of compliance. Install Compliance Central today and deal with confidence.

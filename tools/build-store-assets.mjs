@@ -168,36 +168,41 @@ const screen01 = stage(
 
 const screen02 = stage(
   copyBlock(
-    "No account required",
+    "Free · No account",
     `OFAC sanctions screening,<br><span class="a">100% on your device.</span>`,
-    "Match buyers against the U.S. Treasury OFAC SDN list instantly. Nothing about your customer ever leaves your computer for this check.",
+    "Match buyers against the U.S. Treasury OFAC SDN list instantly. Nothing about your customer ever leaves your computer for this check — and every check is free, with no account.",
     ["Works the moment you install", "Daily auto-refresh of the sanctions list", "Fuzzy name + alias matching"]
   ),
   `
   <div class="sectitle">${I.globe} OFAC Only</div>
   ${rcard(I.globe, "OFAC Screening", "Pass", "pass", "No matches across 17,400+ SDN entries", evBtns)}
   <div class="rcard" style="border-style:dashed">
-    <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>Runs locally — no API key needed</div>
-    <div class="rdetail">Repeat Offender &amp; Title checks connect to your backend; add a key in Settings to enable them.</div>
+    <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>100% on-device — nothing transmitted</div>
+    <div class="rdetail">Repeat Offender &amp; Title/Lien are included too — no account or setup needed.</div>
   </div>
-  ${rcard(I.ban, "Repeat Offender", "Setup", "warn", "Add your API key in Settings to enable")}
+  ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible per MDOS response")}
   `
 );
 
 const screen03 = stage(
   copyBlock(
-    "Connect in seconds",
-    `Add your key once.<br><span class="a">Unlock every check.</span>`,
-    "A simple Settings panel connects your dealership's secure backend — no developer tools, no copy-pasting into storage.",
-    ["Paste your key and save", "Key stored only on your device", "Request access right from Settings"]
+    "Trade-in, covered",
+    `Title &amp; lien checks,<br><span class="a">in one look.</span>`,
+    "Enter the trade-in VIN and get the title brand, lien status, and vehicle details — pulled straight from the state record. Free, no setup.",
+    ["Title brand: Clean / Salvage / Rebuilt", "Active liens & lienholder", "Year, make, model & weight"]
   ),
   `
-  <div class="sectitle">${I.key} Backend API Key</div>
-  <div class="rdetail" style="margin:0">OFAC works with no setup. Repeat Offender and Title/Lien checks require a key.</div>
-  <div><div class="flabel">API Key</div><div class="field" style="font-family:ui-monospace,Menlo,monospace">cc_live_•••••••••••••••••••••</div></div>
-  <div class="pill pass" style="width:max-content">● Connected — MDOS checks enabled</div>
-  <div class="btnrow"><span class="btn gold" style="padding:8px 14px">Save Key</span><span class="btn" style="padding:8px 14px">Clear</span></div>
-  <div class="rdetail">Don't have a key yet? <span style="color:${C.gold}">Request access</span> or email support.</div>
+  <div class="sectitle">${I.file} Title &amp; Lien</div>
+  ${rcard(I.file, "Title &amp; Lien", "Clear", "pass", "2021 Ford F-150 · Clean title", evBtns)}
+  <div class="rcard">
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:11.5px;color:${C.text2}">
+      <div style="display:flex;justify-content:space-between"><span style="color:${C.muted}">Title status</span><span>Clean</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:${C.muted}">Brand</span><span>None</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:${C.muted}">Lien</span><span>No active liens</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:${C.muted}">Vehicle</span><span>2021 Ford F-150</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:${C.muted}">Title issued</span><span>03/2021</span></div>
+    </div>
+  </div>
   `
 );
 
@@ -385,7 +390,7 @@ async function renderStoreIcon() {
 const SCREENS = [
   ["01-run-all-approved-1280x800", screen01, 1280, 800, join(IMAGES, "screenshots")],
   ["02-ofac-only-local-1280x800", screen02, 1280, 800, join(IMAGES, "screenshots")],
-  ["03-settings-api-key-1280x800", screen03, 1280, 800, join(IMAGES, "screenshots")],
+  ["03-title-lien-1280x800", screen03, 1280, 800, join(IMAGES, "screenshots")],
   ["04-dob-decade-picker-1280x800", screen04, 1280, 800, join(IMAGES, "screenshots")],
   ["05-compliance-history-1280x800", screen05, 1280, 800, join(IMAGES, "screenshots")],
 ];

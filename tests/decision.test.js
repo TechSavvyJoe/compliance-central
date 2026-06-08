@@ -49,8 +49,8 @@ test("matches still deny and clean full checks still approve", () => {
   );
 });
 
-test("extension requires a per-install backend key and keeps storage for records", () => {
-  assert.equal(CONFIG.backend.defaultApiKey, null);
+test("ships a built-in backend key so all checks work with no setup", () => {
+  assert.ok(CONFIG.backend.defaultApiKey, "a built-in default key should be shipped");
   assert.equal(manifest.permissions.includes("unlimitedStorage"), true);
 });
 

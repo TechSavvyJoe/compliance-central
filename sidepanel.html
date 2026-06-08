@@ -400,36 +400,35 @@
           </div>
           <div class="modal-body">
             <div class="settings-group">
-              <h4 class="settings-heading"><span class="icon icon-key"></span>Backend API Key</h4>
+              <h4 class="settings-heading"><span class="icon icon-key"></span>Access</h4>
               <p class="settings-help">
-                OFAC sanctions screening works instantly with no setup.
-                <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks connect to the
-                secure Compliance Central backend and require an API key.
+                Every check is included <strong>free</strong> — no account or setup needed.
+                OFAC screening runs on your device; <strong>Repeat Offender</strong> and
+                <strong>Title/Lien</strong> use the secure Compliance Central backend.
               </p>
-              <label class="settings-label" for="apiKeyInput">API Key</label>
+              <p id="apiKeyStatus" class="settings-status connected">All checks active — no setup needed.</p>
+              <label class="settings-label" for="apiKeyInput">Custom backend key (optional)</label>
               <div class="api-key-row">
                 <input
                   type="password"
                   id="apiKeyInput"
                   class="settings-input"
-                  placeholder="cc_live_…"
+                  placeholder="Leave blank to use built-in access"
                   autocomplete="off"
                   spellcheck="false"
                 />
-                <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide API key">
+                <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide key">
                   <span class="icon icon-eye"></span>
                 </button>
               </div>
-              <p id="apiKeyStatus" class="settings-status disconnected">Not connected — OFAC works now; MDOS checks need a key.</p>
               <div class="settings-actions">
-                <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save Key</button>
-                <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Clear</button>
+                <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
+                <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Use Built-in</button>
               </div>
               <p class="settings-help settings-help-muted">
-                Don't have a key yet?
-                <a id="getAccessLink" href="#" target="_blank" rel="noopener noreferrer">Request access</a>
-                or email <a id="supportEmailLink" href="#">support</a>.
-                Your key is stored only on this device.
+                Most users can leave this blank. Advanced: enter your own backend key to override.
+                Questions? Email <a id="supportEmailLink" href="#">support</a>.
+                Keys are stored only on this device.
               </p>
             </div>
           </div>

@@ -8,7 +8,7 @@ import { calculateFinalDecision } from "./checks.js";
 import { MISSING_API_KEY } from "../../lib/api-client.js";
 
 const MISSING_KEY_DETAIL =
-  "Backend account not connected — add your API key in Settings to enable this check.";
+  "This check is temporarily unavailable — please try again in a moment.";
 
 /** Map raw check errors to user-facing copy (e.g. the missing-key case). */
 function friendlyCheckError(message, fallback) {

@@ -70,27 +70,23 @@ Key Features:
 Full policy: https://techsavvyjoe.github.io/compliance-central/
 
 How It Works:
-1. Open the Compliance Central side panel.
-2. First time only: open Settings and add your backend API key to enable MDOS checks — OFAC works right away without one.
-3. Enter the Buyer/Co-Buyer information and Trade-In VIN.
-4. Click "Run All Checks."
-5. View clear Approved / Review / Denied results instantly.
-6. Click "Print All" to document your compliance.
+1. Open the Compliance Central side panel — every check is ready, no account or setup.
+2. Enter the Buyer/Co-Buyer information and Trade-In VIN.
+3. Click "Run All Checks."
+4. View clear Approved / Review / Denied results instantly.
+5. Click "Print All" to document your compliance.
 
 Perfect for: F&I Managers · Sales Managers · Title Clerks · Compliance Officers
 
 Requirements:
-• Google Chrome.
-• OFAC screening: works immediately — no account required.
-• Repeat Offender & Title/Lien checks: a Compliance Central backend API key (request access from the Settings panel).
+• Google Chrome. That's it — every check is included free, with no account, API key, or setup.
 
 Take the headache out of compliance. Install Compliance Central today and deal with confidence.
 
 
 WHAT'S NEW IN 1.2.0
 
-• New Settings panel to add your backend API key directly in the extension — no more developer tools.
-• Clearer guidance when MDOS checks need a key (OFAC keeps working without one).
+• Every check is now included free — no account, API key, or setup required.
 • OFAC data-freshness warning so you never screen against an outdated sanctions list.
 • More reliable "Run All Checks" (protected against double-runs; one failing check no longer hides the others).
 • Refreshed store media and privacy policy.
@@ -131,5 +127,5 @@ SUBMISSION NOTES
 
 • This is version 1.2.0. If a prior version was never published, this is a new public listing; if 1.1.0 was published, upload 1.2.0 as an update.
 • Screenshots (1280x800) and promo tiles live in store-assets/chrome-web-store/images/.
-• Developer contact email (shown publicly): joejgallant@gmail.com — set in lib/config.js, the privacy policy, and the dashboard account settings.
-• Replace the Request access URL and support email placeholders in lib/config.js (CONFIG.support) and the privacy policy with your real values before submitting.
+• Developer contact email (shown publicly): joejgallant@gmail.com — already set in lib/config.js, the privacy policy, and the dashboard account settings.
+• All checks are free with no account/API key: the extension ships a built-in backend key (lib/config.js CONFIG.backend.defaultApiKey). To cut off abuse later, rotate CC_API_KEY on the Fly backend and ship a new value.

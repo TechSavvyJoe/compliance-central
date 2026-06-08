@@ -1,0 +1,121 @@
+I need help finishing a Chrome Web Store listing submission. Everything you need is in this message. Please complete it.
+
+WHAT THIS IS
+- Extension: "Compliance Central - Michigan Dealer Compliance Hub", version 1.2.0. A Chrome Manifest V3 side-panel tool for Michigan auto dealers that runs three compliance screenings: OFAC sanctions (local), MDOS Repeat Offender, and Title/Lien (via a secure backend).
+- The item already exists in my Chrome Web Store Developer Dashboard (Status: Published - public, with a draft in progress). I am logged in as the developer, and the "Store listing" edit page is open in Chrome.
+
+WHAT I NEED YOU TO DO
+Fill in two tabs of the listing draft with the exact text below, then click "Save draft". DO NOT click "Submit for review" until I explicitly tell you to.
+
+IMPORTANT TECHNICAL CONSTRAINT
+Google Chrome blocks browser EXTENSIONS from scripting the Web Store dashboard (any URL on chrome.google.com/webstore). Extension-based browser automation will fail with the error "The extensions gallery cannot be scripted."
+- If you can control my computer's screen/mouse/keyboard directly (computer use), operate the dashboard that way — it is not subject to that restriction.
+- If you cannot control my screen, then give me precise, numbered, click-by-click instructions for each field and I will perform them. Confirm each section as we go.
+
+=====================================================================
+TAB 1 — "Store listing"
+=====================================================================
+
+CATEGORY: Productivity   (Tools is also acceptable if Productivity is unavailable)
+
+LANGUAGE: English (United States)
+
+DESCRIPTION:
+Select all existing text in the Description box, delete it, and replace it with EXACTLY the following (and nothing else):
+
+-----BEGIN DESCRIPTION-----
+Compliance Central — The Ultimate Tool for Michigan Auto Dealers
+
+Streamline your dealership's compliance workflow with Compliance Central, the all-in-one browser extension built specifically for Michigan automotive dealers.
+
+Stop juggling multiple tabs and manual searches. Compliance Central lives in your browser's side panel, so you can run critical screenings — OFAC, Repeat Offender, and Title/Lien — in seconds without ever navigating away from your DMS or work screen.
+
+Key Features:
+
+✅ Unified Compliance Dashboard — Run every essential check from one intuitive interface. Enter customer and trade-in data once and screen the buyer (and co-buyer) in a single click.
+
+✅ Instant OFAC Screening — 100% On-Device — Real-time checks against the U.S. Treasury's Specially Designated Nationals (SDN) list. OFAC runs entirely on your computer — no account, no setup, and no customer data ever leaves your device. Advanced fuzzy + alias matching improves accuracy so real matches aren't missed.
+
+✅ Repeat Offender Checks — Verifies a customer's Michigan Department of State (MDOS) Repeat Offender eligibility. Our secure backend queries the MDOS portal on your behalf and returns the official result plus a screenshot for your records.
+
+✅ Title & Lien Verification — Instantly retrieve key trade-in details:
+• Title Brand (Clean, Salvage, Rebuilt, etc.)
+• Active Liens & Lienholder Information
+• Vehicle Weight & Model Year
+
+✅ Professional "Deal Jacket" Reports — Generate a timestamped proof-of-compliance report in one click. Print or save as a PDF for the deal jacket. Recent checks are kept locally so you can re-open, re-print, or export them anytime.
+
+✅ Privacy-Conscious by Design
+• OFAC screening is processed entirely on your device — nothing is transmitted.
+• For Repeat Offender and Title checks, the customer's name, date of birth, DLN/PID (and VIN) are sent over encrypted HTTPS to our secure backend, used to obtain the official MDOS result, then immediately discarded — never stored or logged on our servers.
+• No tracking. No analytics. We never sell your data.
+Full policy: https://techsavvyjoe.github.io/compliance-central/
+
+How It Works:
+1. Open the Compliance Central side panel.
+2. First time only: open Settings and add your backend API key to enable MDOS checks — OFAC works right away without one.
+3. Enter the Buyer/Co-Buyer information and Trade-In VIN.
+4. Click "Run All Checks."
+5. View clear Approved / Review / Denied results instantly.
+6. Click "Print All" to document your compliance.
+
+Perfect for: F&I Managers · Sales Managers · Title Clerks · Compliance Officers
+
+Requirements:
+• Google Chrome.
+• OFAC screening: works immediately — no account required.
+• Repeat Offender & Title/Lien checks: a Compliance Central backend API key (request access from the Settings panel).
+
+Take the headache out of compliance. Install Compliance Central today and deal with confidence.
+-----END DESCRIPTION-----
+
+GRAPHIC ASSETS (already uploaded and correct — do NOT change unless a slot is empty or shows a white/blank image):
+- Store icon: a 128x128 opaque navy tile with a gold check. Correct.
+- 5 screenshots (1280x800, dark navy). Correct.
+- Small promo tile (440x280) and Marquee promo tile (1400x560). Correct.
+If any asset slot is wrong, the correct files are on this Mac at:
+  /Users/joegallant/AI App Development Projects/compliance-central/store-assets/upload/
+  (store icon = cc-store-icon-v2-128.png; DOB screenshot = screenshot-dob-v2-1280x800.jpg; others named by number.)
+
+OFFICIAL URL / HOMEPAGE / SUPPORT URL (optional): you may set the Support URL to https://techsavvyjoe.github.io/compliance-central/
+
+=====================================================================
+TAB 2 — "Privacy" (left sidebar → Privacy)
+=====================================================================
+
+SINGLE PURPOSE (one text box):
+Compliance Central lets Michigan automotive dealers screen buyers and co-buyers for OFAC sanctions, MDOS repeat-offender status, and vehicle title/lien status from a single browser side panel, and produce a printable record of the result.
+
+PERMISSION JUSTIFICATIONS (there is one box per permission — paste the matching text):
+- sidePanel: The entire user interface is a Chrome side panel; this permission opens and renders it.
+- storage: Saves the dealer's compliance history, preferences, and backend API key locally on the device.
+- unlimitedStorage: The OFAC SDN sanctions dataset plus historical compliance records (with evidence screenshots) can exceed the default storage quota.
+- alarms: Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
+- Host permission https://data.opensanctions.org/: Downloads the public OFAC SDN sanctions list used for on-device screening.
+- Host permission https://compliance-central-api.fly.dev/: The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal.
+
+ARE YOU USING REMOTE CODE? → No. (All code is bundled in the package; nothing is fetched and executed remotely.)
+
+DATA USAGE (the checkbox form):
+- "Does this item collect or use user data?" → Yes.
+- Data collected: Personally identifiable information — name, date of birth, government ID (Michigan driver's license number / PID). (The trade-in VIN is sent only for the optional title check.)
+- Do NOT check: location, web history, financial/payment info, health, authentication info, personal communications.
+- Check all three required certifications (all are true for this extension):
+   (1) I do not sell or transfer user data to third parties, outside of the approved use cases.
+   (2) I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
+   (3) I do not use or transfer user data to determine creditworthiness or for lending purposes.
+- Privacy policy URL: https://techsavvyjoe.github.io/compliance-central/
+
+=====================================================================
+SUPPORT / CONTACT EMAIL
+=====================================================================
+Wherever a developer or support email is requested (account settings and/or the listing), use:
+  [REPLACE THIS WITH MY REAL SUPPORT EMAIL BEFORE YOU START]
+Note: the privacy policy currently lists "support@compliancecentral.app" as a placeholder; if that is not a real inbox I can receive mail at, ask me for the correct address.
+
+=====================================================================
+WHEN DONE
+=====================================================================
+1. Click "Save draft".
+2. Tell me everything the dashboard still flags as missing or invalid (red errors, required fields, the Distribution tab, etc.).
+3. STOP and wait for my explicit "yes, submit" before clicking "Submit for review".

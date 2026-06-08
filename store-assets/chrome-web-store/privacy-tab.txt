@@ -1,0 +1,54 @@
+PRIVACY TAB — copy each block into the matching field
+(Dashboard: left sidebar → Privacy)
+
+
+==================================================
+SINGLE PURPOSE  (one text box)
+==================================================
+Compliance Central lets Michigan automotive dealers screen buyers and co-buyers for OFAC sanctions, MDOS repeat-offender status, and vehicle title/lien status from a single browser side panel, and produce a printable record of the result.
+
+
+==================================================
+PERMISSION JUSTIFICATIONS  (one box per permission)
+==================================================
+
+sidePanel —
+The entire user interface is a Chrome side panel; this permission opens and renders it.
+
+storage —
+Saves the dealer's compliance history, preferences, and backend API key locally on the device.
+
+unlimitedStorage —
+The OFAC SDN sanctions dataset plus historical compliance records (with evidence screenshots) can exceed the default storage quota.
+
+alarms —
+Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
+
+Host permission https://data.opensanctions.org/ —
+Downloads the public OFAC SDN sanctions list used for on-device screening.
+
+Host permission https://compliance-central-api.fly.dev/ —
+The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal.
+
+Are you using remote code?  →  NO
+(All code is bundled in the package; nothing is fetched and executed remotely.)
+
+
+==================================================
+DATA USAGE  (the checkbox form)
+==================================================
+"Does this item collect or use user data?"  →  YES
+
+Data types to mark as COLLECTED:
+  • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
+  • Web history / authentication info: NO
+  • Location, financial, health, personal communications, etc.: NO
+  (The trade-in VIN is sent only for the optional title check — note under "other" if asked.)
+
+Check ALL THREE required certifications (they are all true for this extension):
+  [x] I do not sell or transfer user data to third parties, outside of the approved use cases.
+  [x] I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
+  [x] I do not use or transfer user data to determine creditworthiness or for lending purposes.
+
+Privacy policy URL:
+https://techsavvyjoe.github.io/compliance-central/

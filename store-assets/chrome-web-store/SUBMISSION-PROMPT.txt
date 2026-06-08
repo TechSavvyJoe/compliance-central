@@ -110,8 +110,8 @@ DATA USAGE (the checkbox form):
 SUPPORT / CONTACT EMAIL
 =====================================================================
 Wherever a developer or support email is requested (account settings and/or the listing), use:
-  [REPLACE THIS WITH MY REAL SUPPORT EMAIL BEFORE YOU START]
-Note: the privacy policy currently lists "support@compliancecentral.app" as a placeholder; if that is not a real inbox I can receive mail at, ask me for the correct address.
+  joejgallant@gmail.com
+(This is the public support/contact email; it is already set in the code and the privacy policy.)
 
 =====================================================================
 WHEN DONE

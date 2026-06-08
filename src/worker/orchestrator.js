@@ -249,13 +249,26 @@ async function runAllChecks(data) {
     // partial results (e.g. OFAC passed but MDOS errored) still render.
     await Promise.allSettled([ofacPromise, coBuyerOfacPromise, mdosPromise]);
 
-    // Guard against a branch rejecting before it recorded a result.
-    if (!results.checks.ofac) {
-      results.checks.ofac = {
-        passed: false,
-        status: "error",
-        error: "OFAC screening did not complete",
-      };
+    // Guard against any branch rejecting before it recorded a result, so a
+    // finished run can never silently omit a check the user expected to run.
+    const ensureResult = (key, label, extra = {}) => {
+      if (!results.checks[key]) {
+        results.checks[key] = {
+          passed: false,
+          status: "error",
+          error: `${label} did not complete`,
+          ...extra,
+        };
+      }
+    };
+    ensureResult("ofac", "OFAC screening");
+    ensureResult("repeatOffender", "Repeat Offender check");
+    if (hasCoBuyer) {
+      ensureResult("coBuyerOfac", "Co-Buyer OFAC screening");
+      ensureResult("coBuyerRepeatOffender", "Co-Buyer Repeat Offender check");
+    }
+    if (hasTrade) {
+      ensureResult("title", "Title check", { warning: true });
     }
 
     await chrome.storage.session.set({

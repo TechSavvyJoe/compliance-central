@@ -131,5 +131,5 @@ SUBMISSION NOTES
 
 • This is version 1.2.0. If a prior version was never published, this is a new public listing; if 1.1.0 was published, upload 1.2.0 as an update.
 • Screenshots (1280x800) and promo tiles live in store-assets/chrome-web-store/images/.
-• Developer contact email is required in the account settings and is shown publicly — set a dedicated support inbox (placeholder used in code/policy: support@compliancecentral.app).
+• Developer contact email (shown publicly): joejgallant@gmail.com — set in lib/config.js, the privacy policy, and the dashboard account settings.
 • Replace the Request access URL and support email placeholders in lib/config.js (CONFIG.support) and the privacy policy with your real values before submitting.

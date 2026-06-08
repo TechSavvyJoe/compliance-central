@@ -20,8 +20,15 @@ async function fetchSDNCSV() {
       signal: AbortSignal.timeout(SDN_FETCH_TIMEOUT_MS),
     });
   } catch (err) {
-    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+    if (err?.name === "TimeoutError") {
       throw new Error("SDN download timed out. Check your internet connection.");
+    }
+    if (err?.name === "AbortError") {
+      throw new Error("SDN download was cancelled.");
+    }
+    if (err instanceof TypeError) {
+      // fetch network failure (DNS, offline, CORS, connection refused)
+      throw new Error("Could not reach the OFAC data source. Check your internet connection.");
     }
     throw err;
   }

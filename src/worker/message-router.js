@@ -17,8 +17,12 @@ import {
 export async function handleMessage(message) {
   switch (message.type) {
     case "RUN_ALL_CHECKS":
-      // Fire-and-forget; storage listeners drive UI updates.
-      handleRunAllChecks(message.data);
+      // Fire-and-forget; storage listeners drive UI updates. The orchestrator
+      // handles its own errors, but catch here so any unexpected rejection is
+      // logged instead of becoming a silent unhandled rejection.
+      handleRunAllChecks(message.data).catch((err) =>
+        console.error("[MessageRouter] RUN_ALL_CHECKS failed:", err)
+      );
       return { success: true, status: "started" };
 
     case "RUN_OFAC_CHECK":

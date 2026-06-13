@@ -40,11 +40,7 @@ import {
   setCardsLoadingState,
   setSdnWarning,
 } from "./src/sidepanel/results.js";
-import {
-  initSettings,
-  openSettings,
-  hasBackendApiKey,
-} from "./src/sidepanel/settings.js";
+import { initSettings } from "./src/sidepanel/settings.js";
 import {
   purgeOldHistoryEntries,
   saveToHistory,
@@ -184,7 +180,6 @@ const elements = {
   saveApiKeyBtn: $("saveApiKeyBtn"),
   clearApiKeyBtn: $("clearApiKeyBtn"),
   toggleApiKeyVisibility: $("toggleApiKeyVisibility"),
-  getAccessLink: $("getAccessLink"),
   supportEmailLink: $("supportEmailLink"),
 };
 
@@ -546,7 +541,8 @@ function isMissingKeyError(err) {
 
 function describeError(err) {
   if (isMissingKeyError(err)) {
-    return "Backend account not connected. Add your API key in Settings to enable Repeat Offender & Title checks. (OFAC works without a key.)";
+    // Near-impossible with the built-in key; kept as a safety net.
+    return "This check is temporarily unavailable — please try again in a moment.";
   }
   return err?.message || err?.code || String(err);
 }
@@ -557,14 +553,6 @@ async function handleRunAllChecks() {
   const customerData = getFormData(elements);
   if (!validateCustomerFields(customerData)) return;
   if (getIsRunning()) return;
-
-  if (!(await hasBackendApiKey())) {
-    showToast(
-      "No API key set — OFAC will run, but Repeat Offender & Title checks need a key (open Settings).",
-      "info",
-      6000
-    );
-  }
 
   setIsRunning(true);
   setButtonsDisabled(elements, true);
@@ -654,7 +642,6 @@ async function handleRunRepeatOffender() {
     await updateHistoryCount(elements.historyCount);
   } catch (error) {
     showToast("Repeat Offender check failed: " + describeError(error), "error");
-    if (isMissingKeyError(error)) openSettings();
   } finally {
     hideLoading();
     setButtonsDisabled(elements, false);
@@ -683,7 +670,6 @@ async function handleRunTitle() {
     await updateHistoryCount(elements.historyCount);
   } catch (error) {
     showToast("Title check failed: " + describeError(error), "error");
-    if (isMissingKeyError(error)) openSettings();
   } finally {
     hideLoading();
     setButtonsDisabled(elements, false);
@@ -829,7 +815,20 @@ function printScreenshotModal() {
     `<html><head><title>Compliance Screenshot</title></head><body style="margin:0;padding:20px;"><img src="${src}" style="max-width:100%;"/></body></html>`
   );
   printWindow.document.close();
-  printWindow.print();
+  // Wait for the (large base64) image to render before printing, or the
+  // printed page can come out blank.
+  const img = printWindow.document.querySelector("img");
+  const doPrint = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+  if (img && !img.complete) {
+    img.onload = doPrint;
+    img.onerror = doPrint;
+    setTimeout(doPrint, 2000); // fallback if neither event fires
+  } else {
+    setTimeout(doPrint, 150);
+  }
 }
 
 function downloadScreenshotModal() {

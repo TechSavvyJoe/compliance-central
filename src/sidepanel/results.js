@@ -318,7 +318,7 @@ export function displayResults(elements, results) {
     const ro = results.checks.repeatOffender;
     if (ro.error || ro.status === "error") {
       const isKey = ro.error === MISSING_API_KEY;
-      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Setup" : "Error");
+      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
       elements.repeatResultDetail.textContent = friendlyCheckError(
         ro.error,
         "Unknown error occurred"
@@ -346,7 +346,7 @@ export function displayResults(elements, results) {
 
     if (title.error) {
       const isKey = title.error === MISSING_API_KEY;
-      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Setup" : "Check Failed");
+      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Unavailable" : "Check Failed");
       elements.titleResultDetail.textContent = friendlyCheckError(
         title.error,
         "Unable to complete Title check"
@@ -422,7 +422,7 @@ export function displayResults(elements, results) {
       const cbRO = results.checks.coBuyerRepeatOffender;
       if (cbRO.error || cbRO.status === "error") {
         const isKey = cbRO.error === MISSING_API_KEY;
-        setResultStatus(elements.cbRepeatResultStatus, "warning", isKey ? "Setup" : "Error");
+        setResultStatus(elements.cbRepeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
         elements.cbRepeatResultDetail.textContent = friendlyCheckError(
           cbRO.error,
           "Unknown error occurred"
@@ -474,7 +474,7 @@ export function displayIndividualResult(elements, type, result) {
     elements.repeatResultCard?.classList.remove("hidden");
     if (result.error || result.status === "error") {
       const isKey = result.error === MISSING_API_KEY;
-      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Setup" : "Error");
+      setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
       elements.repeatResultDetail.textContent = friendlyCheckError(
         result.error,
         "Repeat Offender check could not be completed"
@@ -493,7 +493,7 @@ export function displayIndividualResult(elements, type, result) {
     elements.titleResultCard?.classList.remove("hidden");
     if (result.error) {
       const isKey = result.error === MISSING_API_KEY;
-      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Setup" : "Check Failed");
+      setResultStatus(elements.titleResultStatus, "warning", isKey ? "Unavailable" : "Check Failed");
       elements.titleResultDetail.textContent = friendlyCheckError(
         result.error,
         "Unable to complete Title check"

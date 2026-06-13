@@ -16,7 +16,7 @@ sidePanel —
 The entire user interface is a Chrome side panel; this permission opens and renders it.
 
 storage —
-Saves the dealer's compliance history, preferences, and backend API key locally on the device.
+Saves the dealer's compliance history, preferences, and (optionally) a custom backend API key locally on the device.
 
 unlimitedStorage —
 The OFAC SDN sanctions dataset plus historical compliance records (with evidence screenshots) can exceed the default storage quota.

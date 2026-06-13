@@ -177,7 +177,11 @@ function ofacReportHTML({ customer, ofac, lastUpdate, subjectLabel = "SUBJECT SC
               (m) =>
                 `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(m.score)}%, Type: ${sanitizeHTML(m.type)})</li>`
             )
-            .join("")}</ul></div>`
+            .join("")}</ul>${
+            ofac.matches.length > 5
+              ? `<p><em>…and ${ofac.matches.length - 5} more potential match(es) — review the full list in the extension before proceeding.</em></p>`
+              : ""
+          }</div>`
         : ""
     }
   </div>
@@ -1034,12 +1038,18 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
       : "REVIEW REQUIRED — Potential match found",
     extraLines:
       !ofac.passed && ofac.matches?.length
-        ? ofac.matches
-            .slice(0, 5)
-            .map(
-              (m) =>
-                `${m.name} — Score ${m.score}%   ·   Type ${m.type}`
-            )
+        ? [
+            ...ofac.matches
+              .slice(0, 5)
+              .map(
+                (m) => `${m.name} — Score ${m.score}%   ·   Type ${m.type}`
+              ),
+            ...(ofac.matches.length > 5
+              ? [
+                  `…and ${ofac.matches.length - 5} more potential match(es) — review the full list in the extension.`,
+                ]
+              : []),
+          ]
         : [],
   });
 
@@ -1053,11 +1063,17 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
 
 function subjectFullName(customer) {
   if (!customer) return "—";
-  const name = buildSanitizedName(customer)
-    .replace(/&amp;/g, "&")
-    .replace(/&#039;/g, "'")
-    .replace(/&quot;/g, '"');
-  return name;
+  // jsPDF draws plain text (no HTML context), so use the raw name directly —
+  // round-tripping through HTML entities mangled names containing & < > etc.
+  const parts = [
+    customer.firstName,
+    customer.middleName,
+    customer.lastName,
+    customer.suffix,
+  ]
+    .map((p) => (p || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : "—";
 }
 
 // ---------- MDOS screenshot sections (Repeat Offender, Title) ----------

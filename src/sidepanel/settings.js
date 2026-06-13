@@ -47,7 +47,6 @@ export function initSettings(elements) {
   els.clearApiKeyBtn?.addEventListener("click", clearKey);
   els.toggleApiKeyVisibility?.addEventListener("click", toggleVisibility);
 
-  if (els.getAccessLink) els.getAccessLink.href = CONFIG.support.getAccessUrl;
   if (els.supportEmailLink) {
     els.supportEmailLink.href = `mailto:${CONFIG.support.email}`;
     els.supportEmailLink.textContent = CONFIG.support.email;

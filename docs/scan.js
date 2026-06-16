@@ -1,4 +1,7 @@
 import { parseAAMVA, aamvaElementCodes } from "./lib/aamva.js";
+import { encryptPayload } from "./lib/crypto-pair.js";
+
+const RELAY_BASE = "https://compliance-central-api.fly.dev";
 
 // Phase 1: sessionId + key are parsed to lock the URL contract but NOT used yet.
 // Phase 2 will encrypt the payload with `keyB64` and POST to the relay for `sessionId`.
@@ -206,12 +209,11 @@ function onConfirm() {
   }
 }
 
-function finish() {
+async function finish() {
   // Guard: same license scanned twice.
   if (deal.coBuyer && deal.buyer && deal.coBuyer.dlnPid === deal.buyer.dlnPid) {
     showError("Buyer and co-buyer have the same license number — did you scan the same card twice?");
   }
-  // Phase 1: assemble the payload (Phase 2 encrypts + relays it to the extension).
   lastPayload = {
     buyer: deal.buyer,
     coBuyer: deal.coBuyer || null,
@@ -227,6 +229,30 @@ function finish() {
   const cs = el("captureSummary");
   if (cs) cs.innerHTML = rows;
   show("done");
+
+  // If we arrived via a paired QR (session + key in the URL), encrypt the
+  // payload with the QR-supplied key and relay it; otherwise the page just
+  // works standalone (the summary above is the result).
+  if (sessionId && keyB64) {
+    try {
+      const blob = await encryptPayload(keyB64, lastPayload);
+      const res = await fetch(
+        `${RELAY_BASE}/pair/${encodeURIComponent(sessionId)}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(blob),
+        }
+      );
+      if (!res.ok) throw new Error("relay " + res.status);
+    } catch (e) {
+      showError(
+        "Couldn't send to your computer: " +
+          (e && e.message ? e.message : "network error") +
+          ". The data stayed on this phone."
+      );
+    }
+  }
 }
 
 function resetAll() {

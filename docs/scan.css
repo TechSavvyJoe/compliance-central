@@ -47,6 +47,9 @@ h2 { font-size: 18px; }
   border-radius: 8px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
 }
 .status { color: var(--text-muted); font-size: 14px; text-align: center; }
+.diag { color: var(--text-muted); font-size: 11px; text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.8;
+  word-break: break-word; min-height: 14px; }
 
 .fields { background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px; }

@@ -47,41 +47,89 @@ function stopCamera() {
   }
 }
 
+// On-screen diagnostics (we can't see the phone's console).
+function diag(msg) {
+  const d = el("diag");
+  if (d) d.textContent = msg;
+}
+
+// A dense license PDF417 needs a high-resolution, focused frame to decode.
+const HIRES = {
+  facingMode: { ideal: "environment" },
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
+};
+
+// Best-effort continuous autofocus (advanced constraint; support varies).
+async function applyContinuousFocus(mediaStream) {
+  try {
+    const track = mediaStream.getVideoTracks()[0];
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.focusMode && caps.focusMode.includes("continuous")) {
+      await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+    }
+    return track;
+  } catch {
+    return mediaStream.getVideoTracks()[0];
+  }
+}
+
 // Resolve with the raw AAMVA barcode text from the camera.
 async function scanRawBarcode() {
   const video = el("video");
+  let attempts = 0;
+  let lastErr = "";
+
+  // Path 1: native BarcodeDetector (Android Chrome) on high-res frames.
   if ("BarcodeDetector" in window) {
     let formats = [];
     try { formats = await window.BarcodeDetector.getSupportedFormats(); } catch {}
     if (formats.includes("pdf417")) {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      stream = await navigator.mediaDevices.getUserMedia({ video: HIRES });
       video.srcObject = stream;
       await video.play();
+      const track = await applyContinuousFocus(stream);
+      const s = track && track.getSettings ? track.getSettings() : {};
       const detector = new window.BarcodeDetector({ formats: ["pdf417"] });
       detectorLoop = true;
       return new Promise((resolve) => {
         const tick = async () => {
           if (!detectorLoop) return;
+          attempts++;
           try {
             const codes = await detector.detect(video);
             if (codes.length && codes[0].rawValue) { resolve(codes[0].rawValue); return; }
-          } catch {}
+          } catch (e) { lastErr = e && e.name ? e.name : "detect-error"; }
+          if (attempts % 15 === 0) {
+            diag(`BarcodeDetector · cam ${s.width || "?"}×${s.height || "?"} · video ${video.videoWidth}×${video.videoHeight} · tries ${attempts}${lastErr ? " · " + lastErr : ""}`);
+          }
           requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
       });
     }
   }
-  // Fallback: ZXing handles getUserMedia + decode (iOS Safari).
+
+  // Path 2: ZXing fallback (iOS Safari) on high-res frames.
   if (typeof ZXing === "undefined") throw new Error("Barcode scanner failed to load.");
   const hints = new Map();
   hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
   hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
   zxingReader = new ZXing.BrowserMultiFormatReader(hints);
   return new Promise((resolve, reject) => {
+    let focusApplied = false;
     zxingReader
-      .decodeFromConstraints({ video: { facingMode: "environment" } }, video, (result) => {
-        if (result) resolve(result.getText());
+      .decodeFromConstraints({ video: HIRES }, video, (result, err) => {
+        attempts++;
+        if (!focusApplied && video.srcObject) {
+          focusApplied = true;
+          applyContinuousFocus(video.srcObject);
+        }
+        if (result) { resolve(result.getText()); return; }
+        if (err && err.name && err.name !== "NotFoundException") lastErr = err.name;
+        if (attempts % 15 === 0) {
+          diag(`ZXing · video ${video.videoWidth}×${video.videoHeight} · tries ${attempts}${lastErr ? " · " + lastErr : ""}`);
+        }
       })
       .catch(reject);
   });

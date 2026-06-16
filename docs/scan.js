@@ -1,4 +1,4 @@
-import { parseAAMVA } from "./lib/aamva.js";
+import { parseAAMVA, aamvaElementCodes } from "./lib/aamva.js";
 
 // Phase 1: sessionId + key are parsed to lock the URL contract but NOT used yet.
 // Phase 2 will encrypt the payload with `keyB64` and POST to the relay for `sessionId`.
@@ -179,6 +179,13 @@ async function beginCapture(which) {
     }
     pending = parsed;
     renderReview(parsed);
+    // Privacy-safe diagnostic: shows which element codes the card uses (no
+    // values), plus payload size + newline count, to confirm real-card layout.
+    const rd = el("reviewDiag");
+    if (rd) {
+      const lf = (raw.match(/\n/g) || []).length;
+      rd.textContent = `codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
+    }
     show("review");
   } catch (e) {
     stopCamera();

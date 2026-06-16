@@ -17,11 +17,14 @@ Key Features:
 • Active Liens & Lienholder Information
 • Vehicle Weight & Model Year
 
+✅ Scan a License with Your Phone — Skip the typing (and the typos that cause missed matches). Tap "Scan license with phone," scan the QR with your phone, then scan the barcode on the back of a Michigan driver's license or state ID — the buyer (and co-buyer) fields fill in automatically. Scanning happens on your phone; the fields are end-to-end encrypted and the license image is never uploaded.
+
 ✅ Professional "Deal Jacket" Reports — Generate a timestamped proof-of-compliance report in one click. Print or save as a PDF for the deal jacket. Recent checks are kept locally so you can re-open, re-print, or export them anytime.
 
 ✅ Privacy-Conscious by Design
 • OFAC screening is processed entirely on your device — nothing is transmitted.
 • For Repeat Offender and Title checks, the customer's name, date of birth, DLN/PID (and VIN) are sent over encrypted HTTPS to our secure backend, used to obtain the official MDOS result, then immediately discarded — never stored or logged on our servers.
+• The optional phone license-scan is end-to-end encrypted: our backend relays only an encrypted, single-use package it cannot read, and the license image is never transmitted.
 • No tracking. No analytics. We never sell your data.
 Full policy: https://techsavvyjoe.github.io/compliance-central/
 

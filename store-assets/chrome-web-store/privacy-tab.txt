@@ -28,7 +28,7 @@ Host permission https://data.opensanctions.org/ —
 Downloads the public OFAC SDN sanctions list used for on-device screening.
 
 Host permission https://compliance-central-api.fly.dev/ —
-The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal.
+The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal. It also relays the optional phone license-scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read (deleted on pickup; the license image is never transmitted).
 
 Are you using remote code?  →  NO
 (All code is bundled in the package; nothing is fetched and executed remotely.)

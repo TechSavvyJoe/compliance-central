@@ -62,7 +62,7 @@
     <header>
         <h1>Compliance Central</h1>
         <p>Privacy Policy</p>
-        <p class="last-updated">Last Updated: June 8, 2026</p>
+        <p class="last-updated">Last Updated: June 16, 2026</p>
     </header>
 
     <div class="section">
@@ -90,21 +90,33 @@
     </div>
 
     <div class="section">
-        <h2>4. OFAC Screening (Local Only)</h2>
-        <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the public OFAC SDN list from OpenSanctions and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
-    </div>
-
-    <div class="section">
-        <h2>5. Third-Party Services</h2>
+        <h2>4. License Scan (Optional)</h2>
+        <p>The optional <strong>"Scan license with phone"</strong> feature lets you capture a customer's Michigan driver's license or state ID with your phone instead of typing. It is designed to be private:</p>
         <ul>
-            <li><strong>OpenSanctions</strong> (<code>data.opensanctions.org</code>): provides the public OFAC SDN list the extension downloads for local screening. Only the list is downloaded &mdash; no customer data is sent.</li>
-            <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
-            <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and not persisted.</li>
+            <li><strong>Scanning and parsing happen on your phone</strong> &mdash; the barcode on the back of the license is read and decoded in your phone's browser. The <strong>license image is never uploaded or transmitted</strong>.</li>
+            <li>Only the parsed text fields (<strong>name, date of birth, and license/ID number</strong>) travel to your computer, and they are <strong>end-to-end encrypted</strong>: the desktop extension generates a one-time key that exists only inside the QR code, your phone encrypts the fields with it, and our backend merely relays an <strong>encrypted package it cannot read</strong>.</li>
+            <li>That encrypted package is <strong>single-use, expires in about two minutes, and is deleted the moment your computer retrieves it</strong>. It is never written to a database or log.</li>
+            <li>Once the fields autofill, they are handled exactly like manually-typed data (used for the checks above and stored only on your device).</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>6. Permissions</h2>
+        <h2>5. OFAC Screening (Local Only)</h2>
+        <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the public OFAC SDN list from OpenSanctions and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
+    </div>
+
+    <div class="section">
+        <h2>6. Third-Party Services</h2>
+        <ul>
+            <li><strong>OpenSanctions</strong> (<code>data.opensanctions.org</code>): provides the public OFAC SDN list the extension downloads for local screening. Only the list is downloaded &mdash; no customer data is sent.</li>
+            <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
+            <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and not persisted; for the optional license scan it relays only an encrypted, single-use package it cannot read.</li>
+            <li><strong>GitHub Pages</strong> (<code>techsavvyjoe.github.io</code>): serves the static phone scan page (and this policy). The scan page performs the barcode decoding on your phone; the license image is not sent to it.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>7. Permissions</h2>
         <p>The extension requests only the permissions it needs:</p>
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
@@ -116,7 +128,7 @@
     </div>
 
     <div class="section">
-        <h2>7. Your Rights and Choices</h2>
+        <h2>8. Your Rights and Choices</h2>
         <ul>
             <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
             <li>Remove any optional backend key you've set, at any time from Settings.</li>
@@ -125,12 +137,12 @@
     </div>
 
     <div class="section" id="get-access">
-        <h2>8. No Account Needed</h2>
+        <h2>9. No Account Needed</h2>
         <p>All checks &mdash; OFAC, Repeat Offender, and Title/Lien &mdash; are included free, with no account, sign-up, or API key. Just install and use. (Advanced users may optionally configure their own backend key in Settings.)</p>
     </div>
 
     <div class="section">
-        <h2>9. Contact Us</h2>
+        <h2>10. Contact Us</h2>
         <p>Questions about this policy, the extension, or backend access? Email <a href="mailto:joejgallant@gmail.com">joejgallant@gmail.com</a> or use the Chrome Web Store support page for this listing.</p>
     </div>
 

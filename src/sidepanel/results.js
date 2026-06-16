@@ -316,7 +316,12 @@ export function displayResults(elements, results) {
   // Buyer Repeat Offender.
   if (results.checks.repeatOffender) {
     const ro = results.checks.repeatOffender;
-    if (ro.error || ro.status === "error") {
+    if (ro.status === "not_applicable") {
+      setResultStatus(elements.repeatResultStatus, "skipped", "N/A — out of state");
+      elements.repeatResultDetail.textContent =
+        ro.message ||
+        "The Michigan Repeat Offender check applies only to Michigan license/ID holders.";
+    } else if (ro.error || ro.status === "error") {
       const isKey = ro.error === MISSING_API_KEY;
       setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
       elements.repeatResultDetail.textContent = friendlyCheckError(
@@ -331,8 +336,10 @@ export function displayResults(elements, results) {
       );
       elements.repeatResultDetail.textContent = repeatOffenderDetail(ro);
     }
-    setActionVisibility(elements.printRepeatBtn, !ro.error && ro.status !== "error");
-    setActionVisibility(elements.downloadRepeatBtn, !ro.error && ro.status !== "error");
+    const roPrintable =
+      !ro.error && ro.status !== "error" && ro.status !== "not_applicable";
+    setActionVisibility(elements.printRepeatBtn, roPrintable);
+    setActionVisibility(elements.downloadRepeatBtn, roPrintable);
   } else {
     setResultStatus(elements.repeatResultStatus, "skipped", "Not Run");
     elements.repeatResultDetail.textContent = "Repeat Offender check has not run";
@@ -418,7 +425,12 @@ export function displayResults(elements, results) {
 
     if (results.checks.coBuyerRepeatOffender) {
       const cbRO = results.checks.coBuyerRepeatOffender;
-      if (cbRO.error || cbRO.status === "error") {
+      if (cbRO.status === "not_applicable") {
+        setResultStatus(elements.cbRepeatResultStatus, "skipped", "N/A — out of state");
+        elements.cbRepeatResultDetail.textContent =
+          cbRO.message ||
+          "The Michigan Repeat Offender check applies only to Michigan license/ID holders.";
+      } else if (cbRO.error || cbRO.status === "error") {
         const isKey = cbRO.error === MISSING_API_KEY;
         setResultStatus(elements.cbRepeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
         elements.cbRepeatResultDetail.textContent = friendlyCheckError(
@@ -433,14 +445,10 @@ export function displayResults(elements, results) {
         );
         elements.cbRepeatResultDetail.textContent = repeatOffenderDetail(cbRO);
       }
-      setActionVisibility(
-        elements.printCbRepeatBtn,
-        !cbRO.error && cbRO.status !== "error"
-      );
-      setActionVisibility(
-        elements.downloadCbRepeatBtn,
-        !cbRO.error && cbRO.status !== "error"
-      );
+      const cbPrintable =
+        !cbRO.error && cbRO.status !== "error" && cbRO.status !== "not_applicable";
+      setActionVisibility(elements.printCbRepeatBtn, cbPrintable);
+      setActionVisibility(elements.downloadCbRepeatBtn, cbPrintable);
     } else {
       setResultStatus(elements.cbRepeatResultStatus, "skipped", "Not Run");
       elements.cbRepeatResultDetail.textContent =

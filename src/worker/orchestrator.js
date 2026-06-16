@@ -123,7 +123,17 @@ async function runAllChecks(data) {
         await saveState(overall);
       };
 
-      // 1. Buyer Repeat Offender.
+      // 1. Buyer Repeat Offender (Michigan license/ID only).
+      if (customer.buyerIsMichigan === false) {
+        results.checks.repeatOffender = {
+          passed: null,
+          status: "not_applicable",
+          message:
+            "Out-of-state ID — the Michigan Repeat Offender check does not apply.",
+        };
+        completedMdos++;
+        await updateMdosProgress(0);
+      } else {
       await setInFlight(IN_FLIGHT.repeatOffender);
       await updateMdosProgress(0);
       try {
@@ -163,9 +173,20 @@ async function runAllChecks(data) {
       }
       completedMdos++;
       await updateMdosProgress(0);
+      }
 
       // 2. Co-Buyer Repeat Offender.
       if (hasCoBuyer) {
+        if (customer.coBuyerIsMichigan === false) {
+          results.checks.coBuyerRepeatOffender = {
+            passed: null,
+            status: "not_applicable",
+            message:
+              "Out-of-state ID — the Michigan Repeat Offender check does not apply.",
+          };
+          completedMdos++;
+          await updateMdosProgress(0);
+        } else {
         await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
         try {
           const coBuyerWithKey = {
@@ -204,6 +225,7 @@ async function runAllChecks(data) {
         }
         completedMdos++;
         await updateMdosProgress(0);
+        }
       }
 
       // 3. Title check.

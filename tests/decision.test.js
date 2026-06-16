@@ -49,6 +49,35 @@ test("matches still deny and clean full checks still approve", () => {
   );
 });
 
+test("out-of-state subject: Repeat Offender not_applicable is non-blocking (OFAC governs)", () => {
+  // Out-of-state buyer: OFAC passed, RO N/A (passed:null) -> APPROVED, not DENIED.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: true },
+      repeatOffender: { passed: null, status: "not_applicable" },
+    }).level,
+    "APPROVED"
+  );
+  // But an out-of-state subject who IS an OFAC match still denies.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: false, matches: [{ name: "Match" }] },
+      repeatOffender: { passed: null, status: "not_applicable" },
+    }).level,
+    "DENIED"
+  );
+  // Out-of-state co-buyer RO N/A is also non-blocking.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: true },
+      repeatOffender: { passed: true, status: "eligible" },
+      coBuyerOfac: { passed: true },
+      coBuyerRepeatOffender: { passed: null, status: "not_applicable" },
+    }).level,
+    "APPROVED"
+  );
+});
+
 test("ships a built-in backend key so all checks work with no setup", () => {
   assert.ok(CONFIG.backend.defaultApiKey, "a built-in default key should be shipped");
   assert.equal(manifest.permissions.includes("unlimitedStorage"), true);

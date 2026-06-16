@@ -63,6 +63,7 @@ import {
   downloadAllReportsPDF,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
+import { startPairing } from "./src/sidepanel/scan-pairing.js";
 import {
   getCurrentResults,
   setCurrentResults,
@@ -109,6 +110,14 @@ const elements = {
   inputSummaryBar: $("inputSummaryBar"),
   inputSummaryText: $("inputSummaryText"),
   inputSummaryAction: $("inputSummaryAction"),
+
+  // Phone license-scan pairing
+  scanLicenseBtn: $("scanLicenseBtn"),
+  scanPairModal: $("scanPairModal"),
+  scanPairQr: $("scanPairQr"),
+  scanPairStatus: $("scanPairStatus"),
+  scanPairCancel: $("scanPairCancel"),
+  scanPairCloseX: $("scanPairCloseX"),
 
   // Progress
   progressSection: $("progressSection"),
@@ -532,6 +541,49 @@ function initEventListeners() {
       elements.inputSummaryBar.getAttribute("aria-expanded") === "true";
     setInputCollapsed(isOpen);
   });
+
+  // Phone license scan: open a pairing session, show the QR, autofill on receipt.
+  let cancelPair = null;
+  const closeScanPair = () => {
+    if (cancelPair) { cancelPair(); cancelPair = null; }
+    elements.scanPairModal?.classList.add("hidden");
+  };
+  elements.scanLicenseBtn?.addEventListener("click", async () => {
+    if (elements.scanPairQr) elements.scanPairQr.innerHTML = "";
+    if (elements.scanPairStatus)
+      elements.scanPairStatus.textContent = "Waiting for your phone…";
+    elements.scanPairModal?.classList.remove("hidden");
+    try {
+      cancelPair = await startPairing(
+        elements,
+        (url) => {
+          if (!window.qrcode || !elements.scanPairQr) return;
+          const qr = window.qrcode(0, "M");
+          qr.addData(url);
+          qr.make();
+          elements.scanPairQr.innerHTML = qr.createImgTag(6, 8);
+        },
+        (result) => {
+          if (result.status === "filled") {
+            recordScanJurisdiction(result.payload);
+            closeScanPair();
+            const co = result.payload?.coBuyer ? " + co-buyer" : "";
+            showToast(`License scanned — buyer${co} filled.`, "success");
+          } else if (result.status === "expired") {
+            if (elements.scanPairStatus)
+              elements.scanPairStatus.textContent =
+                "Pairing expired — close and try again.";
+          }
+        }
+      );
+    } catch (e) {
+      if (elements.scanPairStatus)
+        elements.scanPairStatus.textContent =
+          "Couldn't start pairing: " + describeError(e);
+    }
+  });
+  elements.scanPairCancel?.addEventListener("click", closeScanPair);
+  elements.scanPairCloseX?.addEventListener("click", closeScanPair);
 }
 
 function withTempResults(temp, fn) {
@@ -627,8 +679,21 @@ function resetInputPanel() {
   elements.inputSummaryBar.setAttribute("aria-expanded", "false");
 }
 
+// Per-person issuing jurisdiction from a phone scan; null = manually entered
+// (assumed Michigan). Drives Repeat Offender eligibility in handleRunAllChecks:
+// an out-of-state subject (false) can run OFAC but not the MI Repeat Offender.
+const scanJurisdiction = { buyer: null, coBuyer: null };
+function recordScanJurisdiction(payload) {
+  scanJurisdiction.buyer = payload?.buyer ? !!payload.buyer.isMichigan : null;
+  scanJurisdiction.coBuyer = payload?.coBuyer ? !!payload.coBuyer.isMichigan : null;
+}
+
 async function handleRunAllChecks() {
   const customerData = getFormData(elements);
+  // From a phone scan: true=MI, false=out-of-state, null=manual (assume MI).
+  // Drives Repeat Offender eligibility in the worker.
+  customerData.buyerIsMichigan = scanJurisdiction.buyer;
+  customerData.coBuyerIsMichigan = scanJurisdiction.coBuyer;
   if (!validateCustomerFields(customerData)) return;
   if (getIsRunning()) return;
 
@@ -761,6 +826,8 @@ function handleClear() {
   setIsRunning(false);
   setButtonsDisabled(elements, false);
   resetInputPanel();
+  scanJurisdiction.buyer = null;
+  scanJurisdiction.coBuyer = null;
   chrome.storage.session.set({
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     [STORAGE_KEYS.searchProgress]: 0,

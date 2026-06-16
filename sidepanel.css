@@ -181,6 +181,15 @@ body {
   border: 1px solid var(--border-color);
 }
 
+/* "Scan license with phone" button + QR pairing modal. */
+.scan-license-btn { width: 100%; margin-bottom: 14px; justify-content: center; }
+.scan-pair-qr {
+  display: flex; justify-content: center; align-items: center;
+  background: #fff; border-radius: 8px; padding: 12px; margin: 14px auto;
+  width: max-content; min-height: 180px;
+}
+.scan-pair-qr img { display: block; width: 220px; height: 220px; image-rendering: pixelated; }
+
 /* Collapsed customer/vehicle summary bar (shown after a run; click to edit). */
 .input-summary-bar {
   display: flex;

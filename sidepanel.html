@@ -50,6 +50,11 @@
             Customer Information
           </h3>
 
+          <button id="scanLicenseBtn" type="button" class="btn-secondary btn-ghost scan-license-btn">
+            <span class="btn-icon icon icon-user"></span>
+            Scan license with phone
+          </button>
+
           <div class="form-row">
             <div class="form-group">
               <label for="firstName">First Name <span class="required">*</span></label>
@@ -464,6 +469,25 @@
       </div>
     </div>
 
+    <div id="scanPairModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanPairTitle">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="scanPairTitle">Scan with your phone</h3>
+          <button class="modal-close" id="scanPairCloseX" aria-label="Close pairing modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="hint">On your phone, open the camera and point it at this code. You'll
+            scan the license barcode on your phone — the fields fill here automatically.</p>
+          <div id="scanPairQr" class="scan-pair-qr"></div>
+          <p id="scanPairStatus" class="status" role="status" aria-live="polite">Starting…</p>
+        </div>
+        <div class="modal-footer">
+          <button id="scanPairCancel" class="btn-secondary btn-ghost">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="lib/qrcode.min.js"></script>
     <script src="sidepanel.js" type="module"></script>
   </body>
 </html>

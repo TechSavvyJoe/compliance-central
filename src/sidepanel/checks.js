@@ -180,11 +180,18 @@ export function calculateFinalDecision(checks) {
   }
 
   const ofacPass = checks.ofac.passed;
-  const repeatPass = checks.repeatOffender.passed;
+  // An out-of-state subject's Michigan Repeat Offender check is "not_applicable"
+  // (passed: null) — that is NOT a failure, so treat it as non-blocking.
+  const repeatPass =
+    checks.repeatOffender.status === "not_applicable"
+      ? true
+      : checks.repeatOffender.passed;
   const cbOfacPass = checks.coBuyerOfac ? checks.coBuyerOfac.passed : true;
-  const cbRepeatPass = checks.coBuyerRepeatOffender
-    ? checks.coBuyerRepeatOffender.passed
-    : true;
+  const cbRepeatPass = !checks.coBuyerRepeatOffender
+    ? true
+    : checks.coBuyerRepeatOffender.status === "not_applicable"
+      ? true
+      : checks.coBuyerRepeatOffender.passed;
 
   if (!ofacPass || !cbOfacPass) {
     return {

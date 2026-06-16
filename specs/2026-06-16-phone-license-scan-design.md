@@ -16,6 +16,28 @@ The license's PDF417 barcode (back of the card, AAMVA standard) encodes name, DO
 and license number as structured text. "Scanning" = capture the barcode → parse the
 AAMVA fields → relay to the extension → autofill.
 
+## Scope: jurisdiction drives check eligibility
+
+Any US DL/State ID can be scanned, but the **issuing jurisdiction** decides which checks
+the subject is eligible for:
+
+- **OFAC** is a federal, name-based screen that applies to **everyone** — Michigan or
+  out-of-state. Always runs.
+- **Repeat Offender** is a Michigan Department of State function that searches the
+  **Michigan driver record**, so it is only valid for a subject who holds a **Michigan**
+  DL/State ID. For an out-of-state subject it is **skipped** (clearly marked, not failed).
+- **Title/Lien** keys off the trade-in **VIN**, not a person, so it is unaffected by
+  either subject's jurisdiction.
+
+Therefore the scanner **accepts any state's DL/ID** (it never rejects out-of-state cards);
+it reads the jurisdiction from the AAMVA data and carries it to the extension, which uses
+it to enable/disable the Repeat Offender check per person (buyer and co-buyer independently).
+Michigan issuance = AAMVA Issuer Identification Number `636032`.
+
+Manual (non-scan) entry has no jurisdiction signal and is **assumed Michigan** (the tool's
+core audience), so it behaves as today — adding a manual out-of-state toggle is out of
+scope for this feature.
+
 ## Key decisions (locked during brainstorm)
 
 1. **Scope:** Design the full feature now; build and verify the riskiest part (the
@@ -32,6 +54,10 @@ AAMVA fields → relay to the extension → autofill.
 6. **Transport:** Backend relay with **short polling** (extension polls until the blob
    arrives or the ~2-minute window expires). Chosen over SSE/WebRTC for simplicity and
    robustness; encryption (not transport) provides privacy, so polling costs nothing.
+7. **Jurisdiction-aware:** scan accepts any state's DL/State ID and reads the issuing
+   jurisdiction (Michigan = AAMVA IIN `636032`). Michigan subjects are eligible for all
+   checks; out-of-state subjects get OFAC only — the Michigan Repeat Offender check is
+   skipped for them. Determined per person (buyer and co-buyer independently).
 
 ## Architecture & components
 
@@ -56,9 +82,12 @@ Four independently testable units:
    zero-knowledge without an ECDH handshake.
 4. Dealer scans the QR with the phone camera → opens the branded scan page.
 5. Phone flow:
-   a. Scan **buyer's** license → decode → parse → show fields.
+   a. Scan **buyer's** license → decode → parse → show fields. Any state is accepted; if
+      it's **out-of-state**, show a non-blocking note: *"Out-of-state ID — OFAC will run;
+      the Michigan Repeat Offender check needs a Michigan DL/State ID."*
    b. Prompt **"Is there a co-buyer?"** (Yes / No).
-   c. If Yes → scan **co-buyer's** license → decode → parse → show.
+   c. If Yes → scan **co-buyer's** license → decode → parse → show (same out-of-state note
+      if applicable).
    d. **Review** both → **Send**.
    - Guard: if buyer and co-buyer license numbers are identical, warn before sending
      (likely a double-scan of the same card).
@@ -132,6 +161,13 @@ with a periodic sweep for expired entries.
   inputs; if `coBuyer` present, set `#hasCoBuyer` checked (dispatch `change` to reveal
   the section) and fill `cb*` fields; reuse `setDateInputValue` for DOB; toast on
   success. Cancel/timeout cleanly tears down the session and stops polling.
+- **Jurisdiction gating:** stash each person's `isMichigan` in form state (e.g. a
+  `data-jurisdiction` attribute / the customer object). At run time, OFAC runs for
+  everyone; the **Repeat Offender** check runs only for a Michigan subject — for an
+  out-of-state subject it is skipped and shown as *"Not applicable — out-of-state ID"*
+  (a distinct state, not an error/fail), buyer and co-buyer evaluated independently. The
+  orchestrator and results UI gain a "not applicable / skipped" outcome for this. Title
+  is unaffected. Manually-entered subjects (no scan) default to Michigan = eligible.
 - **Permissions:** expected **none new** — QR is local, polling targets the
   already-permitted Fly origin, decryption uses built-in Web Crypto.
 
@@ -139,11 +175,12 @@ with a periodic sweep for expired entries.
 
 QR URL: `…/scan.html?s=<sessionId>#k=<aesKeyBase64Url>`
 
-Decrypted payload (the only thing that crosses, encrypted):
+Decrypted payload (the only thing that crosses, encrypted). Each person carries their
+issuing `jurisdiction` + `isMichigan` so the extension can gate the Repeat Offender check:
 ```json
 {
-  "buyer":   { "firstName": "", "middleName": "", "lastName": "", "suffix": "", "dob": "YYYY-MM-DD", "dlnPid": "" },
-  "coBuyer": { "firstName": "", "middleName": "", "lastName": "", "suffix": "", "dob": "YYYY-MM-DD", "dlnPid": "" },
+  "buyer":   { "firstName": "", "middleName": "", "lastName": "", "suffix": "", "dob": "YYYY-MM-DD", "dlnPid": "", "jurisdiction": "MI", "isMichigan": true },
+  "coBuyer": { "firstName": "", "middleName": "", "lastName": "", "suffix": "", "dob": "YYYY-MM-DD", "dlnPid": "", "jurisdiction": "OH", "isMichigan": false },
   "scannedAt": "ISO-8601"
 }
 ```
@@ -157,10 +194,14 @@ Relay body (opaque to server): `{ "iv": "<b64url>", "ciphertext": "<b64url>" }`.
   `DBB`=DOB (`MMDDCCYY`), `DAQ`=license/ID number, `DCU`=name suffix. (Older/jurisdiction
   variants exist — e.g. a combined `DAA` full-name field — so the parser must tolerate
   missing elements and fall back gracefully.)
-- Pure function `parseAAMVA(text) -> {firstName, middleName, lastName, suffix, dob, dlnPid}`,
+- Pure function `parseAAMVA(text) -> {firstName, middleName, lastName, suffix, dob, dlnPid, iin, jurisdiction, isMichigan}`,
   tolerant of the `@\n\rANSI ` header and element/segment separators.
+- **Jurisdiction:** read the Issuer Identification Number from the header; `isMichigan`
+  is `iin === "636032"`. The scan is **accepted regardless of state** — `isMichigan` is
+  carried to the extension to drive Repeat Offender eligibility, never to reject the card.
 - Normalize DOB to the extension's date format; trim/uppercase per the form's expectations.
-- **Unit-tested** with fixture strings from multiple states (formats vary slightly).
+- **Unit-tested** with fixture strings: a Michigan DL and a Michigan State ID (parse +
+  `isMichigan === true`), plus an out-of-state sample (parses + `isMichigan === false`).
 
 ## Privacy & policy
 

@@ -7,6 +7,32 @@ import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { getDateInputValue, setDateInputValue } from "./date-picker.js";
 import { showToast } from "./toast.js";
 
+// Fills the form fields from a customer object (used by the phone-scan autofill;
+// mirrors the cache-restore logic). DLN spaces are stripped so the value passes
+// dlnPattern (Michigan DLs encode the number with spaces, e.g. "U 123 ...").
+export function applyCustomerData(elements, data) {
+  const dln = (v) => (v || "").replace(/\s+/g, "");
+  elements.firstName.value = data.firstName || "";
+  if (elements.middleName) elements.middleName.value = data.middleName || "";
+  elements.lastName.value = data.lastName || "";
+  if (elements.suffix) elements.suffix.value = data.suffix || "";
+  setDateInputValue(elements.dob, data.dob || "");
+  elements.dlnPid.value = dln(data.dlnPid);
+  if (data.tradeVin !== undefined) elements.tradeVin.value = data.tradeVin || "";
+
+  if (data.coBuyer && elements.hasCoBuyer) {
+    elements.hasCoBuyer.checked = true;
+    elements.hasCoBuyer.dispatchEvent(new Event("change")); // unhide the section
+    const co = data.coBuyer;
+    if (elements.cbFirstName) elements.cbFirstName.value = co.firstName || "";
+    if (elements.cbMiddleName) elements.cbMiddleName.value = co.middleName || "";
+    if (elements.cbLastName) elements.cbLastName.value = co.lastName || "";
+    if (elements.cbSuffix) elements.cbSuffix.value = co.suffix || "";
+    setDateInputValue(elements.cbDob, co.dob || "");
+    if (elements.cbDlnPid) elements.cbDlnPid.value = dln(co.dlnPid);
+  }
+}
+
 export function getFormData(elements) {
   const hasCoBuyer = elements.hasCoBuyer?.checked || false;
 

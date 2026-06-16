@@ -1078,11 +1078,81 @@ function subjectFullName(customer) {
 
 // ---------- MDOS screenshot sections (Repeat Offender, Title) ----------
 
-function drawMdosScreenshotSection(ctx, opts) {
-  const { title, meta, screenshot } = opts;
+// One self-contained page: header + subject + result box + (screenshot if the
+// portal returned one, else an honest note) + footer. The screenshot scales to
+// the remaining space (drawScreenshotPage), so each check stays on ONE page.
+function drawMdosResultSection(ctx, opts) {
+  const { title, meta = [], subject, result, screenshot } = opts;
   drawCheckHeader(ctx, { title, meta });
-  drawScreenshotPage(ctx, ensureDataUrl(screenshot), { reserveFooter: true });
+  if (subject) drawSubjectBox(ctx, subject);
+  if (result) drawResultBox(ctx, result);
+  if (screenshot) {
+    writeText(ctx, "Official MDOS portal response:", {
+      fontSize: 9,
+      bold: true,
+      color: PALETTE.muted,
+    });
+    ctx.y += 2;
+    drawScreenshotPage(ctx, ensureDataUrl(screenshot), { reserveFooter: true });
+  } else {
+    writeText(
+      ctx,
+      "The MDOS portal screenshot was not captured for this check; the result above reflects the portal response.",
+      { fontSize: 9, italic: true, color: PALETTE.muted }
+    );
+  }
   drawFooter(ctx, MDOS_FOOTER);
+}
+
+/** Result-box args for a Repeat Offender check (eligible/ineligible). */
+function repeatOffenderResultArgs(ro) {
+  return {
+    variant: ro?.passed ? "pass" : "fail",
+    title: ro?.passed ? "ELIGIBLE" : "NOT ELIGIBLE",
+    subtitle: ro?.passed
+      ? "No repeat-offender or ex parte records found — eligible to purchase."
+      : ro?.message ||
+        ro?.rawText ||
+        "Repeat-offender or ex parte record found — review before proceeding.",
+  };
+}
+
+/** Result-box args for a Title/Lien check (clear / branded / lien). */
+function titleResultArgs(t) {
+  const brand =
+    t?.titleBrand &&
+    !["CLEAN", "UNKNOWN", "NONE"].includes(String(t.titleBrand).toUpperCase())
+      ? String(t.titleBrand).toUpperCase()
+      : null;
+  if (t?.hasLien) {
+    return {
+      variant: "warn",
+      title: "ACTIVE LIEN",
+      subtitle: t.lienStatus || "Vehicle has an active lien — payoff required.",
+    };
+  }
+  if (brand) {
+    return {
+      variant: "warn",
+      title: `${brand} TITLE`,
+      subtitle: "Branded title — requires disclosure before sale.",
+    };
+  }
+  return {
+    variant: "pass",
+    title: "CLEAR TITLE",
+    subtitle: "No title brands or active liens reported.",
+  };
+}
+
+/** Subject rows for a title PDF from the check details. */
+function titleSubjectRows(t, vin) {
+  const rows = [{ label: "VIN", value: vin }];
+  const vehicle = [t?.year, t?.make, t?.model].filter(Boolean).join(" ");
+  if (vehicle) rows.push({ label: "Vehicle", value: vehicle });
+  if (t?.titleStatus) rows.push({ label: "Title Status", value: t.titleStatus });
+  rows.push({ label: "Lien", value: t?.hasLien ? t?.lienStatus || "Active lien" : "No active liens" });
+  return rows;
 }
 
 // ---------- Public downloaders ----------
@@ -1137,8 +1207,8 @@ export async function downloadCoBuyerOfacReportPDF(currentResults) {
 
 export async function downloadRepeatOffenderPDF(currentResults) {
   const ro = currentResults?.checks?.repeatOffender;
-  if (!ro?.screenshotData) {
-    showToast("No Repeat Offender screenshot to download.", "info");
+  if (!ro || ro.error || ro.status === "error") {
+    showToast("No completed Repeat Offender result to download.", "info");
     return;
   }
   let ctx;
@@ -1150,12 +1220,18 @@ export async function downloadRepeatOffenderPDF(currentResults) {
     return;
   }
   const c = currentResults.customer;
-  drawMdosScreenshotSection(ctx, {
+  drawMdosResultSection(ctx, {
     title: "Michigan Repeat Offender Check",
-    meta: [
-      { label: "Customer", value: subjectFullName(c) },
-      { label: "Date", value: nowStamp() },
-    ],
+    meta: [{ label: "Date", value: nowStamp() }],
+    subject: {
+      title: "SUBJECT SCREENED",
+      rows: [
+        { label: "Full Name", value: subjectFullName(c) },
+        { label: "Date of Birth", value: c?.dob },
+        { label: "Driver License / PID", value: c?.dlnPid },
+      ],
+    },
+    result: repeatOffenderResultArgs(ro),
     screenshot: ro.screenshotData,
   });
   ctx.doc.save(
@@ -1166,8 +1242,8 @@ export async function downloadRepeatOffenderPDF(currentResults) {
 export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
   const ro = currentResults?.checks?.coBuyerRepeatOffender;
   const co = currentResults?.customer?.coBuyer;
-  if (!ro?.screenshotData || !co) {
-    showToast("No Co-Buyer Repeat Offender screenshot to download.", "info");
+  if (!co || !ro || ro.error || ro.status === "error") {
+    showToast("No completed Co-Buyer Repeat Offender result to download.", "info");
     return;
   }
   let ctx;
@@ -1178,12 +1254,18 @@ export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
-  drawMdosScreenshotSection(ctx, {
+  drawMdosResultSection(ctx, {
     title: "Michigan Repeat Offender Check (Co-Buyer)",
-    meta: [
-      { label: "Co-Buyer", value: subjectFullName(co) },
-      { label: "Date", value: nowStamp() },
-    ],
+    meta: [{ label: "Date", value: nowStamp() }],
+    subject: {
+      title: "CO-BUYER SCREENED",
+      rows: [
+        { label: "Full Name", value: subjectFullName(co) },
+        { label: "Date of Birth", value: co.dob },
+        { label: "Driver License / PID", value: co.dlnPid },
+      ],
+    },
+    result: repeatOffenderResultArgs(ro),
     screenshot: ro.screenshotData,
   });
   ctx.doc.save(
@@ -1193,8 +1275,8 @@ export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
 
 export async function downloadTitleReportPDF(currentResults) {
   const title = currentResults?.checks?.title;
-  if (!title?.screenshotData) {
-    showToast("No Title/Lien screenshot to download.", "info");
+  if (!title || title.error) {
+    showToast("No completed Title/Lien result to download.", "info");
     return;
   }
   let ctx;
@@ -1206,12 +1288,11 @@ export async function downloadTitleReportPDF(currentResults) {
     return;
   }
   const vin = currentResults.customer?.tradeVin || "N/A";
-  drawMdosScreenshotSection(ctx, {
+  drawMdosResultSection(ctx, {
     title: "Michigan Title & Lien Check",
-    meta: [
-      { label: "VIN", value: vin },
-      { label: "Date", value: nowStamp() },
-    ],
+    meta: [{ label: "Date", value: nowStamp() }],
+    subject: { title: "TRADE-IN VEHICLE", rows: titleSubjectRows(title, vin) },
+    result: titleResultArgs(title),
     screenshot: title.screenshotData,
   });
   ctx.doc.save(`Title_${safeFileName([vin])}_${Date.now()}.pdf`);
@@ -1261,40 +1342,56 @@ export async function downloadAllReportsPDF(currentResults) {
   }
 
   // Repeat Offender (buyer).
-  if (checks.repeatOffender?.screenshotData) {
+  const ro = checks.repeatOffender;
+  if (ro && !ro.error && ro.status !== "error") {
     beginSection();
-    drawMdosScreenshotSection(ctx, {
+    drawMdosResultSection(ctx, {
       title: "Michigan Repeat Offender Check",
-      meta: [
-        { label: "Customer", value: subjectFullName(customer) },
-        { label: "Date", value: nowStamp() },
-      ],
-      screenshot: checks.repeatOffender.screenshotData,
+      meta: [{ label: "Date", value: nowStamp() }],
+      subject: {
+        title: "SUBJECT SCREENED",
+        rows: [
+          { label: "Full Name", value: subjectFullName(customer) },
+          { label: "Date of Birth", value: customer?.dob },
+          { label: "Driver License / PID", value: customer?.dlnPid },
+        ],
+      },
+      result: repeatOffenderResultArgs(ro),
+      screenshot: ro.screenshotData,
     });
   }
 
   // Repeat Offender (co-buyer).
-  if (checks.coBuyerRepeatOffender?.screenshotData && customer.coBuyer) {
+  const cbRo = checks.coBuyerRepeatOffender;
+  if (cbRo && !cbRo.error && cbRo.status !== "error" && customer.coBuyer) {
     beginSection();
-    drawMdosScreenshotSection(ctx, {
+    drawMdosResultSection(ctx, {
       title: "Michigan Repeat Offender Check (Co-Buyer)",
-      meta: [
-        { label: "Co-Buyer", value: subjectFullName(customer.coBuyer) },
-        { label: "Date", value: nowStamp() },
-      ],
-      screenshot: checks.coBuyerRepeatOffender.screenshotData,
+      meta: [{ label: "Date", value: nowStamp() }],
+      subject: {
+        title: "CO-BUYER SCREENED",
+        rows: [
+          { label: "Full Name", value: subjectFullName(customer.coBuyer) },
+          { label: "Date of Birth", value: customer.coBuyer?.dob },
+          { label: "Driver License / PID", value: customer.coBuyer?.dlnPid },
+        ],
+      },
+      result: repeatOffenderResultArgs(cbRo),
+      screenshot: cbRo.screenshotData,
     });
   }
 
   // Title & Lien.
-  if (checks.title?.screenshotData) {
+  if (checks.title && !checks.title.error) {
     beginSection();
-    drawMdosScreenshotSection(ctx, {
+    drawMdosResultSection(ctx, {
       title: "Michigan Title & Lien Check",
-      meta: [
-        { label: "VIN", value: customer?.tradeVin || "N/A" },
-        { label: "Date", value: nowStamp() },
-      ],
+      meta: [{ label: "Date", value: nowStamp() }],
+      subject: {
+        title: "TRADE-IN VEHICLE",
+        rows: titleSubjectRows(checks.title, customer?.tradeVin || "N/A"),
+      },
+      result: titleResultArgs(checks.title),
       screenshot: checks.title.screenshotData,
     });
   }

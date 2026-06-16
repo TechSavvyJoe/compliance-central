@@ -1402,6 +1402,18 @@ body {
 .settings-actions { display: flex; gap: var(--spacing-sm); }
 .settings-actions .btn-primary,
 .settings-actions .btn-secondary { flex: 1; }
+.settings-advanced { margin-top: var(--spacing-xs); }
+.settings-advanced > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 6px 0;
+  list-style: revert;
+  user-select: none;
+}
+.settings-advanced > summary:hover { color: var(--text-secondary); }
+.settings-advanced[open] > summary { margin-bottom: var(--spacing-sm); color: var(--text-secondary); }
+.settings-advanced > *:not(summary) { margin-top: var(--spacing-sm); }
 
 /* Print styles — used when the user prints the sidebar directly */
 @media print {

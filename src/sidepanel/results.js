@@ -332,7 +332,7 @@ export function displayResults(elements, results) {
       elements.repeatResultDetail.textContent = repeatOffenderDetail(ro);
     }
     setActionVisibility(elements.printRepeatBtn, !ro.error && ro.status !== "error");
-    setActionVisibility(elements.downloadRepeatBtn, !!ro.screenshotData);
+    setActionVisibility(elements.downloadRepeatBtn, !ro.error && ro.status !== "error");
   } else {
     setResultStatus(elements.repeatResultStatus, "skipped", "Not Run");
     elements.repeatResultDetail.textContent = "Repeat Offender check has not run";
@@ -392,9 +392,7 @@ export function displayResults(elements, results) {
         lines.length > 0 ? lines.join("\n") : "Title information retrieved";
 
       elements.printTitleBtn?.classList.remove("hidden");
-      if (title.screenshotData) {
-        elements.downloadTitleBtn?.classList.remove("hidden");
-      }
+      elements.downloadTitleBtn?.classList.remove("hidden");
     }
   } else {
     setResultStatus(elements.titleResultStatus, "skipped", "No Trade");
@@ -439,7 +437,10 @@ export function displayResults(elements, results) {
         elements.printCbRepeatBtn,
         !cbRO.error && cbRO.status !== "error"
       );
-      setActionVisibility(elements.downloadCbRepeatBtn, !!cbRO.screenshotData);
+      setActionVisibility(
+        elements.downloadCbRepeatBtn,
+        !cbRO.error && cbRO.status !== "error"
+      );
     } else {
       setResultStatus(elements.cbRepeatResultStatus, "skipped", "Not Run");
       elements.cbRepeatResultDetail.textContent =
@@ -488,7 +489,7 @@ export function displayIndividualResult(elements, type, result) {
       elements.repeatResultDetail.textContent = repeatOffenderDetail(result);
     }
     setActionVisibility(elements.printRepeatBtn, !result.error && result.status !== "error");
-    setActionVisibility(elements.downloadRepeatBtn, !!result.screenshotData);
+    setActionVisibility(elements.downloadRepeatBtn, !result.error && result.status !== "error");
   } else if (type === "title") {
     elements.titleResultCard?.classList.remove("hidden");
     if (result.error) {
@@ -509,7 +510,7 @@ export function displayIndividualResult(elements, type, result) {
       elements.titleResultDetail.textContent = detail;
     }
     setActionVisibility(elements.printTitleBtn, !result.error);
-    setActionVisibility(elements.downloadTitleBtn, !!result.screenshotData);
+    setActionVisibility(elements.downloadTitleBtn, !result.error);
   }
 }
 

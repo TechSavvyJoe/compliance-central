@@ -401,34 +401,40 @@
           <div class="modal-body">
             <div class="settings-group">
               <h4 class="settings-heading"><span class="icon icon-key"></span>Access</h4>
-              <p class="settings-help">
-                Every check is included <strong>free</strong> — no account or setup needed.
-                OFAC screening runs on your device; <strong>Repeat Offender</strong> and
-                <strong>Title/Lien</strong> use the secure Compliance Central backend.
-              </p>
               <p id="apiKeyStatus" class="settings-status connected">All checks active — no setup needed.</p>
-              <label class="settings-label" for="apiKeyInput">Custom backend key (optional)</label>
-              <div class="api-key-row">
-                <input
-                  type="password"
-                  id="apiKeyInput"
-                  class="settings-input"
-                  placeholder="Leave blank to use built-in access"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide key">
-                  <span class="icon icon-eye"></span>
-                </button>
-              </div>
-              <div class="settings-actions">
-                <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
-                <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Use Built-in</button>
-              </div>
+              <p class="settings-help">
+                Every check — OFAC, Repeat Offender, and Title/Lien — is included
+                <strong>free</strong>, with no account, key, or setup. Just enter the
+                customer's info and run.
+              </p>
+
+              <details class="settings-advanced">
+                <summary>Advanced: use your own backend key</summary>
+                <label class="settings-label" for="apiKeyInput">Custom backend key</label>
+                <div class="api-key-row">
+                  <input
+                    type="password"
+                    id="apiKeyInput"
+                    class="settings-input"
+                    placeholder="Leave blank to use built-in access"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide key">
+                    <span class="icon icon-eye"></span>
+                  </button>
+                </div>
+                <div class="settings-actions">
+                  <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
+                  <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Use Built-in</button>
+                </div>
+                <p class="settings-help settings-help-muted">
+                  Only needed if you run your own Compliance Central backend. Stored only on this device.
+                </p>
+              </details>
+
               <p class="settings-help settings-help-muted">
-                Most users can leave this blank. Advanced: enter your own backend key to override.
                 Questions? Email <a id="supportEmailLink" href="#">support</a>.
-                Keys are stored only on this device.
               </p>
             </div>
           </div>

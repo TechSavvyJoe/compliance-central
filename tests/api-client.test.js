@@ -49,15 +49,38 @@ test("a backend HTTP error with no JSON body falls back to the status code", asy
   stubStorage("test-key");
   globalThis.fetch = async () => ({
     ok: false,
-    status: 503,
+    status: 500,
     json: async () => {
       throw new Error("not json");
     },
   });
   await assert.rejects(
     () => backendRepeatOffenderCheck({ firstName: "A", lastName: "B" }),
-    /HTTP 503/
+    /HTTP 500/
   );
+});
+
+test("retries on a 503 'busy' response, then succeeds", async () => {
+  stubStorage("test-key");
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) {
+      return {
+        ok: false,
+        status: 503,
+        headers: { get: () => "0" }, // Retry-After: 0 -> retry immediately
+        json: async () => ({ error: "busy" }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({ success: true, status: "eligible", passed: true }),
+    };
+  };
+  const res = await backendRepeatOffenderCheck({ firstName: "A", lastName: "B" });
+  assert.equal(calls, 2, "should retry once after the 503");
+  assert.equal(res.success, true);
 });
 
 test("isBackendAvailable reflects the health endpoint result", async () => {

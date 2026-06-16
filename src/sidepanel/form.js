@@ -30,6 +30,18 @@ export function applyCustomerData(elements, data) {
     if (elements.cbSuffix) elements.cbSuffix.value = co.suffix || "";
     setDateInputValue(elements.cbDob, co.dob || "");
     if (elements.cbDlnPid) elements.cbDlnPid.value = dln(co.dlnPid);
+  } else if (elements.hasCoBuyer) {
+    // A scan must fully own the form state: if this fill has NO co-buyer, clear
+    // any co-buyer left checked/filled from a prior scan — otherwise a stale,
+    // different person would be screened.
+    elements.hasCoBuyer.checked = false;
+    elements.hasCoBuyer.dispatchEvent(new Event("change")); // hide the section
+    if (elements.cbFirstName) elements.cbFirstName.value = "";
+    if (elements.cbMiddleName) elements.cbMiddleName.value = "";
+    if (elements.cbLastName) elements.cbLastName.value = "";
+    if (elements.cbSuffix) elements.cbSuffix.value = "";
+    setDateInputValue(elements.cbDob, "");
+    if (elements.cbDlnPid) elements.cbDlnPid.value = "";
   }
 }
 

@@ -573,6 +573,10 @@ function initEventListeners() {
             if (elements.scanPairStatus)
               elements.scanPairStatus.textContent =
                 "Pairing expired — close and try again.";
+          } else if (result.status === "error") {
+            if (elements.scanPairStatus)
+              elements.scanPairStatus.textContent =
+                "Couldn't read the scan — close and try again.";
           }
         }
       );
@@ -584,6 +588,20 @@ function initEventListeners() {
   });
   elements.scanPairCancel?.addEventListener("click", closeScanPair);
   elements.scanPairCloseX?.addEventListener("click", closeScanPair);
+
+  // A manual edit to an identity field invalidates a scanned jurisdiction flag,
+  // so a hand-typed subject is treated as Michigan (assumed), not carried over
+  // from a prior scan. (Programmatic autofill sets .value without firing input.)
+  ["firstName", "lastName", "dlnPid"].forEach((id) =>
+    elements[id]?.addEventListener("input", () => {
+      scanJurisdiction.buyer = null;
+    })
+  );
+  ["cbFirstName", "cbLastName", "cbDlnPid"].forEach((id) =>
+    elements[id]?.addEventListener("input", () => {
+      scanJurisdiction.coBuyer = null;
+    })
+  );
 }
 
 function withTempResults(temp, fn) {
@@ -765,6 +783,15 @@ async function handleRunOfac() {
 async function handleRunRepeatOffender() {
   const customerData = getFormData(elements);
   if (!validateCustomerFields(customerData)) return;
+  // The Michigan Repeat Offender check only applies to a Michigan license/ID;
+  // running it on a scanned out-of-state subject would be a misleading "pass".
+  if (scanJurisdiction.buyer === false) {
+    showToast(
+      "Repeat Offender check applies only to Michigan licenses/IDs — skipped for an out-of-state subject.",
+      "info"
+    );
+    return;
+  }
   setButtonsDisabled(elements, true);
   showLoading("Checking Repeat Offender status...");
   await clearTransientScreenshots();

@@ -41,31 +41,48 @@ async function openSession() {
 }
 
 // Polls until the phone submits, the window expires, or it's cancelled.
+// Captures the session this loop belongs to and re-checks `active === session`
+// after every await, so a cancel / a newly-started pairing during an in-flight
+// fetch or decrypt can't autofill into a closed/superseded modal (TOCTOU).
 function poll(elements, onDone) {
+  const session = active;
   const tick = async () => {
-    if (!active) return;
-    if (Date.now() > active.deadline) {
+    if (active !== session) return; // cancelled or superseded
+    if (Date.now() > session.deadline) {
       stop();
       onDone({ status: "expired" });
       return;
     }
+    let res;
     try {
-      const res = await fetch(`${RELAY_BASE}/pair/${active.sessionId}`, {
+      res = await fetch(`${RELAY_BASE}/pair/${session.sessionId}`, {
         headers: { "x-api-key": apiKey() },
       });
-      if (res.status === 200) {
+    } catch {
+      if (active === session) session.timer = setTimeout(tick, POLL_MS); // transient
+      return;
+    }
+    if (active !== session) return; // cancelled during the fetch
+    if (res.status === 200) {
+      let payload;
+      try {
         const { blob } = await res.json();
-        const payload = await decryptPayload(active.key, blob);
-        stop();
-        applyCustomerData(elements, { ...payload.buyer, coBuyer: payload.coBuyer });
-        onDone({ status: "filled", payload });
+        payload = await decryptPayload(session.key, blob);
+      } catch {
+        if (active === session) {
+          stop();
+          onDone({ status: "error" }); // tampered/garbage blob — don't hang
+        }
         return;
       }
-      // 204 = nothing yet; keep polling.
-    } catch {
-      // transient; keep polling until the window expires
+      if (active !== session) return; // cancelled during decrypt
+      stop();
+      applyCustomerData(elements, { ...payload.buyer, coBuyer: payload.coBuyer });
+      onDone({ status: "filled", payload });
+      return;
     }
-    if (active) active.timer = setTimeout(tick, POLL_MS);
+    // 204 = nothing yet; keep polling if still active.
+    if (active === session) session.timer = setTimeout(tick, POLL_MS);
   };
   tick();
 }

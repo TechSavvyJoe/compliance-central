@@ -5,6 +5,8 @@ import { parseAAMVA, aamvaElementCodes } from "./lib/aamva.js";
 const params = new URLSearchParams(location.search);
 const sessionId = params.get("s") || "";
 const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+// Diagnostics (camera resolution, element codes) only show with ?debug=1.
+const DEBUG = params.has("debug");
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -15,6 +17,7 @@ const screens = {
 };
 
 const deal = { buyer: null, coBuyer: null };
+let lastPayload = null; // assembled on finish(); Phase 2 encrypts + relays it
 let capturing = "buyer"; // "buyer" | "coBuyer"
 let pending = null; // last parsed result awaiting confirmation
 let stream = null;
@@ -47,8 +50,9 @@ function stopCamera() {
   }
 }
 
-// On-screen diagnostics (we can't see the phone's console).
+// On-screen diagnostics (we can't see the phone's console). Off unless ?debug=1.
 function diag(msg) {
+  if (!DEBUG) return;
   const d = el("diag");
   if (d) d.textContent = msg;
 }
@@ -179,10 +183,9 @@ async function beginCapture(which) {
     }
     pending = parsed;
     renderReview(parsed);
-    // Privacy-safe diagnostic: shows which element codes the card uses (no
-    // values), plus payload size + newline count, to confirm real-card layout.
+    // Privacy-safe diagnostic (codes only, no values), shown with ?debug=1.
     const rd = el("reviewDiag");
-    if (rd) {
+    if (rd && DEBUG) {
       const lf = (raw.match(/\n/g) || []).length;
       rd.textContent = `codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
     }
@@ -208,13 +211,21 @@ function finish() {
   if (deal.coBuyer && deal.buyer && deal.coBuyer.dlnPid === deal.buyer.dlnPid) {
     showError("Buyer and co-buyer have the same license number — did you scan the same card twice?");
   }
-  const payload = {
+  // Phase 1: assemble the payload (Phase 2 encrypts + relays it to the extension).
+  lastPayload = {
     buyer: deal.buyer,
     coBuyer: deal.coBuyer || null,
     scannedAt: new Date().toISOString(),
   };
-  // Phase 1: display the assembled payload (Phase 2 encrypts + relays it).
-  el("payloadPreview").textContent = JSON.stringify(payload, null, 2);
+  // Clean, human-readable confirmation of who was captured (no raw JSON).
+  const fullName = (p) =>
+    [p.firstName, p.middleName, p.lastName, p.suffix].filter(Boolean).join(" ");
+  let rows = `<div class="cap-row"><span>Buyer</span><strong>${escapeHtml(fullName(deal.buyer))}</strong></div>`;
+  if (deal.coBuyer) {
+    rows += `<div class="cap-row"><span>Co-buyer</span><strong>${escapeHtml(fullName(deal.coBuyer))}</strong></div>`;
+  }
+  const cs = el("captureSummary");
+  if (cs) cs.innerHTML = rows;
   show("done");
 }
 

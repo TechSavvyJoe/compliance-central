@@ -70,9 +70,13 @@ h2 { font-size: 18px; }
   border: 1px solid var(--border); }
 
 .done-check { font-size: 56px; color: var(--success); text-align: center; }
-.payload-preview { background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 12px; font-size: 11px; color: var(--text-muted);
-  white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; }
+.capture-summary { background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px 16px; }
+.capture-summary .cap-row { display: flex; justify-content: space-between; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border); }
+.capture-summary .cap-row:last-child { border-bottom: none; }
+.capture-summary .cap-row span { color: var(--text-muted); font-size: 13px; }
+.capture-summary .cap-row strong { font-weight: 600; text-align: right; }
 
 .error-banner { background: rgba(239,68,68,0.12); border: 1px solid #ef4444;
   color: #ef4444; border-radius: var(--radius); padding: 12px; font-size: 14px; margin-top: 16px; }

@@ -81,6 +81,28 @@ test("DAA combined full-name fallback (no DCS/DAC/DAD)", () => {
   assert.equal(r.middleName, "QUINCY");
 });
 
+// Faithful REAL Michigan layout (confirmed on-device 2026-06-16): last name in
+// DCS, given names COMBINED in DCT, NO DAC/DAD, DLN spaced, plus other codes a
+// Michigan card carries. Synthetic values (not a real person's PII).
+const MI_REAL_LAYOUT =
+  "@\n\rANSI 636032100102DL00410279ZM03200008\n" +
+  "DLDCBNONE\nDCDNONE\nDBA08152030\nDCSSAMPLE\nDDEN\nDCTPAT ALEX\nDDFN\n" +
+  "DBD08152022\nDBB08081985\nDBCM\nDAG123 MAIN ST\nDAILANSING\nDAJMI\n" +
+  "DAK488010000\nDAQS 123 456 789 012\nDCGUSA\nDCK00000\nZMZMI\n\r";
+
+test("real Michigan layout: DCS + combined DCT given names, no DAC/DAD", () => {
+  const r = parseAAMVA(MI_REAL_LAYOUT);
+  assert.equal(r.firstName, "PAT");
+  assert.equal(r.middleName, "ALEX");
+  assert.equal(r.lastName, "SAMPLE");
+  assert.equal(r.dob, "08/08/1985");
+  assert.equal(r.dlnPid, "S 123 456 789 012");
+  assert.equal(r.isMichigan, true);
+  const codes = aamvaElementCodes(MI_REAL_LAYOUT);
+  assert.ok(codes.includes("DCS") && codes.includes("DCT"));
+  assert.ok(!codes.includes("DAC") && !codes.includes("DAD"));
+});
+
 test("aamvaElementCodes lists element codes present (no header noise)", () => {
   const codes = aamvaElementCodes(MI_DL);
   assert.ok(codes.includes("DCS"));

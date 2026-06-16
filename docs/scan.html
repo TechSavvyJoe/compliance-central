@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Scan License — Compliance Central</title>
+  <link rel="icon" href="../icons/icon32.png" />
+  <link rel="stylesheet" href="scan.css" />
+</head>
+<body>
+  <header class="cc-header">
+    <img class="cc-logo" src="../icons/icon128.png" alt="Compliance Central" />
+    <div class="cc-title">
+      <h1>Compliance Central</h1>
+      <span class="cc-subtitle">Michigan Dealer Compliance Hub</span>
+    </div>
+  </header>
+
+  <main class="cc-main">
+    <!-- Camera / scanning screen -->
+    <section id="cameraScreen" class="screen">
+      <h2 id="captureHeading">Scan the buyer's license</h2>
+      <p class="hint">Line up the <strong>barcode on the back</strong> of the Michigan
+        driver's license or state ID inside the frame.</p>
+      <div class="viewport">
+        <video id="video" playsinline muted></video>
+        <div class="frame-guide" aria-hidden="true"></div>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite">Starting camera…</p>
+      <button id="startBtn" class="btn btn-primary hidden">Start camera</button>
+    </section>
+
+    <!-- Review screen -->
+    <section id="reviewScreen" class="screen hidden">
+      <h2 id="reviewHeading">Confirm the details</h2>
+      <dl id="fields" class="fields"></dl>
+      <p id="jurisdictionNote" class="note hidden"></p>
+      <div class="actions">
+        <button id="rescanBtn" class="btn btn-ghost">Re-scan</button>
+        <button id="confirmBtn" class="btn btn-primary">Looks good</button>
+      </div>
+    </section>
+
+    <!-- Co-buyer prompt -->
+    <section id="cobuyerPrompt" class="screen hidden">
+      <h2>Is there a co-buyer?</h2>
+      <p class="hint">A co-buyer is a second person on the deal. Scan their license too,
+        or finish with just the buyer.</p>
+      <div class="actions">
+        <button id="noCoBuyerBtn" class="btn btn-ghost">No co-buyer</button>
+        <button id="yesCoBuyerBtn" class="btn btn-primary">Scan co-buyer</button>
+      </div>
+    </section>
+
+    <!-- Done screen -->
+    <section id="doneScreen" class="screen hidden">
+      <div class="done-check" aria-hidden="true">✓</div>
+      <h2>Scan complete</h2>
+      <p class="hint">Return to your computer — the form will fill automatically.</p>
+      <pre id="payloadPreview" class="payload-preview"></pre>
+      <button id="startOverBtn" class="btn btn-ghost">Start over</button>
+    </section>
+
+    <section id="errorBanner" class="error-banner hidden" role="alert"></section>
+  </main>
+
+  <script src="lib/zxing.min.js"></script>
+  <script src="scan.js" type="module"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "for f in $(find . -name '*.js' -not -path './lib/jspdf.umd.min.js' -not -path './node_modules/*'); do node --check \"$f\" || exit 1; done",
+    "check": "for f in $(find . -name '*.js' -not -path './lib/jspdf.umd.min.js' -not -path './docs/lib/zxing.min.js' -not -path './node_modules/*'); do node --check \"$f\" || exit 1; done",
     "test": "node --test",
     "assets": "node tools/build-store-assets.mjs",
     "package": "bash tools/package-extension.sh"

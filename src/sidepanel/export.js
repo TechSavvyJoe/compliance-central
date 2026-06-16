@@ -185,6 +185,11 @@ function ofacReportHTML({ customer, ofac, lastUpdate, subjectLabel = "SUBJECT SC
         : ""
     }
   </div>
+  ${
+    ofac.stale
+      ? `<div class="certification" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;"><p><strong>Data Freshness Notice:</strong> This screening used cached SDN data (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
+      : ""
+  }
   <div class="certification">
     <p><strong>Compliance Certification:</strong> This screening was performed in accordance with OFAC regulations requiring financial institutions and businesses to screen customers against the SDN List. This report serves as documentation of compliance efforts.</p>
   </div>
@@ -437,6 +442,15 @@ export async function printCoBuyerOfacReport(currentResults) {
     } catch {
       lastUpdate = "Unknown";
     }
+  } else {
+    try {
+      const parsed = new Date(lastUpdate);
+      if (!Number.isNaN(parsed.getTime())) {
+        lastUpdate = parsed.toLocaleDateString();
+      }
+    } catch {
+      // leave as-is
+    }
   }
 
   openAndPrint(
@@ -559,9 +573,9 @@ const PALETTE = {
   ink: [17, 24, 39],
 };
 
-async function createPdfContext() {
+async function createPdfContext(orientation = "portrait") {
   const JsPDF = await loadJsPDF();
-  const doc = new JsPDF({ unit: "pt", format: "letter" });
+  const doc = new JsPDF({ unit: "pt", format: "letter", orientation });
   return {
     doc,
     pageWidth: doc.internal.pageSize.getWidth(),
@@ -569,6 +583,16 @@ async function createPdfContext() {
     margin: 48,
     y: 48,
   };
+}
+
+// Adds a page with an explicit orientation and resyncs the cached page size.
+// All current reports are portrait; this keeps page sizing correct if a
+// section ever opts into a different orientation.
+function addPageWithOrientation(ctx, orientation = "portrait") {
+  ctx.doc.addPage("letter", orientation);
+  ctx.pageWidth = ctx.doc.internal.pageSize.getWidth();
+  ctx.pageHeight = ctx.doc.internal.pageSize.getHeight();
+  ctx.y = ctx.margin;
 }
 
 function setFill(doc, rgb) { doc.setFillColor(rgb[0], rgb[1], rgb[2]); }
@@ -1053,6 +1077,17 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
         : [],
   });
 
+  if (ofac.stale) {
+    writeText(
+      ctx,
+      `DATA FRESHNESS NOTICE: This screening used cached SDN data last updated ${lastUpdate}${
+        ofac.dataAgeHours != null ? ` (about ${ofac.dataAgeHours} hours ago)` : ""
+      }. A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.`,
+      { fontSize: 9, bold: true, color: PALETTE.warnText }
+    );
+    ctx.y += 6;
+  }
+
   drawCertification(
     ctx,
     "This screening was performed against the OFAC SDN List under U.S. Treasury regulations requiring screening of customers prior to consummating a financial transaction. This report serves as documented evidence of compliance efforts."
@@ -1102,6 +1137,104 @@ function drawMdosResultSection(ctx, opts) {
     );
   }
   drawFooter(ctx, MDOS_FOOTER);
+}
+
+// Renders an MDOS/SOS check as the ACTUAL captured portal page: a slim
+// provenance header (who / what / when), then the real screenshot filling the
+// page, then a source footer. This is the digital equivalent of opening the
+// portal and printing it — we do NOT rebuild the result with our own boxes.
+// (Reconstruction is reserved for OFAC, which has no portal page to capture.)
+function drawPortalCapture(ctx, opts) {
+  const { title, metaLine, screenshot, footerLines = MDOS_FOOTER } = opts;
+  const { doc, pageWidth, margin } = ctx;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  setText(doc, PALETTE.navy);
+  doc.text(title, margin, ctx.y + 12);
+  ctx.y += 22;
+
+  if (metaLine) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setText(doc, PALETTE.muted);
+    const lines = doc.splitTextToSize(String(metaLine), pageWidth - margin * 2);
+    for (const ln of lines) {
+      doc.text(ln, margin, ctx.y + 8);
+      ctx.y += 11;
+    }
+  }
+
+  setDraw(doc, PALETTE.navy);
+  doc.setLineWidth(0.8);
+  doc.line(margin, ctx.y + 2, pageWidth - margin, ctx.y + 2);
+  ctx.y += 12;
+
+  drawScreenshotPage(ctx, ensureDataUrl(screenshot), { reserveFooter: true });
+  drawFooter(ctx, footerLines);
+}
+
+/** A combined-report section that renders the actual Repeat Offender portal
+ * capture when a screenshot exists, else a labeled summary. */
+function repeatSection(ro, person, title, subjectLabel) {
+  if (ro?.screenshotData) {
+    return {
+      orientation: "portrait",
+      render: (ctx) =>
+        drawPortalCapture(ctx, {
+          title,
+          metaLine: `Customer: ${subjectFullName(person)}   ·   DLN/PID: ${person?.dlnPid || "—"}   ·   Captured: ${nowStamp()}`,
+          screenshot: ro.screenshotData,
+        }),
+    };
+  }
+  return {
+    orientation: "portrait",
+    render: (ctx) =>
+      drawMdosResultSection(ctx, {
+        title,
+        meta: [{ label: "Date", value: nowStamp() }],
+        subject: {
+          title: subjectLabel,
+          rows: [
+            { label: "Full Name", value: subjectFullName(person) },
+            { label: "Date of Birth", value: person?.dob },
+            { label: "Driver License / PID", value: person?.dlnPid },
+          ],
+        },
+        result: repeatOffenderResultArgs(ro),
+        screenshot: null,
+      }),
+  };
+}
+
+/** A combined-report section that renders the actual Title & Lien portal
+ * capture when a screenshot exists, else a labeled summary. */
+function titleSection(t, customer) {
+  const vin = customer?.tradeVin || "N/A";
+  const vehicle = [t?.year, t?.make, t?.model].filter(Boolean).join(" ");
+  if (t?.screenshotData) {
+    return {
+      orientation: "portrait",
+      render: (ctx) =>
+        drawPortalCapture(ctx, {
+          title: "Michigan Title & Lien Check",
+          metaLine: `VIN: ${vin}${vehicle ? "   ·   " + vehicle : ""}   ·   Captured: ${nowStamp()}`,
+          screenshot: t.screenshotData,
+        }),
+    };
+  }
+  return {
+    orientation: "portrait",
+    render: (ctx) =>
+      drawMdosResultSection(ctx, {
+        title: "Michigan Title & Lien Check",
+        meta: [{ label: "Date", value: nowStamp() }],
+        subject: { title: "TRADE-IN VEHICLE", rows: titleSubjectRows(t, vin) },
+        result: titleResultArgs(t),
+        screenshot: null,
+      }),
+  };
 }
 
 /** Result-box args for a Repeat Offender check (eligible/ineligible). */
@@ -1211,32 +1344,20 @@ export async function downloadRepeatOffenderPDF(currentResults) {
     showToast("No completed Repeat Offender result to download.", "info");
     return;
   }
+  const c = currentResults.customer;
+  const fileName = `RepeatOffender_${safeFileName([c?.firstName, c?.lastName])}_${Date.now()}.pdf`;
+  const section = repeatSection(ro, c, "Michigan Repeat Offender Check", "SUBJECT SCREENED");
+
   let ctx;
   try {
-    ctx = await createPdfContext();
+    ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
-  const c = currentResults.customer;
-  drawMdosResultSection(ctx, {
-    title: "Michigan Repeat Offender Check",
-    meta: [{ label: "Date", value: nowStamp() }],
-    subject: {
-      title: "SUBJECT SCREENED",
-      rows: [
-        { label: "Full Name", value: subjectFullName(c) },
-        { label: "Date of Birth", value: c?.dob },
-        { label: "Driver License / PID", value: c?.dlnPid },
-      ],
-    },
-    result: repeatOffenderResultArgs(ro),
-    screenshot: ro.screenshotData,
-  });
-  ctx.doc.save(
-    `RepeatOffender_${safeFileName([c?.firstName, c?.lastName])}_${Date.now()}.pdf`
-  );
+  await section.render(ctx);
+  ctx.doc.save(fileName);
 }
 
 export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
@@ -1246,31 +1367,24 @@ export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
     showToast("No completed Co-Buyer Repeat Offender result to download.", "info");
     return;
   }
+  const fileName = `RepeatOffender_CoBuyer_${safeFileName([co.firstName, co.lastName])}_${Date.now()}.pdf`;
+  const section = repeatSection(
+    ro,
+    co,
+    "Michigan Repeat Offender Check (Co-Buyer)",
+    "CO-BUYER SCREENED"
+  );
+
   let ctx;
   try {
-    ctx = await createPdfContext();
+    ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
-  drawMdosResultSection(ctx, {
-    title: "Michigan Repeat Offender Check (Co-Buyer)",
-    meta: [{ label: "Date", value: nowStamp() }],
-    subject: {
-      title: "CO-BUYER SCREENED",
-      rows: [
-        { label: "Full Name", value: subjectFullName(co) },
-        { label: "Date of Birth", value: co.dob },
-        { label: "Driver License / PID", value: co.dlnPid },
-      ],
-    },
-    result: repeatOffenderResultArgs(ro),
-    screenshot: ro.screenshotData,
-  });
-  ctx.doc.save(
-    `RepeatOffender_CoBuyer_${safeFileName([co.firstName, co.lastName])}_${Date.now()}.pdf`
-  );
+  await section.render(ctx);
+  ctx.doc.save(fileName);
 }
 
 export async function downloadTitleReportPDF(currentResults) {
@@ -1279,23 +1393,20 @@ export async function downloadTitleReportPDF(currentResults) {
     showToast("No completed Title/Lien result to download.", "info");
     return;
   }
+  const vin = currentResults.customer?.tradeVin || "N/A";
+  const fileName = `Title_${safeFileName([vin])}_${Date.now()}.pdf`;
+  const section = titleSection(title, currentResults.customer);
+
   let ctx;
   try {
-    ctx = await createPdfContext();
+    ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
-  const vin = currentResults.customer?.tradeVin || "N/A";
-  drawMdosResultSection(ctx, {
-    title: "Michigan Title & Lien Check",
-    meta: [{ label: "Date", value: nowStamp() }],
-    subject: { title: "TRADE-IN VEHICLE", rows: titleSubjectRows(title, vin) },
-    result: titleResultArgs(title),
-    screenshot: title.screenshotData,
-  });
-  ctx.doc.save(`Title_${safeFileName([vin])}_${Date.now()}.pdf`);
+  await section.render(ctx);
+  ctx.doc.save(fileName);
 }
 
 /**
@@ -1308,97 +1419,71 @@ export async function downloadAllReportsPDF(currentResults) {
     return;
   }
 
+  const customer = currentResults.customer;
+  const checks = currentResults.checks || {};
+  const coBuyer = customer?.coBuyer;
+
+  // Build the section list. OFAC renders its official letterhead; the MDOS/SOS
+  // checks render the actual portal capture (the page the dealer would print).
+  // All pages are portrait.
+  const sections = [];
+
+  if (checks.ofac) {
+    sections.push({
+      orientation: "portrait",
+      render: (ctx) => drawOfacSection(ctx, customer, checks.ofac),
+    });
+  }
+  if (checks.coBuyerOfac && coBuyer) {
+    sections.push({
+      orientation: "portrait",
+      render: (ctx) =>
+        drawOfacSection(ctx, coBuyer, checks.coBuyerOfac, {
+          subjectLabel: "CO-BUYER SUBJECT SCREENED",
+        }),
+    });
+  }
+
+  const ro = checks.repeatOffender;
+  if (ro && !ro.error && ro.status !== "error") {
+    sections.push(
+      repeatSection(ro, customer, "Michigan Repeat Offender Check", "SUBJECT SCREENED")
+    );
+  }
+
+  const cbRo = checks.coBuyerRepeatOffender;
+  if (cbRo && !cbRo.error && cbRo.status !== "error" && coBuyer) {
+    sections.push(
+      repeatSection(
+        cbRo,
+        coBuyer,
+        "Michigan Repeat Offender Check (Co-Buyer)",
+        "CO-BUYER SCREENED"
+      )
+    );
+  }
+
+  if (checks.title && !checks.title.error) {
+    sections.push(titleSection(checks.title, customer));
+  }
+
+  if (!sections.length) {
+    showToast("Nothing to include in the PDF yet.", "info");
+    return;
+  }
+
   let ctx;
   try {
-    ctx = await createPdfContext();
+    ctx = await createPdfContext(sections[0].orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
 
-  const customer = currentResults.customer;
-  const checks = currentResults.checks || {};
-
-  let firstPage = true;
-  const beginSection = () => {
-    if (!firstPage) ctx.doc.addPage();
-    ctx.y = ctx.margin;
-    firstPage = false;
-  };
-
-  // OFAC (buyer).
-  if (checks.ofac) {
-    beginSection();
-    await drawOfacSection(ctx, customer, checks.ofac);
-  }
-
-  // OFAC (co-buyer).
-  if (checks.coBuyerOfac && customer.coBuyer) {
-    beginSection();
-    await drawOfacSection(ctx, customer.coBuyer, checks.coBuyerOfac, {
-      subjectLabel: "CO-BUYER SUBJECT SCREENED",
-    });
-  }
-
-  // Repeat Offender (buyer).
-  const ro = checks.repeatOffender;
-  if (ro && !ro.error && ro.status !== "error") {
-    beginSection();
-    drawMdosResultSection(ctx, {
-      title: "Michigan Repeat Offender Check",
-      meta: [{ label: "Date", value: nowStamp() }],
-      subject: {
-        title: "SUBJECT SCREENED",
-        rows: [
-          { label: "Full Name", value: subjectFullName(customer) },
-          { label: "Date of Birth", value: customer?.dob },
-          { label: "Driver License / PID", value: customer?.dlnPid },
-        ],
-      },
-      result: repeatOffenderResultArgs(ro),
-      screenshot: ro.screenshotData,
-    });
-  }
-
-  // Repeat Offender (co-buyer).
-  const cbRo = checks.coBuyerRepeatOffender;
-  if (cbRo && !cbRo.error && cbRo.status !== "error" && customer.coBuyer) {
-    beginSection();
-    drawMdosResultSection(ctx, {
-      title: "Michigan Repeat Offender Check (Co-Buyer)",
-      meta: [{ label: "Date", value: nowStamp() }],
-      subject: {
-        title: "CO-BUYER SCREENED",
-        rows: [
-          { label: "Full Name", value: subjectFullName(customer.coBuyer) },
-          { label: "Date of Birth", value: customer.coBuyer?.dob },
-          { label: "Driver License / PID", value: customer.coBuyer?.dlnPid },
-        ],
-      },
-      result: repeatOffenderResultArgs(cbRo),
-      screenshot: cbRo.screenshotData,
-    });
-  }
-
-  // Title & Lien.
-  if (checks.title && !checks.title.error) {
-    beginSection();
-    drawMdosResultSection(ctx, {
-      title: "Michigan Title & Lien Check",
-      meta: [{ label: "Date", value: nowStamp() }],
-      subject: {
-        title: "TRADE-IN VEHICLE",
-        rows: titleSubjectRows(checks.title, customer?.tradeVin || "N/A"),
-      },
-      result: titleResultArgs(checks.title),
-      screenshot: checks.title.screenshotData,
-    });
-  }
-
-  if (firstPage) {
-    showToast("Nothing to include in the PDF yet.", "info");
-    return;
+  for (let i = 0; i < sections.length; i++) {
+    if (i > 0) addPageWithOrientation(ctx, sections[i].orientation);
+    await sections[i].render(ctx);
   }
 
   ctx.doc.save(

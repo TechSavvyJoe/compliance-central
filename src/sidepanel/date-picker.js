@@ -173,6 +173,15 @@ function handleInputKeydown(event, state) {
     return;
   }
 
+  if (event.key === "Tab") {
+    // The picker auto-opens on focus, so a plain Tab would otherwise dive into
+    // the calendar's buttons instead of advancing to the next field (DLN/PID).
+    // Close the popover synchronously — without preventing default — so its
+    // controls leave the tab order before the browser moves focus.
+    if (state.isOpen) closePicker(state);
+    return;
+  }
+
   if (event.key === "ArrowDown") {
     event.preventDefault();
     openPicker(state);

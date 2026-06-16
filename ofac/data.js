@@ -174,6 +174,10 @@ export async function downloadAndParseSDN() {
 
 export function needsUpdate(lastUpdate) {
   if (!lastUpdate) return true;
-  const hoursSince = (Date.now() - new Date(lastUpdate).getTime()) / 3600000;
+  const t = new Date(lastUpdate).getTime();
+  // Fail safe: an unparseable/unknown timestamp means the age is unknown, so
+  // treat it as needing a refresh rather than silently assuming it's fresh.
+  if (Number.isNaN(t)) return true;
+  const hoursSince = (Date.now() - t) / 3600000;
   return hoursSince >= 24;
 }

@@ -104,6 +104,12 @@ const elements = {
 
   viewHistoryBtn: $("viewHistoryBtn"),
 
+  // Collapsible customer/vehicle input
+  inputPanel: $("inputPanel"),
+  inputSummaryBar: $("inputSummaryBar"),
+  inputSummaryText: $("inputSummaryText"),
+  inputSummaryAction: $("inputSummaryAction"),
+
   // Progress
   progressSection: $("progressSection"),
   ofacStatus: $("ofacStatus"),
@@ -299,6 +305,7 @@ async function applyPersistedResults() {
   if (persisted.state === "running") {
     setIsRunning(true);
     setButtonsDisabled(elements, true);
+    setInputCollapsed(true);
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
     updateProgress(elements, persisted.progress);
@@ -336,6 +343,7 @@ async function applyPersistedResults() {
   if (persisted.state === "individual" && persisted.results) {
     setCurrentResults(persisted.results);
     displayStoredIndividualResult(persisted.results);
+    setInputCollapsed(true);
     elements.resultsSection.classList.remove("hidden");
     elements.progressSection.classList.add("hidden");
     return;
@@ -343,6 +351,7 @@ async function applyPersistedResults() {
 
   if (persisted.state === "complete" && persisted.results) {
     displayResults(elements, persisted.results);
+    setInputCollapsed(true);
     elements.resultsSection.classList.remove("hidden");
     elements.progressSection.classList.add("hidden");
   }
@@ -516,6 +525,13 @@ function initEventListeners() {
       }
     });
   }
+
+  // Summary bar is a two-way toggle: collapse when open, expand when collapsed.
+  elements.inputSummaryBar?.addEventListener("click", () => {
+    const isOpen =
+      elements.inputSummaryBar.getAttribute("aria-expanded") === "true";
+    setInputCollapsed(isOpen);
+  });
 }
 
 function withTempResults(temp, fn) {
@@ -548,6 +564,68 @@ function describeError(err) {
 }
 
 // ---------- Action handlers ----------
+
+// ---------- Collapsible customer/vehicle input ----------
+
+// Builds the one-line summary shown on the collapsed bar (name · DOB · DLN · VIN).
+function buildInputSummary() {
+  const form = getFormData(elements);
+  // On reload, results restore (applyPersistedResults) can race ahead of the
+  // cached-form-data hydration, leaving the inputs momentarily empty. Fall back
+  // to the restored results' customer so the summary never renders blank.
+  const haveForm =
+    form.firstName || form.lastName || form.dob || form.dlnPid || form.tradeVin;
+  const c = haveForm ? form : getCurrentResults()?.customer || form;
+  const parts = [];
+  const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
+  if (name) parts.push(name);
+  if (c.dob) parts.push("DOB " + c.dob);
+  if (c.dlnPid) parts.push("DLN " + c.dlnPid);
+  if (c.coBuyer && (c.coBuyer.firstName || c.coBuyer.lastName)) {
+    const cbName = [c.coBuyer.firstName, c.coBuyer.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (cbName) parts.push("Co-buyer " + cbName);
+  }
+  if (c.tradeVin) parts.push("VIN " + c.tradeVin);
+  return parts.length ? parts.join("  ·  ") : "Customer details";
+}
+
+// Shows/hides the input form via the summary bar, which stays visible as a
+// two-way toggle once a run has collapsed it: click to collapse, click to
+// expand, as often as needed. Inputs keep their values while hidden, so the
+// form still submits and re-collapses on the next run. Reset by handleClear.
+function setInputCollapsed(collapsed) {
+  if (!elements.inputPanel || !elements.inputSummaryBar) return;
+  elements.inputSummaryBar.classList.remove("hidden");
+  const chevron = elements.inputSummaryBar.querySelector(".section-toggle");
+  if (collapsed) {
+    elements.inputSummaryText.textContent = buildInputSummary();
+    // If keyboard/SR focus is inside the panel we're about to hide, move it to
+    // the (now-visible) summary bar so focus isn't silently lost to <body>.
+    const focusInsidePanel = elements.inputPanel.contains(document.activeElement);
+    elements.inputPanel.classList.add("hidden");
+    elements.inputSummaryBar.setAttribute("aria-expanded", "false");
+    if (elements.inputSummaryAction) elements.inputSummaryAction.textContent = "Edit";
+    chevron?.classList.remove("rotated");
+    if (focusInsidePanel) elements.inputSummaryBar.focus();
+  } else {
+    elements.inputSummaryText.textContent = "Customer & Vehicle Details";
+    elements.inputPanel.classList.remove("hidden");
+    elements.inputSummaryBar.setAttribute("aria-expanded", "true");
+    if (elements.inputSummaryAction) elements.inputSummaryAction.textContent = "Hide";
+    chevron?.classList.add("rotated");
+  }
+}
+
+// Returns the panel to its pristine first-use state: form open, no summary bar.
+function resetInputPanel() {
+  if (!elements.inputPanel || !elements.inputSummaryBar) return;
+  elements.inputPanel.classList.remove("hidden");
+  elements.inputSummaryBar.classList.add("hidden");
+  elements.inputSummaryBar.setAttribute("aria-expanded", "false");
+}
 
 async function handleRunAllChecks() {
   const customerData = getFormData(elements);
@@ -607,6 +685,7 @@ async function handleRunOfac() {
       runLabel: "OFAC Only",
     });
     displayIndividualResult(elements, "ofac", result);
+    setInputCollapsed(true);
     await persistCurrentResults();
     await saveToHistory(results);
     await updateHistoryCount(elements.historyCount);
@@ -637,6 +716,7 @@ async function handleRunRepeatOffender() {
       }
     );
     displayIndividualResult(elements, "repeatOffender", result);
+    setInputCollapsed(true);
     await persistCurrentResults();
     await saveToHistory(results);
     await updateHistoryCount(elements.historyCount);
@@ -665,6 +745,7 @@ async function handleRunTitle() {
       runLabel: "Title/Lien",
     });
     displayIndividualResult(elements, "title", result);
+    setInputCollapsed(true);
     await persistCurrentResults();
     await saveToHistory(results);
     await updateHistoryCount(elements.historyCount);
@@ -679,6 +760,7 @@ async function handleRunTitle() {
 function handleClear() {
   setIsRunning(false);
   setButtonsDisabled(elements, false);
+  resetInputPanel();
   chrome.storage.session.set({
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     [STORAGE_KEYS.searchProgress]: 0,
@@ -904,6 +986,7 @@ function handleSearchStatusChange(changes) {
   if (status === SEARCH_STATUS.running) {
     setIsRunning(true);
     setButtonsDisabled(elements, true);
+    setInputCollapsed(true);
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
     setCardsLoadingState(elements, true);
@@ -932,6 +1015,7 @@ function handleSearchStatusChange(changes) {
   if (status === SEARCH_STATUS.complete) {
     setIsRunning(false);
     setButtonsDisabled(elements, false);
+    setInputCollapsed(true);
     setCardsLoadingState(elements, false);
 
     const results = getCurrentResults();
@@ -953,6 +1037,7 @@ function handleSearchStatusChange(changes) {
   if (status === SEARCH_STATUS.error) {
     setIsRunning(false);
     setButtonsDisabled(elements, false);
+    resetInputPanel();
     setCardsLoadingState(elements, false);
     const errorMsg = changes[STORAGE_KEYS.lastError]?.newValue;
     showToast("Error: " + (describeError({ message: errorMsg }) || "An error occurred."), "error");

@@ -28,6 +28,22 @@
       <main id="main-content" class="hub-main" role="main">
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 
+        <button
+          id="inputSummaryBar"
+          class="input-summary-bar hidden"
+          type="button"
+          aria-expanded="false"
+          aria-controls="inputPanel"
+        >
+          <span class="input-summary-icon icon icon-user"></span>
+          <span class="input-summary-text" id="inputSummaryText">Customer details</span>
+          <span class="input-summary-edit"
+            ><span id="inputSummaryAction">Edit</span
+            ><span class="icon icon-chevron section-toggle"></span
+          ></span>
+        </button>
+
+        <div id="inputPanel">
         <section class="input-section">
           <h3 class="section-title">
             <span class="section-icon icon icon-user"></span>
@@ -77,7 +93,7 @@
                   aria-haspopup="dialog"
                   aria-expanded="false"
                 />
-                <button type="button" class="date-picker-toggle" aria-label="Open Date of Birth calendar">
+                <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Date of Birth calendar">
                   <span class="icon icon-calendar"></span>
                 </button>
               </div>
@@ -145,7 +161,7 @@
                   aria-haspopup="dialog"
                   aria-expanded="false"
                 />
-                <button type="button" class="date-picker-toggle" aria-label="Open Co-Buyer Date of Birth calendar">
+                <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Co-Buyer Date of Birth calendar">
                   <span class="icon icon-calendar"></span>
                 </button>
               </div>
@@ -189,6 +205,7 @@
             </div>
           </div>
         </section>
+        </div>
 
         <section class="action-section">
           <div class="main-actions">

@@ -121,6 +121,39 @@ export async function storeSDNEntries(entries) {
 }
 
 /**
+ * Atomically replace all SDN entries: clears the store and writes the new set
+ * within a SINGLE transaction. If the worker dies mid-write or any put fails,
+ * the transaction aborts and rolls back, leaving the previous list intact —
+ * the DB is never left empty by a partial/failed update.
+ * @param {Array} entries - Array of SDN entry objects
+ * @returns {Promise<void>}
+ */
+export async function replaceSDNEntries(entries) {
+  // Defense in depth: never let an empty/garbage set wipe the stored list. The
+  // caller (performSDNUpdate) already enforces a count floor; this guards any
+  // future caller from atomically clearing the DB to nothing.
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw new Error("replaceSDNEntries refused an empty entry set");
+  }
+  const database = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([SDN_STORE], "readwrite");
+    const store = transaction.objectStore(SDN_STORE);
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () =>
+      reject(transaction.error || new Error("Failed to replace SDN entries"));
+    transaction.onabort = () =>
+      reject(transaction.error || new Error("SDN replace transaction aborted"));
+
+    store.clear();
+    for (const entry of entries) {
+      store.put(entry);
+    }
+  });
+}
+
+/**
  * Get all SDN entries from the database
  * @returns {Promise<Array>}
  */

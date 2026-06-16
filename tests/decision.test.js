@@ -49,6 +49,35 @@ test("matches still deny and clean full checks still approve", () => {
   );
 });
 
+test("a clean but STALE OFAC screen requires review, not silent approval", () => {
+  // Stale SDN list (could not refresh) + no match → REVIEW, not APPROVED.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: true, stale: true, dataAgeHours: 40 },
+      repeatOffender: { passed: true, status: "eligible" },
+    }).level,
+    "REVIEW"
+  );
+  // Fresh clean screen still approves.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: true, stale: false },
+      repeatOffender: { passed: true, status: "eligible" },
+    }).level,
+    "APPROVED"
+  );
+  // A co-buyer stale screen also triggers review.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { passed: true },
+      repeatOffender: { passed: true, status: "eligible" },
+      coBuyerOfac: { passed: true, stale: true },
+      coBuyerRepeatOffender: { passed: true, status: "eligible" },
+    }).level,
+    "REVIEW"
+  );
+});
+
 test("out-of-state subject: Repeat Offender not_applicable is non-blocking (OFAC governs)", () => {
   // Out-of-state buyer: OFAC passed, RO N/A (passed:null) -> APPROVED, not DENIED.
   assert.equal(

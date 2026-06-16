@@ -209,6 +209,17 @@ export function calculateFinalDecision(checks) {
     };
   }
 
+  // A clean OFAC result against a list that could not be refreshed is not a
+  // confident clear — require review rather than silently approving.
+  if (checks.ofac.stale || checks.coBuyerOfac?.stale) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason:
+        "OFAC SDN list could not be refreshed — screened against cached data. Re-run when back online before proceeding.",
+    };
+  }
+
   if (checks.title) {
     const titleBrand = checks.title.titleBrand;
 

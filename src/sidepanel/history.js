@@ -62,7 +62,10 @@ export async function saveToHistory(results) {
       runLabel: results.runLabel || "Run All Checks",
       checks: {
         ofac: checks.ofac?.passed,
-        repeatOffender: checks.repeatOffender?.passed,
+        repeatOffender:
+          checks.repeatOffender?.status === "not_applicable"
+            ? "na"
+            : checks.repeatOffender?.passed,
         title: checks.title?.passed,
       },
       fullResults: archivedResults,
@@ -164,11 +167,13 @@ export async function populateHistoryModal(historyListEl) {
               : `<span class="icon-danger">${ICONS.x}</span>`
             : "—";
         const repeatStatus =
-          checks.repeatOffender !== undefined
-            ? checks.repeatOffender
-              ? `<span class="icon-success">${ICONS.check}</span>`
-              : `<span class="icon-danger">${ICONS.x}</span>`
-            : "—";
+          checks.repeatOffender === "na"
+            ? `<span class="icon-muted" title="Not applicable — out-of-state ID">N/A</span>`
+            : checks.repeatOffender !== undefined
+              ? checks.repeatOffender
+                ? `<span class="icon-success">${ICONS.check}</span>`
+                : `<span class="icon-danger">${ICONS.x}</span>`
+              : "—";
         const titleStatus =
           checks.title !== undefined
             ? checks.title

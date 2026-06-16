@@ -57,9 +57,14 @@ async function runAllChecks(data) {
   });
 
   const saveState = async (progress) => {
-    await atomicStateUpdate(() => {
+    await atomicStateUpdate((current) => {
       const update = { [STORAGE_KEYS.currentResults]: results };
-      if (progress !== undefined) update[STORAGE_KEYS.searchProgress] = progress;
+      if (progress !== undefined) {
+        // Keep progress monotonic: the OFAC and MDOS branches write
+        // concurrently, so never let a later write move the bar backwards.
+        const prev = current[STORAGE_KEYS.searchProgress] || 0;
+        update[STORAGE_KEYS.searchProgress] = Math.max(prev, progress);
+      }
       return update;
     });
   };

@@ -65,6 +65,7 @@ function setResultStatus(el, statusKey, customLabel) {
 function checkStatusKey(check, failKey = "fail") {
   if (!check) return "waiting";
   if (check.error || check.status === "error") return "warning";
+  if (check.status === "not_applicable") return "skipped";
   return check.passed ? "pass" : failKey;
 }
 
@@ -114,15 +115,23 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
     return;
   }
 
+  // A stale screen (the SDN list could not be refreshed before screening) is a
+  // weaker "Pass" — flag it on the row so a clean result isn't taken at face
+  // value when the data might be out of date.
   setResultStatus(
     statusEl,
-    ofac.passed ? "pass" : "fail",
-    ofac.passed ? "Pass" : "Match"
+    ofac.passed ? (ofac.stale ? "warning" : "pass") : "fail",
+    ofac.passed ? (ofac.stale ? "Pass (stale data)" : "Pass") : "Match"
   );
   if (detailEl) {
-    detailEl.textContent = ofac.passed
+    let txt = ofac.passed
       ? "No matches in SDN list"
       : `${ofac.matches?.length || 0} potential match(es) found`;
+    if (ofac.stale) {
+      const age = ofac.dataAgeHours != null ? ` (~${ofac.dataAgeHours}h old)` : "";
+      txt += ` — screened against a cached SDN list${age}; could not refresh. Re-run when online.`;
+    }
+    detailEl.textContent = txt;
   }
   setActionVisibility(printBtn, true);
   setActionVisibility(downloadBtn, true);

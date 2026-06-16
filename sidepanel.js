@@ -63,7 +63,7 @@ import {
   downloadAllReportsPDF,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
-import { startPairing } from "./src/sidepanel/scan-pairing.js";
+import { startPairing, cancelPairing } from "./src/sidepanel/scan-pairing.js";
 import {
   getCurrentResults,
   setCurrentResults,
@@ -377,6 +377,9 @@ function applyInFlight(key) {
 function statusForCheck(check, failStatus = "fail") {
   if (!check) return "waiting";
   if (check.error || check.status === "error") return "warning";
+  // Out-of-state Repeat Offender = not applicable (passed:null) — must NOT
+  // render as a red FAIL on the live progress row.
+  if (check.status === "not_applicable") return "skipped";
   return check.passed ? "pass" : failStatus;
 }
 
@@ -544,15 +547,24 @@ function initEventListeners() {
 
   // Phone license scan: open a pairing session, show the QR, autofill on receipt.
   let cancelPair = null;
-  const closeScanPair = () => {
+  function closeScanPair() {
     if (cancelPair) { cancelPair(); cancelPair = null; }
     elements.scanPairModal?.classList.add("hidden");
-  };
+    document.removeEventListener("keydown", scanEsc);
+    elements.scanPairModal?.removeEventListener("click", scanBackdrop);
+  }
+  function scanEsc(e) { if (e.key === "Escape") closeScanPair(); }
+  function scanBackdrop(e) {
+    if (e.target === elements.scanPairModal) closeScanPair();
+  }
   elements.scanLicenseBtn?.addEventListener("click", async () => {
     if (elements.scanPairQr) elements.scanPairQr.innerHTML = "";
     if (elements.scanPairStatus)
       elements.scanPairStatus.textContent = "Waiting for your phone…";
     elements.scanPairModal?.classList.remove("hidden");
+    document.addEventListener("keydown", scanEsc);
+    elements.scanPairModal?.addEventListener("click", scanBackdrop);
+    setTimeout(() => elements.scanPairCloseX?.focus(), 80);
     try {
       cancelPair = await startPairing(
         elements,
@@ -701,6 +713,9 @@ function resetInputPanel() {
 // (assumed Michigan). Drives Repeat Offender eligibility in handleRunAllChecks:
 // an out-of-state subject (false) can run OFAC but not the MI Repeat Offender.
 const scanJurisdiction = { buyer: null, coBuyer: null };
+// Pending "reveal results" timer after a run completes; cleared on Clear so a
+// late fire can't re-show stale results over a freshly-cleared form.
+let completeRevealTimer = null;
 function recordScanJurisdiction(payload) {
   scanJurisdiction.buyer = payload?.buyer ? !!payload.buyer.isMichigan : null;
   scanJurisdiction.coBuyer = payload?.coBuyer ? !!payload.coBuyer.isMichigan : null;
@@ -855,6 +870,13 @@ function handleClear() {
   resetInputPanel();
   scanJurisdiction.buyer = null;
   scanJurisdiction.coBuyer = null;
+  // Cancel a pending results reveal and any in-progress phone-scan pairing.
+  if (completeRevealTimer) {
+    clearTimeout(completeRevealTimer);
+    completeRevealTimer = null;
+  }
+  cancelPairing();
+  elements.scanPairModal?.classList.add("hidden");
   chrome.storage.session.set({
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     [STORAGE_KEYS.searchProgress]: 0,
@@ -951,6 +973,9 @@ function loadHistoryItem(item) {
       setDateInputValue(elements.cbDob, cust.coBuyer.dob || "");
       elements.cbDlnPid.value = cust.coBuyer.dlnPid || "";
     }
+    // Restore the scanned jurisdiction so re-running honors out-of-state gating.
+    scanJurisdiction.buyer = cust.buyerIsMichigan ?? null;
+    scanJurisdiction.coBuyer = cust.coBuyerIsMichigan ?? null;
   } else if (item.customer) {
     const names = item.customer.split(" ");
     if (names.length > 0) elements.firstName.value = names[0];
@@ -1121,7 +1146,9 @@ function handleSearchStatusChange(changes) {
         console.error("Display/save error:", e);
       }
     }
-    setTimeout(() => {
+    if (completeRevealTimer) clearTimeout(completeRevealTimer);
+    completeRevealTimer = setTimeout(() => {
+      completeRevealTimer = null;
       elements.progressSection.classList.add("hidden");
       elements.resultsSection.classList.remove("hidden");
     }, 350);

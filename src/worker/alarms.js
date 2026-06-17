@@ -31,32 +31,46 @@ export async function setupUpdateAlarm() {
 }
 
 export function registerAlarmListeners() {
+  // Each handler is fully guarded: an async event listener that rejects becomes
+  // an unhandled rejection, which Chrome surfaces on the extension Errors page.
   chrome.runtime.onInstalled.addListener(async (details) => {
-    if (details.reason === "install") {
-      await initDB();
-      await performSDNUpdate();
-    } else if (details.reason === "update") {
+    try {
+      if (details.reason === "install") {
+        await initDB();
+        await performSDNUpdate();
+      } else if (details.reason === "update") {
+        await initDB();
+        const status = await handleGetDataStatus();
+        if (status.needsUpdate) {
+          await performSDNUpdate();
+        }
+      }
+      await setupUpdateAlarm();
+    } catch (err) {
+      console.error("[Alarms] onInstalled handler failed:", err);
+    }
+  });
+
+  chrome.runtime.onStartup.addListener(async () => {
+    try {
       await initDB();
       const status = await handleGetDataStatus();
       if (status.needsUpdate) {
         await performSDNUpdate();
       }
+      await setupUpdateAlarm();
+    } catch (err) {
+      console.error("[Alarms] onStartup handler failed:", err);
     }
-    await setupUpdateAlarm();
-  });
-
-  chrome.runtime.onStartup.addListener(async () => {
-    await initDB();
-    const status = await handleGetDataStatus();
-    if (status.needsUpdate) {
-      await performSDNUpdate();
-    }
-    await setupUpdateAlarm();
   });
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === UPDATE_ALARM_NAME) {
-      await performSDNUpdate();
+    try {
+      if (alarm.name === UPDATE_ALARM_NAME) {
+        await performSDNUpdate();
+      }
+    } catch (err) {
+      console.error("[Alarms] onAlarm handler failed:", err);
     }
   });
 }

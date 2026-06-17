@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Central - Promo Animation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        :root {
+            --bg-color: #0f172a; /* Tailwind slate-900 */
+            --panel-bg: #1e293b; /* Tailwind slate-800 */
+            --primary: #3b82f6; /* Tailwind blue-500 */
+            --success: #10b981; /* Tailwind emerald-500 */
+            --danger: #ef4444; /* Tailwind red-500 */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Abstract glowing background blobs */
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.5;
+            z-index: 0;
+            animation: float 10s infinite ease-in-out alternate;
+        }
+        .blob-1 {
+            width: 600px; height: 600px;
+            background: rgba(59, 130, 246, 0.3);
+            top: -100px; left: -100px;
+        }
+        .blob-2 {
+            width: 500px; height: 500px;
+            background: rgba(16, 185, 129, 0.2);
+            bottom: -50px; right: -50px;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(50px) scale(1.1); }
+        }
+
+        /* Mock Browser Window */
+        .browser-window {
+            width: 1200px;
+            height: 750px;
+            background-color: #0f172a;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            z-index: 1;
+            position: relative;
+            overflow: hidden;
+            transform: scale(0.9);
+            opacity: 0;
+            animation: introBrowser 1s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.5s;
+        }
+
+        @keyframes introBrowser {
+            from { transform: scale(0.85) translateY(40px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        /* Browser Header */
+        .browser-header {
+            height: 60px;
+            background-color: #1e293b;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+        .window-controls div {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+        }
+        .close { background: #ff5f56; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #27c93f; }
+
+        .address-bar {
+            flex-grow: 1;
+            background: #0f172a;
+            height: 32px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            color: var(--text-muted);
+            font-size: 14px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .extensions-area {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .ext-icon {
+            width: 28px; height: 28px;
+            background: #3b82f6;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Browser Content Area */
+        .browser-body {
+            display: flex;
+            flex-grow: 1;
+            position: relative;
+            background: #0f172a;
+            padding: 40px;
+        }
+
+        /* Fake DMS system */
+        .fake-dms {
+            width: 60%;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .dms-header {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+        }
+        .dms-record {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .dms-field {
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            color: var(--text-muted);
+        }
+        .dms-field strong { color: var(--text-main); font-family: 'Inter', sans-serif;}
+
+        /* The Extension Panel (Simulating Side Panel) */
+        .side-panel {
+            position: absolute;
+            right: -400px; /* Hidden initially */
+            top: 0;
+            bottom: 0;
+            width: 360px;
+            background: #1e293b;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            transition: right 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 10;
+        }
+
+        .side-panel.open {
+            right: 0;
+        }
+
+        .sp-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sp-header .logo {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+        .sp-header h2 { font-size: 16px; font-weight: 600; }
+
+        .sp-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .scan-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s ease;
+            margin-bottom: 16px;
+        }
+        .scan-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .scan-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: var(--primary);
+        }
+        .scan-card.success::before { background: var(--success); }
+        .scan-card.danger::before { background: var(--danger); }
+
+        .scan-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between;}
+        .scan-status { font-size: 12px; color: var(--text-muted); }
+        .scan-status.success { color: var(--success); }
+        .scan-status.danger { color: var(--danger); }
+        
+        .progress-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            transition: width 1s ease;
+        }
+
+        /* Scan Button */
+        .scan-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: auto;
+        }
+
+        /* Overlay texts for the video */
+        .video-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            text-align: center;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .huge-text {
+            font-size: 72px;
+            font-weight: 800;
+            color: #ffffff;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
+            background: rgba(15, 23, 42, 0.7);
+            padding: 30px 60px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        @keyframes popText {
+            0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+            10% { opacity: 1; transform: scale(1) translateY(0); }
+            85% { opacity: 1; transform: scale(1) translateY(0); }
+            100% { opacity: 0; transform: scale(1.1) translateY(-20px); }
+        }
+
+        /* Fake Mouse Cursor */
+        .cursor {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="1.5"><path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L5.5 3.21z"/></svg>');
+            z-index: 999;
+            top: 600px;
+            left: 300px;
+            transition: top 1s cubic-bezier(0.25, 1, 0.5, 1), left 1s cubic-bezier(0.25, 1, 0.5, 1);
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+            pointer-events: none;
+        }
+        .cursor.click {
+            transform: scale(0.8);
+            transition: transform 0.1s;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="video-overlay" id="overlayContainer">
+        <div class="huge-text" id="overlayText"></div>
+    </div>
+
+    <div class="browser-window">
+        <div class="browser-header">
+            <div class="window-controls">
+                <div class="close"></div>
+                <div class="minimize"></div>
+                <div class="maximize"></div>
+            </div>
+            <div class="address-bar">
+                <span style="color: #4ade80; margin-right: 8px;">&#128274;</span> https://dealer-dms.michiganauto.com/customer/10492
+            </div>
+            <div class="extensions-area">
+                <div class="ext-icon" id="extBtn"><img src="../icons/icon32.png" alt="CC" style="width: 24px; height: 24px;"></div>
+            </div>
+        </div>
+        <div class="browser-body">
+            
+            <div class="fake-dms">
+                <div class="dms-header">
+                    Customer Profile: John Doe
+                    <span style="font-size:14px; background:#2563eb; padding:6px 12px; border-radius:6px; color: white;">Edit Deal</span>
+                </div>
+                <div class="dms-record">
+                    <div class="dms-field"><strong>Full Name:</strong> Johnathan Doe</div>
+                    <div class="dms-field"><strong>DOB:</strong> 05/14/1982</div>
+                    <div class="dms-field"><strong>Address:</strong> 123 Main St, Detroit MI</div>
+                    <div class="dms-field"><strong>SSN:</strong> ***-**-1234</div>
+                </div>
+                <div style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                    <div style="color: var(--text-muted); margin-bottom: 10px;">Vehicle Selected</div>
+                    <div style="font-size: 20px; font-weight: 600;">2021 Ford F-150 Lariat</div>
+                    <div style="color: var(--text-muted); font-family: monospace; margin-top: 5px;">VIN: 1FTFW1ED3MXXXXXXX</div>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel" id="sidePanel">
+                <div class="sp-header">
+                    <img src="../icons/icon48.png" alt="Logo" style="width: 32px; height: 32px; border-radius: 8px;">
+                    <h2>Compliance Central</h2>
+                </div>
+                <div class="sp-content">
+                    <button class="scan-btn" id="runScanBtn">Run Deal Compliance Check</button>
+                    
+                    <div style="height: 20px;"></div>
+
+                    <div class="scan-card" id="card1">
+                        <div class="scan-title">OFAC Sanctions Search <span class="scan-status" id="stat1">Waiting...</span></div>
+                        <div class="progress-bar"><div class="progress-fill" id="prog1"></div></div>
+                    </div>
+                    
+                    <div class="scan-card" id="card2">
+                        <div class="scan-title">MI Repeat Offender Check <span class="scan-status" id="stat2">Waiting...</span></div>
+                        <div class="progress-bar"><div class="progress-fill" id="prog2"></div></div>
+                    </div>
+
+                    <div class="scan-card" id="card3">
+                        <div class="scan-title">Title & Lien Verification <span class="scan-status" id="stat3">Waiting...</span></div>
+                        <div class="progress-bar"><div class="progress-fill" id="prog3"></div></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- The automated cursor -->
+    <div class="cursor" id="cursor"></div>
+
+    <script>
+        const cursor = document.getElementById('cursor');
+        const extBtn = document.getElementById('extBtn');
+        const sidePanel = document.getElementById('sidePanel');
+        const runScanBtn = document.getElementById('runScanBtn');
+        const overlayText = document.getElementById('overlayText');
+
+        // Helper for timing
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        function moveCursor(x, y) {
+            cursor.style.top = y + 'px';
+            cursor.style.left = x + 'px';
+        }
+
+        async function clickCursor() {
+            cursor.classList.add('click');
+            await sleep(150);
+            cursor.classList.remove('click');
+        }
+
+        async function showText(text, duration) {
+            overlayText.innerHTML = text;
+            overlayText.style.animation = 'none';
+            void overlayText.offsetWidth; // trigger reflow
+            overlayText.style.animation = `popText ${duration}ms cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+            await sleep(duration);
+        }
+
+        async function simulateScan(cardId, progId, statId, delay, success, text) {
+            await sleep(delay);
+            document.getElementById(cardId).classList.add('visible');
+            const prog = document.getElementById(progId);
+            const stat = document.getElementById(statId);
+            
+            stat.innerText = "Scanning...";
+            stat.style.color = "#3b82f6";
+            prog.style.width = "100%";
+            
+            await sleep(1000);
+            
+            if(success) {
+                document.getElementById(cardId).classList.add('success');
+                stat.innerText = text || "Clear";
+                stat.classList.add('success');
+                prog.style.background = "var(--success)";
+            } else {
+                document.getElementById(cardId).classList.add('danger');
+                stat.innerText = text || "Flagged";
+                stat.classList.add('danger');
+                prog.style.background = "var(--danger)";
+            }
+        }
+
+        async function runSequence() {
+            await sleep(1500); // Wait for intro animation
+
+            // 1. Text intro
+            showText("The Ultimate Dealership<br>Compliance Tool", 3500);
+            await sleep(3500);
+
+            // 2. Move cursor to extension button
+            const btnRect = extBtn.getBoundingClientRect();
+            moveCursor(btnRect.left + 14, btnRect.top + 14);
+            await sleep(1000);
+            await clickCursor();
+            
+            // 3. Open side panel
+            sidePanel.classList.add('open');
+            await sleep(1500);
+
+            // 4. Move to scan button
+            const scanRect = runScanBtn.getBoundingClientRect();
+            moveCursor(scanRect.left + 150, scanRect.top + 20);
+            await sleep(1000);
+            await clickCursor();
+
+            // 5. Run scans
+            runScanBtn.innerText = "Scanning Data...";
+            runScanBtn.style.background = "#475569";
+            moveCursor(scanRect.left + 250, scanRect.top + 200); // Move cursor away
+
+            showText("Instant OFAC Checks", 2500);
+            await simulateScan('card1', 'prog1', 'stat1', 0, true, "No Match Found");
+            
+            showText("Automated Repeat Offender Check", 2500);
+            await simulateScan('card2', 'prog2', 'stat2', 500, true, "Clear to Sell");
+            
+            showText("Clean Title Verification", 2500);
+            await simulateScan('card3', 'prog3', 'stat3', 500, true, "No Liens Found");
+
+            await sleep(1000);
+            runScanBtn.innerText = "All Checks Passed!";
+            runScanBtn.style.background = "var(--success)";
+
+            await sleep(1500);
+            showText("Compliance Central<br>Install Free on Chrome Web Store", 5000);
+
+        }
+
+        // Start animation loop
+        window.onload = runSequence;
+
+    </script>
+</body>
+</html>

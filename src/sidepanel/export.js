@@ -9,6 +9,11 @@
 
 import { sanitizeHTML, buildSanitizedName } from "./dom-utils.js";
 import { showToast } from "./toast.js";
+import {
+  formatTitleType,
+  cleanLienHolder,
+  formatLienStatus,
+} from "./title-format.js";
 
 const PRINT_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -1257,10 +1262,13 @@ function titleResultArgs(t) {
       ? String(t.titleBrand).toUpperCase()
       : null;
   if (t?.hasLien) {
+    const holder = cleanLienHolder(t.lienHolder);
     return {
       variant: "warn",
       title: "ACTIVE LIEN",
-      subtitle: t.lienStatus || "Vehicle has an active lien — payoff required.",
+      subtitle: holder
+        ? `Lienholder: ${holder} — payoff required before sale.`
+        : `${formatLienStatus(t.lienStatus, true)} — payoff / lien release required before sale.`,
     };
   }
   if (brand) {
@@ -1283,7 +1291,16 @@ function titleSubjectRows(t, vin) {
   const vehicle = [t?.year, t?.make, t?.model].filter(Boolean).join(" ");
   if (vehicle) rows.push({ label: "Vehicle", value: vehicle });
   if (t?.titleStatus) rows.push({ label: "Title Status", value: t.titleStatus });
-  rows.push({ label: "Lien", value: t?.hasLien ? t?.lienStatus || "Active lien" : "No active liens" });
+  const ttype = formatTitleType(t?.titleType);
+  if (ttype) rows.push({ label: "Title Type", value: ttype });
+  if (t?.titleIssued) rows.push({ label: "Title Issued", value: t.titleIssued });
+  if (t?.unladenWeight) rows.push({ label: "Unladen Weight", value: t.unladenWeight });
+  rows.push({
+    label: "Lien",
+    value: formatLienStatus(t?.lienStatus, t?.hasLien),
+  });
+  const holder = cleanLienHolder(t?.lienHolder);
+  if (t?.hasLien && holder) rows.push({ label: "Lienholder", value: holder });
   return rows;
 }
 

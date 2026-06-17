@@ -107,6 +107,27 @@ test("out-of-state subject: Repeat Offender not_applicable is non-blocking (OFAC
   );
 });
 
+test("an active-lien APPROVED never warns 'Trade lien: Unknown'", () => {
+  // Backend gives a lien status but no lienholder name (the common case).
+  const decision = calculateFinalDecision({
+    ofac: { passed: true },
+    repeatOffender: { passed: true, status: "eligible" },
+    title: { passed: true, hasLien: true, lienStatus: "Active Lien on Vehicle" },
+  });
+  assert.equal(decision.level, "APPROVED");
+  assert.equal(decision.warnings.length, 1);
+  assert.doesNotMatch(decision.warnings[0], /unknown/i);
+  assert.match(decision.warnings[0], /payoff/i);
+
+  // When a real lienholder IS known, it is named in the warning.
+  const named = calculateFinalDecision({
+    ofac: { passed: true },
+    repeatOffender: { passed: true, status: "eligible" },
+    title: { passed: true, hasLien: true, lienHolder: "Ally Financial" },
+  });
+  assert.match(named.warnings[0], /Ally Financial/);
+});
+
 test("ships a built-in backend key so all checks work with no setup", () => {
   assert.ok(CONFIG.backend.defaultApiKey, "a built-in default key should be shipped");
   assert.equal(manifest.permissions.includes("unlimitedStorage"), true);

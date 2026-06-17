@@ -6,6 +6,12 @@ import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
 import { calculateFinalDecision } from "./checks.js";
 import { MISSING_API_KEY } from "../../lib/api-client.js";
+import {
+  formatTitleType,
+  titleTypeNote,
+  cleanLienHolder,
+  formatLienStatus,
+} from "./title-format.js";
 
 const MISSING_KEY_DETAIL =
   "This check is temporarily unavailable — please try again in a moment.";
@@ -439,19 +445,51 @@ export function displayResults(elements, results) {
       if (title.year && title.make && title.model) {
         lines.push(`${title.year} ${title.make} ${title.model}`);
       }
-      if (title.titleType && title.titleType !== "UNKNOWN") {
-        lines.push(
-          `Title: ${title.titleType}${title.titleIssued ? ` (${title.titleIssued})` : ""}`
-        );
-      }
-      if (title.lienStatus && title.lienStatus !== "UNKNOWN") {
-        lines.push(`Lien: ${title.lienStatus}`);
-      }
+
+      // Title status / brand headline.
       if (title.vehicleBrands && title.vehicleBrands.length > 0) {
         lines.push(`Brands: ${title.vehicleBrands.join(", ")}`);
-      } else if (title.titleBrand === "CLEAN") {
-        lines.push("No title brands");
+      } else if (
+        title.titleBrand &&
+        !["CLEAN", "UNKNOWN"].includes(title.titleBrand)
+      ) {
+        lines.push(`Branded title: ${title.titleBrand}`);
+      } else if (title.titleStatus === "No Record Found") {
+        lines.push("No title record found for this VIN");
+      } else {
+        lines.push("Clean title — no brands");
       }
+
+      // Title type (paper vs electronic) + issue date — important for transfer.
+      const ttype = formatTitleType(title.titleType);
+      if (ttype) {
+        lines.push(
+          `Title type: ${ttype}${title.titleIssued ? ` · issued ${title.titleIssued}` : ""}`
+        );
+      } else if (title.titleIssued) {
+        lines.push(`Title issued: ${title.titleIssued}`);
+      }
+
+      // Lien status + lienholder (never "Unknown"/junk).
+      if (title.hasLien) {
+        lines.push(`Lien: ${formatLienStatus(title.lienStatus, true)}`);
+        const holder = cleanLienHolder(title.lienHolder);
+        lines.push(
+          holder
+            ? `Lienholder: ${holder} — payoff required`
+            : "Payoff / lien release required before sale"
+        );
+      } else if (title.lienStatus && title.lienStatus !== "UNKNOWN") {
+        lines.push(`Lien: ${formatLienStatus(title.lienStatus, false)}`);
+      }
+
+      if (title.unladenWeight) {
+        lines.push(`Unladen weight: ${title.unladenWeight}`);
+      }
+
+      // Plain-language note on what the title type means for the deal.
+      const note = titleTypeNote(title.titleType);
+      if (note) lines.push(note);
 
       elements.titleResultDetail.textContent =
         lines.length > 0 ? lines.join("\n") : "Title information retrieved";
@@ -571,9 +609,37 @@ export function displayIndividualResult(elements, type, result) {
         result.passed ? "pass" : "warning",
         result.passed ? "Clear" : "Review"
       );
-      let detail = `Title: ${result.titleBrand}`;
-      if (result.hasLien) detail += `\nLien: ${result.lienHolder || "Yes"}`;
-      elements.titleResultDetail.textContent = detail;
+      const dlines = [];
+      // Title status / brand headline (parity with the full-run card).
+      if (
+        result.titleBrand &&
+        !["CLEAN", "UNKNOWN"].includes(result.titleBrand)
+      ) {
+        dlines.push(`Branded title: ${result.titleBrand}`);
+      } else if (result.titleStatus === "No Record Found") {
+        dlines.push("No title record found for this VIN");
+      } else {
+        dlines.push("Clean title — no brands");
+      }
+      const itype = formatTitleType(result.titleType);
+      if (itype) {
+        dlines.push(
+          `Title type: ${itype}${result.titleIssued ? ` · issued ${result.titleIssued}` : ""}`
+        );
+      }
+      if (result.hasLien) {
+        dlines.push(`Lien: ${formatLienStatus(result.lienStatus, true)}`);
+        const holder = cleanLienHolder(result.lienHolder);
+        dlines.push(
+          holder
+            ? `Lienholder: ${holder} — payoff required`
+            : "Payoff / lien release required before sale"
+        );
+      }
+      const inote = titleTypeNote(result.titleType);
+      if (inote) dlines.push(inote);
+      elements.titleResultDetail.textContent =
+        dlines.join("\n") || "Title information retrieved";
     }
     setActionVisibility(elements.printTitleBtn, !result.error);
     setActionVisibility(elements.downloadTitleBtn, !result.error);

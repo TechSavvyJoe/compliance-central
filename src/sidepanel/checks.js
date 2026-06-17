@@ -4,6 +4,7 @@
  */
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { lienSummary } from "./title-format.js";
 
 /**
  * Remove any leftover MDOS screenshots from a prior run in this session.
@@ -120,6 +121,7 @@ export async function runTitleCheck(customerData) {
     make: result.make,
     model: result.model,
     unladenWeight: result.unladenWeight,
+    titleStatus: result.titleStatus,
     titleBrand: result.titleBrand || "CLEAN",
     titleType: result.titleType || "UNKNOWN",
     titleIssued: result.titleIssued,
@@ -246,9 +248,7 @@ export function calculateFinalDecision(checks) {
         approved: true,
         level: "APPROVED",
         reason: "Customer checks passed - trade has active lien",
-        warnings: [
-          `Trade lien: ${checks.title.lienHolder || "Unknown"} - payoff required`,
-        ],
+        warnings: [lienSummary(checks.title)],
       };
     }
   }

@@ -1,0 +1,24 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "webextensions": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-var": "error",
+    "prefer-const": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "lib/jspdf.umd.min.js",
+    "docs/lib/zxing.min.js",
+    "lib/qrcode.min.js"
+  ]
+}

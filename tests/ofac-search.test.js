@@ -7,6 +7,7 @@ import {
   calculateNameSimilarity,
   checkNameMatch,
   searchSDNEntries,
+  dobConfidence,
 } from "../ofac/search.js";
 
 test("normalizeName strips punctuation, lowercases, and collapses whitespace", () => {
@@ -82,4 +83,61 @@ test("searchSDNEntries returns only above-threshold matches, highest score first
   }
   // The unrelated "Zimmerman" entry must not appear.
   assert.ok(!matches.some((m) => m.matchedName === "Jane Zimmerman"));
+});
+
+test("dobConfidence: same/near birth year is high, clearly different is low", () => {
+  // Customer DOB (YYYY-MM-DD or MM/DD/YYYY) vs SDN free-form birth_date.
+  assert.equal(dobConfidence("1969-08-18", "1969-08-18"), "high");
+  assert.equal(dobConfidence("1969-08-18", "1969"), "high"); // bare year
+  assert.equal(dobConfidence("08/18/1969", "1970-01-01"), "high"); // ±1 slip
+  assert.equal(dobConfidence("1969-08-18", "1944-04-28"), "low"); // 25y apart
+});
+
+test("dobConfidence: missing DOB on either side is medium (cannot disambiguate)", () => {
+  assert.equal(dobConfidence("", "1969-08-18"), "medium");
+  assert.equal(dobConfidence("1969-08-18", ""), "medium");
+  assert.equal(dobConfidence("", ""), "medium");
+});
+
+test("dobConfidence: multi-value SDN birth_date matches if ANY year is near", () => {
+  // OpenSanctions can carry several semicolon-separated dates.
+  assert.equal(dobConfidence("1969-08-18", "1944-01-01;1969-12-31"), "high");
+  assert.equal(dobConfidence("1969-08-18", "1944-01-01;1955-12-31"), "low");
+});
+
+test("searchSDNEntries threads DOB into per-match confidence (display-only)", () => {
+  const entries = [
+    {
+      firstName: "John",
+      middleName: "",
+      lastName: "Doe",
+      fullName: "John Doe",
+      birthDate: "1980-05-05",
+      aliases: [],
+    },
+  ];
+  const sameYear = searchSDNEntries(
+    { firstName: "John", middleName: "", lastName: "Doe", dob: "1980-05-05" },
+    entries,
+    85
+  );
+  assert.equal(sameYear[0].confidence, "high");
+  assert.equal(sameYear[0].sdnBirthDate, "1980-05-05");
+
+  const diffYear = searchSDNEntries(
+    { firstName: "John", middleName: "", lastName: "Doe", dob: "1955-05-05" },
+    entries,
+    85
+  );
+  // A name match with a clearly different DOB still MATCHES (name is what
+  // blocks); confidence merely flags it as a likely false positive.
+  assert.equal(diffYear.length, 1);
+  assert.equal(diffYear[0].confidence, "low");
+
+  const noDob = searchSDNEntries(
+    { firstName: "John", middleName: "", lastName: "Doe" },
+    entries,
+    85
+  );
+  assert.equal(noDob[0].confidence, "medium");
 });

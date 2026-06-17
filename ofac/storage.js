@@ -90,7 +90,7 @@ export async function clearSDNEntries() {
  */
 export async function storeSDNEntries(entries) {
   const database = await initDB();
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const transaction = database.transaction([SDN_STORE], "readwrite");
     const store = transaction.objectStore(SDN_STORE);
 

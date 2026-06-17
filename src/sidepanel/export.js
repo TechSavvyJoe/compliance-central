@@ -12,6 +12,13 @@ import { showToast } from "./toast.js";
 
 const PRINT_TIMEOUT_MS = 5 * 60 * 1000;
 
+// DOB-disambiguation confidence labels for the OFAC report (mirrors the card).
+const OFAC_CONF_LABEL = {
+  high: "DOB match",
+  medium: "DOB unknown",
+  low: "DOB differs",
+};
+
 function setupPrintWindowCleanup(printWindow, timeoutMs = PRINT_TIMEOUT_MS) {
   let closed = false;
   const closeWindow = () => {
@@ -175,7 +182,11 @@ function ofacReportHTML({ customer, ofac, lastUpdate, subjectLabel = "SUBJECT SC
             .slice(0, 5)
             .map(
               (m) =>
-                `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(m.score)}%, Type: ${sanitizeHTML(m.type)})</li>`
+                `<li>${sanitizeHTML(m.name)} (Score: ${sanitizeHTML(m.score)}%${
+                  m.confidence ? `, ${OFAC_CONF_LABEL[m.confidence] || ""}` : ""
+                }${
+                  m.sdnBirthDate ? `, SDN DOB ${sanitizeHTML(m.sdnBirthDate)}` : ""
+                }, Type: ${sanitizeHTML(m.type)})</li>`
             )
             .join("")}</ul>${
             ofac.matches.length > 5
@@ -639,21 +650,6 @@ function writeText(ctx, text, opts = {}) {
   }
 }
 
-function drawDivider(ctx, opts = {}) {
-  const { color = PALETTE.border, gapAbove = 6, gapBelow = 10 } = opts;
-  ctx.y += gapAbove;
-  ensureSpace(ctx, 4);
-  setDraw(ctx.doc, color);
-  ctx.doc.setLineWidth(0.5);
-  ctx.doc.line(
-    ctx.margin,
-    ctx.y,
-    ctx.pageWidth - ctx.margin,
-    ctx.y
-  );
-  ctx.y += gapBelow;
-}
-
 /**
  * Draws the official "U.S. DEPARTMENT OF THE TREASURY / OFAC" letterhead
  * with the navy double border, two-column meta row, and divider.
@@ -721,7 +717,6 @@ function drawOfficialHeader(ctx, opts = {}) {
   doc.setFontSize(8.5);
   setText(doc, PALETTE.body);
   if (meta.length) {
-    const half = innerWidth / 2;
     const left = meta.filter((m) => m.side !== "right");
     const right = meta.filter((m) => m.side === "right");
     let ly = yy;
@@ -775,7 +770,7 @@ function drawCheckHeader(ctx, opts) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   setText(doc, PALETTE.muted);
-  let metaY = ctx.y + 32;
+  const metaY = ctx.y + 32;
   const metaText = meta
     .filter(Boolean)
     .map((m) => (m.value ? `${m.label}: ${m.value}` : null))
@@ -972,7 +967,7 @@ function drawScreenshotPage(ctx, dataUrl, opts = {}) {
 // ---------- Shared assembly helpers ----------
 
 async function getSdnLastUpdate(ofac) {
-  let lastUpdate = ofac?.lastUpdate;
+  const lastUpdate = ofac?.lastUpdate;
   if (lastUpdate) {
     try {
       const d = new Date(lastUpdate);
@@ -1065,9 +1060,13 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
         ? [
             ...ofac.matches
               .slice(0, 5)
-              .map(
-                (m) => `${m.name} — Score ${m.score}%   ·   Type ${m.type}`
-              ),
+              .map((m) => {
+                const conf = m.confidence
+                  ? `   ·   ${OFAC_CONF_LABEL[m.confidence] || ""}`
+                  : "";
+                const dob = m.sdnBirthDate ? `   ·   SDN DOB ${m.sdnBirthDate}` : "";
+                return `${m.name} — Score ${m.score}%${conf}${dob}   ·   Type ${m.type}`;
+              }),
             ...(ofac.matches.length > 5
               ? [
                   `…and ${ofac.matches.length - 5} more potential match(es) — review the full list in the extension.`,
@@ -1340,7 +1339,7 @@ export async function downloadCoBuyerOfacReportPDF(currentResults) {
 
 export async function downloadRepeatOffenderPDF(currentResults) {
   const ro = currentResults?.checks?.repeatOffender;
-  if (!ro || ro.error || ro.status === "error") {
+  if (!ro || ro.error || ro.status === "error" || ro.status === "not_applicable") {
     showToast("No completed Repeat Offender result to download.", "info");
     return;
   }
@@ -1363,7 +1362,7 @@ export async function downloadRepeatOffenderPDF(currentResults) {
 export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
   const ro = currentResults?.checks?.coBuyerRepeatOffender;
   const co = currentResults?.customer?.coBuyer;
-  if (!co || !ro || ro.error || ro.status === "error") {
+  if (!co || !ro || ro.error || ro.status === "error" || ro.status === "not_applicable") {
     showToast("No completed Co-Buyer Repeat Offender result to download.", "info");
     return;
   }
@@ -1445,14 +1444,14 @@ export async function downloadAllReportsPDF(currentResults) {
   }
 
   const ro = checks.repeatOffender;
-  if (ro && !ro.error && ro.status !== "error") {
+  if (ro && !ro.error && ro.status !== "error" && ro.status !== "not_applicable") {
     sections.push(
       repeatSection(ro, customer, "Michigan Repeat Offender Check", "SUBJECT SCREENED")
     );
   }
 
   const cbRo = checks.coBuyerRepeatOffender;
-  if (cbRo && !cbRo.error && cbRo.status !== "error" && coBuyer) {
+  if (cbRo && !cbRo.error && cbRo.status !== "error" && cbRo.status !== "not_applicable" && coBuyer) {
     sections.push(
       repeatSection(
         cbRo,

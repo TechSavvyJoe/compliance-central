@@ -1,5 +1,11 @@
 // Phone-side AES-GCM encryption for the pairing relay. The key is supplied by
 // the extension via the QR fragment; the server never sees it.
+//
+// SYNC: the base64url + AES-GCM primitives here MUST stay byte-compatible with
+// lib/crypto-pair.js (the extension side). They live in two deployment roots
+// (GitHub Pages vs extension bundle) and can't share a runtime module. The
+// PARITY tests in tests/crypto-pair.test.js encrypt with one and decrypt with
+// the other to catch drift — change both files together and re-run those tests.
 
 export function b64urlToBytes(b64url) {
   const b64 = b64url

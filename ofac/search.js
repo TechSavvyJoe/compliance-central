@@ -132,6 +132,36 @@ export function calculateNameSimilarity(searchName, sdnName) {
   return Math.round(finalScore);
 }
 
+// Pull plausible birth years (1900–2100) out of a free-form date string. The
+// OpenSanctions birth_date field may be a full date ("1965-04-12"), a bare year
+// ("1965"), a range, or several semicolon-separated values — so scan for all.
+function extractYears(value) {
+  const years = [];
+  const re = /(\d{4})/g;
+  let m;
+  while ((m = re.exec(String(value || "")))) {
+    const y = Number(m[1]);
+    if (y >= 1900 && y <= 2100) years.push(y);
+  }
+  return years;
+}
+
+/**
+ * Confidence that a name match is the SAME person, judged by birth year.
+ * DISPLAY-ONLY — a name match always requires human review regardless; this
+ * never auto-clears a hit, it only helps the reviewer prioritize.
+ *   high   — birth years match (within ±1, tolerating data-entry slips)
+ *   medium — DOB missing on either side; cannot disambiguate
+ *   low    — birth years clearly differ; likely a false positive
+ */
+export function dobConfidence(searchDob, sdnBirthDate) {
+  const searchYears = extractYears(searchDob);
+  const sdnYears = extractYears(sdnBirthDate);
+  if (searchYears.length === 0 || sdnYears.length === 0) return "medium";
+  const sy = searchYears[0];
+  return sdnYears.some((y) => Math.abs(y - sy) <= 1) ? "high" : "low";
+}
+
 function parseAlias(alias) {
   const parts = alias.split(/\s+/);
   if (parts.length === 1) {
@@ -171,6 +201,9 @@ export function checkNameMatch(searchName, sdnEntry, threshold = 85) {
     isMatch: bestScore >= threshold,
     score: bestScore,
     matchedName,
+    // searchName.dob is optional; when absent, confidence is "medium".
+    confidence: dobConfidence(searchName.dob, sdnEntry.birthDate),
+    sdnBirthDate: sdnEntry.birthDate || "",
   };
 }
 
@@ -184,6 +217,8 @@ export function searchSDNEntries(searchName, sdnEntries, threshold = 85) {
         entry,
         score: result.score,
         matchedName: result.matchedName,
+        confidence: result.confidence,
+        sdnBirthDate: result.sdnBirthDate,
       });
     }
   }

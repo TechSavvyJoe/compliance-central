@@ -130,6 +130,9 @@ async function runAllChecks(data) {
 
       // 1. Buyer Repeat Offender (Michigan license/ID only).
       if (customer.buyerIsMichigan === false) {
+        // Flash the in-flight indicator so the progress row still reflects the
+        // check before it resolves to skipped (parity with the run path).
+        await setInFlight(IN_FLIGHT.repeatOffender);
         results.checks.repeatOffender = {
           passed: null,
           status: "not_applicable",
@@ -183,6 +186,7 @@ async function runAllChecks(data) {
       // 2. Co-Buyer Repeat Offender.
       if (hasCoBuyer) {
         if (customer.coBuyerIsMichigan === false) {
+          await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
           results.checks.coBuyerRepeatOffender = {
             passed: null,
             status: "not_applicable",
@@ -256,6 +260,7 @@ async function runAllChecks(data) {
             results.checks.title = {
               passed: false,
               error: titleResult.error,
+              status: "error",
               warning: true,
             };
           }
@@ -264,6 +269,7 @@ async function runAllChecks(data) {
           results.checks.title = {
             passed: false,
             error: e.message,
+            status: "error",
             warning: true,
           };
         }

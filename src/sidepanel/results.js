@@ -96,6 +96,44 @@ function prepareFullResultsView(elements) {
   }
 }
 
+// DOB-disambiguation confidence shown beside each match. Display-only: a name
+// match always requires review, but this helps the reviewer prioritize.
+const CONFIDENCE_META = {
+  high: { label: "DOB match", cls: "conf-high" },
+  medium: { label: "DOB unknown", cls: "conf-medium" },
+  low: { label: "DOB differs", cls: "conf-low" },
+};
+
+function renderOfacMatchList(matches) {
+  if (!matches?.length) return "";
+  const items = matches
+    .map((m) => {
+      const conf = CONFIDENCE_META[m.confidence] || CONFIDENCE_META.medium;
+      const meta = [m.program, m.country]
+        .map((s) => sanitizeHTML(s || ""))
+        .filter(Boolean)
+        .join(" · ");
+      const dob = m.sdnBirthDate
+        ? `SDN DOB ${sanitizeHTML(m.sdnBirthDate)}`
+        : "SDN DOB not listed";
+      return `
+        <li class="ofac-match ${conf.cls}">
+          <div class="ofac-match-row">
+            <span class="match-name">${sanitizeHTML(m.name)}</span>
+            <span class="match-score">${Math.round(Number(m.score) || 0)}%</span>
+            <span class="match-conf ${conf.cls}">${conf.label}</span>
+          </div>
+          <div class="ofac-match-meta">${dob}${meta ? " · " + meta : ""}</div>
+        </li>`;
+    })
+    .join("");
+  return `
+    <details class="ofac-match-list" open>
+      <summary>Review ${matches.length} potential match${matches.length === 1 ? "" : "es"}</summary>
+      <ul>${items}</ul>
+    </details>`;
+}
+
 function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
   if (!ofac) {
     setResultStatus(statusEl, "skipped", "Not Run");
@@ -124,14 +162,22 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
     ofac.passed ? (ofac.stale ? "Pass (stale data)" : "Pass") : "Match"
   );
   if (detailEl) {
-    let txt = ofac.passed
-      ? "No matches in SDN list"
-      : `${ofac.matches?.length || 0} potential match(es) found`;
-    if (ofac.stale) {
-      const age = ofac.dataAgeHours != null ? ` (~${ofac.dataAgeHours}h old)` : "";
-      txt += ` — screened against a cached SDN list${age}; could not refresh. Re-run when online.`;
+    if (!ofac.passed) {
+      const count = ofac.matches?.length || 0;
+      detailEl.innerHTML =
+        `<span class="ofac-match-summary">${count} potential match${
+          count === 1 ? "" : "es"
+        } found — review each before proceeding.</span>` +
+        renderOfacMatchList(ofac.matches);
+    } else {
+      let txt = "No matches in SDN list";
+      if (ofac.stale) {
+        const age =
+          ofac.dataAgeHours != null ? ` (~${ofac.dataAgeHours}h old)` : "";
+        txt += ` — screened against a cached SDN list${age}; could not refresh. Re-run when online.`;
+      }
+      detailEl.textContent = txt;
     }
-    detailEl.textContent = txt;
   }
   setActionVisibility(printBtn, true);
   setActionVisibility(downloadBtn, true);
@@ -371,18 +417,21 @@ export function displayResults(elements, results) {
       elements.downloadTitleBtn?.classList.add("hidden");
     } else {
       let statusKey, statusLabel;
-      if (title.passed) {
-        statusKey = "pass";
-        statusLabel = "Clear";
+      // Check brand + lien BEFORE passed: the backend leaves passed:true for a
+      // lien (only salvage flips it), so a lien/brand must take precedence or it
+      // would be masked as "Clear".
+      if (title.titleBrand && title.titleBrand !== "CLEAN") {
+        statusKey = "warning";
+        statusLabel = title.titleBrand;
       } else if (title.hasLien) {
         statusKey = "warning";
         statusLabel = "Lien";
-      } else if (title.titleBrand && title.titleBrand !== "CLEAN") {
-        statusKey = "warning";
-        statusLabel = title.titleBrand;
-      } else {
+      } else if (title.passed) {
         statusKey = "pass";
         statusLabel = "Clear";
+      } else {
+        statusKey = "warning";
+        statusLabel = "Review";
       }
       setResultStatus(elements.titleResultStatus, statusKey, statusLabel);
 

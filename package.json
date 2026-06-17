@@ -1,12 +1,17 @@
 {
   "name": "compliance-central",
-  "version": "1.4.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "for f in $(find . -name '*.js' -not -path './lib/jspdf.umd.min.js' -not -path './docs/lib/zxing.min.js' -not -path './lib/qrcode.min.js' -not -path './node_modules/*'); do node --check \"$f\" || exit 1; done",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "node --test",
     "assets": "node tools/build-store-assets.mjs",
     "package": "bash tools/package-extension.sh"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1"
   }
 }

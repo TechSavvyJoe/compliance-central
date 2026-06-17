@@ -45,12 +45,24 @@ export function initDatePicker(input) {
   popover.setAttribute("aria-label", input.getAttribute("aria-label") || "Choose birth date");
   shell.appendChild(popover);
 
+  // Persistent live region for screen-reader navigation announcements. It must
+  // live OUTSIDE the popover (whose innerHTML is replaced on every render) so
+  // the region survives re-renders and its text changes are actually announced.
+  const liveRegion = document.createElement("div");
+  liveRegion.setAttribute("aria-live", "polite");
+  liveRegion.setAttribute("role", "status");
+  liveRegion.style.cssText =
+    "position:absolute;width:1px;height:1px;margin:-1px;padding:0;" +
+    "overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;";
+  shell.appendChild(liveRegion);
+
   const initial = parseDateValue(input.value);
   const state = {
     input,
     shell,
     toggle,
     popover,
+    liveRegion,
     viewDate: initial?.date || defaultViewDate(),
     selectedDate: initial?.date || null,
     isOpen: false,
@@ -266,6 +278,14 @@ function renderPicker(state) {
 
   bindPopoverEvents(state);
   positionPicker(state);
+
+  // Announce the current view to screen readers on navigation. Guarded by
+  // isOpen so the initial render (picker closed) doesn't speak unprompted.
+  if (state.isOpen && state.liveRegion) {
+    state.liveRegion.textContent = isYearMode
+      ? `Years ${rangeLabel}`
+      : `${MONTHS[viewMonth]} ${viewYear}`;
+  }
 }
 
 function positionPicker(state) {

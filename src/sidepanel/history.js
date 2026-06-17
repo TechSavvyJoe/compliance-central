@@ -12,6 +12,33 @@ import { calculateFinalDecision } from "./checks.js";
 
 const RETENTION_DAYS = CONFIG.limits.dataRetentionDays;
 const MAX_ENTRIES = CONFIG.limits.maxHistoryEntries;
+const RESCREEN_DAYS = CONFIG.reminders?.rescreenDays ?? 7;
+
+// Whole days between `timestamp` and now; null if the timestamp is unparseable.
+export function daysSince(timestamp, now = Date.now()) {
+  const t = new Date(timestamp).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.floor((now - t) / (24 * 60 * 60 * 1000));
+}
+
+function agoLabel(days) {
+  if (days == null) return "";
+  if (days <= 0) return "Today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
+/**
+ * Full-run deals (not partial/individual checks) screened at least `days` ago.
+ * Used to remind the user to re-screen before delivery. Returns newest first.
+ */
+export function findAgingDeals(history, days = RESCREEN_DAYS, now = Date.now()) {
+  return (history || []).filter((item) => {
+    if (item.runType === "individual") return false;
+    const d = daysSince(item.timestamp, now);
+    return d != null && d >= days;
+  });
+}
 
 export async function purgeOldHistoryEntries() {
   try {
@@ -148,6 +175,16 @@ export async function populateHistoryModal(historyListEl) {
           minute: "2-digit",
         });
         const dateStr = date.toLocaleDateString();
+        const days = daysSince(item.timestamp);
+        const aging = item.runType !== "individual" && days != null && days >= RESCREEN_DAYS;
+        const agoBadge =
+          days != null
+            ? `<span class="history-age${aging ? " is-aging" : ""}"${
+                aging
+                  ? ' title="Screened over a week ago — re-screen before delivery"'
+                  : ""
+              }>${agoLabel(days)}</span>`
+            : "";
 
         let decisionClass = "status-pass";
         let decisionIcon = ICONS.check;
@@ -198,7 +235,7 @@ export async function populateHistoryModal(historyListEl) {
             <span class="history-decision ${decisionClass}">${decisionIcon} ${sanitizeHTML(item.decision)}</span>
           </div>
           <div class="history-meta">
-            ${dateStr} at ${timeStr}
+            ${dateStr} at ${timeStr} ${agoBadge}
             ${item.runType === "individual" ? ` &middot; ${sanitizeHTML(item.runLabel || "Partial")}` : ""}
             ${item.vin ? ` &middot; VIN: ...${sanitizeHTML(item.vin.slice(-6))}` : " &middot; No Trade-In"}
           </div>
@@ -209,6 +246,11 @@ export async function populateHistoryModal(historyListEl) {
           </div>
           <div class="history-actions">
             <button class="btn-sm history-view-btn" data-index="${index}"><span class="icon-inline">${ICONS.eye}</span>View &amp; Restore</button>
+            ${
+              item.runType !== "individual" && full?.customer
+                ? `<button class="btn-sm history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}"><span class="icon-inline">${ICONS.play}</span>Re-screen</button>`
+                : ""
+            }
             ${hasOfac ? printBtn("history-print-ofac", "Print OFAC") : ""}
             ${hasOfac ? downloadBtn("history-download-ofac", "OFAC PDF") : ""}
             ${hasRepeat ? printBtn("history-print-repeat", "Print Repeat") : ""}

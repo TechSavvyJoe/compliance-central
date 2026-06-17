@@ -48,6 +48,7 @@
           <h3 class="section-title">
             <span class="section-icon icon icon-user"></span>
             Customer Information
+            <span id="buyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h3>
 
           <button id="scanLicenseBtn" type="button" class="btn-secondary btn-ghost scan-license-btn">
@@ -105,7 +106,8 @@
             </div>
             <div class="form-group">
               <label for="dlnPid">DLN/PID <span class="required">*</span></label>
-              <input type="text" id="dlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" />
+              <input type="text" id="dlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" aria-describedby="dlnPidHelp" />
+              <small id="dlnPidHelp" class="helper-text">Front of the ID — letter + 12 digits, or a 9–12 digit PID</small>
             </div>
           </div>
         </section>
@@ -121,6 +123,7 @@
           <h3 class="section-title">
             <span class="section-icon icon icon-users"></span>
             Co-Buyer Information
+            <span id="coBuyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h3>
 
           <div class="form-row">
@@ -199,8 +202,8 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="tradeVin">VIN</label>
-                <input type="text" id="tradeVin" placeholder="1HGBH41JXMN109186" maxlength="17" autocomplete="off" />
-                <small class="helper-text">Leave blank if no trade-in</small>
+                <input type="text" id="tradeVin" placeholder="1HGBH41JXMN109186" maxlength="17" autocomplete="off" aria-describedby="tradeVinHelp" />
+                <small id="tradeVinHelp" class="helper-text">Leave blank if no trade-in — the title/lien check runs only when a VIN is provided</small>
               </div>
             </div>
 
@@ -386,6 +389,10 @@
           </div>
           <div class="modal-body" id="historyList"></div>
           <div class="modal-footer">
+            <button id="exportAuditLogBtn" class="btn-secondary">
+              <span class="btn-icon icon icon-download"></span>
+              Export Audit Log (CSV)
+            </button>
             <button id="clearAllHistoryBtn" class="btn-secondary btn-danger">
               <span class="btn-icon icon icon-trash"></span>
               Clear All History
@@ -457,6 +464,18 @@
 
               <p class="settings-help settings-help-muted">
                 Questions? Email <a id="supportEmailLink" href="#">support</a>.
+              </p>
+            </div>
+
+            <div class="settings-group">
+              <h4 class="settings-heading"><span class="icon icon-ban"></span>Re-screen reminder</h4>
+              <label class="checkbox-label">
+                <input type="checkbox" id="rescreenReminderToggle" />
+                <span class="checkbox-text">Remind me to re-screen deals before delivery</span>
+              </label>
+              <p class="settings-help settings-help-muted">
+                When opening History, flag any deal screened more than a week ago.
+                The OFAC SDN list changes daily, so re-screen before delivery.
               </p>
             </div>
           </div>

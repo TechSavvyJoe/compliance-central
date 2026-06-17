@@ -19,6 +19,7 @@ import {
   validateCustomerFields,
   cacheFormData,
   loadCachedFormData,
+  applyCustomerData,
 } from "./src/sidepanel/form.js";
 import {
   initDatePickers,
@@ -47,7 +48,9 @@ import {
   updateHistoryCount,
   populateHistoryModal,
   clearAllHistory,
+  findAgingDeals,
 } from "./src/sidepanel/history.js";
+import { downloadAuditCsv } from "./src/sidepanel/audit-csv.js";
 import {
   printOfacReport,
   printCoBuyerOfacReport,
@@ -111,6 +114,10 @@ const elements = {
   inputSummaryText: $("inputSummaryText"),
   inputSummaryAction: $("inputSummaryAction"),
 
+  // Out-of-state jurisdiction badges
+  buyerJurisdictionTag: $("buyerJurisdictionTag"),
+  coBuyerJurisdictionTag: $("coBuyerJurisdictionTag"),
+
   // Phone license-scan pairing
   scanLicenseBtn: $("scanLicenseBtn"),
   scanPairModal: $("scanPairModal"),
@@ -170,6 +177,8 @@ const elements = {
   historyList: $("historyList"),
   closeHistoryModal: $("closeHistoryModal"),
   clearAllHistoryBtn: $("clearAllHistoryBtn"),
+  exportAuditLogBtn: $("exportAuditLogBtn"),
+  rescreenReminderToggle: $("rescreenReminderToggle"),
 
   // Screenshot modal
   screenshotModal: $("screenshotModal"),
@@ -419,6 +428,45 @@ function initEventListeners() {
     if (cleared) showToast("All history has been cleared.", "success");
   });
 
+  elements.exportAuditLogBtn?.addEventListener("click", async () => {
+    try {
+      const { [STORAGE_KEYS.complianceHistory]: history = [] } =
+        await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+      if (!history.length) {
+        showToast("No history to export yet.", "info");
+        return;
+      }
+      downloadAuditCsv(history);
+      showToast(`Exported ${history.length} record(s) to CSV.`, "success");
+    } catch (e) {
+      console.error("Audit export failed:", e);
+      showToast("Could not export the audit log.", "error");
+    }
+  });
+
+  // Re-screen reminder toggle (persists in chrome.storage.local).
+  if (elements.rescreenReminderToggle) {
+    chrome.storage.local
+      .get(STORAGE_KEYS.rescreenReminderEnabled)
+      .then((r) => {
+        elements.rescreenReminderToggle.checked =
+          !!r[STORAGE_KEYS.rescreenReminderEnabled];
+      })
+      .catch(() => {});
+    elements.rescreenReminderToggle.addEventListener("change", () => {
+      chrome.storage.local.set({
+        [STORAGE_KEYS.rescreenReminderEnabled]:
+          elements.rescreenReminderToggle.checked,
+      });
+      showToast(
+        elements.rescreenReminderToggle.checked
+          ? "Re-screen reminder on."
+          : "Re-screen reminder off.",
+        "info"
+      );
+    });
+  }
+
   elements.historyList.addEventListener("click", async (e) => {
     const btn = e.target.closest("button");
     if (!btn) return;
@@ -432,6 +480,8 @@ function initEventListeners() {
 
     if (btn.classList.contains("history-view-btn")) {
       loadHistoryItem(item);
+    } else if (btn.classList.contains("history-rescreen-btn")) {
+      reScreenHistoryItem(item);
     } else if (btn.classList.contains("history-print-ofac")) {
       withTempResults(item.fullResults, () => printOfacReport(item.fullResults));
     } else if (btn.classList.contains("history-download-ofac")) {
@@ -546,25 +596,22 @@ function initEventListeners() {
   });
 
   // Phone license scan: open a pairing session, show the QR, autofill on receipt.
+  // Routed through the shared modal helpers so Escape, backdrop-click, and the
+  // close buttons all trap Tab and cancel the in-flight pairing via onClose.
   let cancelPair = null;
   function closeScanPair() {
-    if (cancelPair) { cancelPair(); cancelPair = null; }
-    elements.scanPairModal?.classList.add("hidden");
-    document.removeEventListener("keydown", scanEsc);
-    elements.scanPairModal?.removeEventListener("click", scanBackdrop);
-  }
-  function scanEsc(e) { if (e.key === "Escape") closeScanPair(); }
-  function scanBackdrop(e) {
-    if (e.target === elements.scanPairModal) closeScanPair();
+    hideModal(elements.scanPairModal);
   }
   elements.scanLicenseBtn?.addEventListener("click", async () => {
     if (elements.scanPairQr) elements.scanPairQr.innerHTML = "";
     if (elements.scanPairStatus)
       elements.scanPairStatus.textContent = "Waiting for your phone…";
-    elements.scanPairModal?.classList.remove("hidden");
-    document.addEventListener("keydown", scanEsc);
-    elements.scanPairModal?.addEventListener("click", scanBackdrop);
-    setTimeout(() => elements.scanPairCloseX?.focus(), 80);
+    showModal(elements.scanPairModal, {
+      focusEl: elements.scanPairCloseX,
+      onClose: () => {
+        if (cancelPair) { cancelPair(); cancelPair = null; }
+      },
+    });
     try {
       cancelPair = await startPairing(
         elements,
@@ -607,11 +654,13 @@ function initEventListeners() {
   ["firstName", "lastName", "dlnPid"].forEach((id) =>
     elements[id]?.addEventListener("input", () => {
       scanJurisdiction.buyer = null;
+      updateJurisdictionTags();
     })
   );
   ["cbFirstName", "cbLastName", "cbDlnPid"].forEach((id) =>
     elements[id]?.addEventListener("input", () => {
       scanJurisdiction.coBuyer = null;
+      updateJurisdictionTags();
     })
   );
 }
@@ -717,8 +766,26 @@ const scanJurisdiction = { buyer: null, coBuyer: null };
 // late fire can't re-show stale results over a freshly-cleared form.
 let completeRevealTimer = null;
 function recordScanJurisdiction(payload) {
-  scanJurisdiction.buyer = payload?.buyer ? !!payload.buyer.isMichigan : null;
-  scanJurisdiction.coBuyer = payload?.coBuyer ? !!payload.coBuyer.isMichigan : null;
+  // An absent isMichigan flag means "unknown" (older payload / manual), NOT
+  // "out-of-state". Coercing it to false would wrongly skip Repeat Offender.
+  // `?? null` keeps unknown distinct from an explicit false so the worker
+  // still runs the Michigan check (null → assume MI).
+  scanJurisdiction.buyer = payload?.buyer?.isMichigan ?? null;
+  scanJurisdiction.coBuyer = payload?.coBuyer?.isMichigan ?? null;
+  updateJurisdictionTags();
+}
+
+// Show the "Out-of-state" badge only when a scan explicitly flagged the subject
+// as out-of-state (isMichigan === false). Unknown (null) and Michigan hide it.
+function updateJurisdictionTags() {
+  elements.buyerJurisdictionTag?.classList.toggle(
+    "hidden",
+    scanJurisdiction.buyer !== false
+  );
+  elements.coBuyerJurisdictionTag?.classList.toggle(
+    "hidden",
+    scanJurisdiction.coBuyer !== false
+  );
 }
 
 async function handleRunAllChecks() {
@@ -729,6 +796,24 @@ async function handleRunAllChecks() {
   customerData.coBuyerIsMichigan = scanJurisdiction.coBuyer;
   if (!validateCustomerFields(customerData)) return;
   if (getIsRunning()) return;
+
+  // Tell the user up front when an out-of-state subject will skip the Michigan
+  // Repeat Offender check (OFAC still runs for everyone).
+  const outOfState = [];
+  if (customerData.buyerIsMichigan === false) {
+    outOfState.push(customerData.firstName || "Buyer");
+  }
+  if (customerData.hasCoBuyer && customerData.coBuyerIsMichigan === false) {
+    outOfState.push(customerData.coBuyer?.firstName || "Co-buyer");
+  }
+  if (outOfState.length) {
+    showToast(
+      `Repeat Offender skipped for ${outOfState.join(
+        " & "
+      )} — out-of-state ID; OFAC still runs.`,
+      "info"
+    );
+  }
 
   setIsRunning(true);
   setButtonsDisabled(elements, true);
@@ -870,11 +955,13 @@ function handleClear() {
   resetInputPanel();
   scanJurisdiction.buyer = null;
   scanJurisdiction.coBuyer = null;
+  updateJurisdictionTags();
   // Cancel a pending results reveal and any in-progress phone-scan pairing.
   if (completeRevealTimer) {
     clearTimeout(completeRevealTimer);
     completeRevealTimer = null;
   }
+  clearSlowCheckTimers();
   cancelPairing();
   elements.scanPairModal?.classList.add("hidden");
   chrome.storage.session.set({
@@ -944,6 +1031,31 @@ function handleClear() {
 async function openHistory() {
   await populateHistoryModal(elements.historyList);
   showModal(elements.historyModal);
+
+  // If the re-screen reminder is on, flag any aging full-run deals.
+  try {
+    const {
+      [STORAGE_KEYS.rescreenReminderEnabled]: enabled,
+      [STORAGE_KEYS.complianceHistory]: history = [],
+    } = await chrome.storage.local.get([
+      STORAGE_KEYS.rescreenReminderEnabled,
+      STORAGE_KEYS.complianceHistory,
+    ]);
+    if (enabled) {
+      const aging = findAgingDeals(history);
+      if (aging.length) {
+        showToast(
+          `${aging.length} deal${
+            aging.length === 1 ? "" : "s"
+          } screened over a week ago — re-screen before delivery.`,
+          "warning",
+          7000
+        );
+      }
+    }
+  } catch (e) {
+    console.error("Re-screen reminder check failed:", e);
+  }
 }
 
 function loadHistoryItem(item) {
@@ -976,6 +1088,7 @@ function loadHistoryItem(item) {
     // Restore the scanned jurisdiction so re-running honors out-of-state gating.
     scanJurisdiction.buyer = cust.buyerIsMichigan ?? null;
     scanJurisdiction.coBuyer = cust.coBuyerIsMichigan ?? null;
+    updateJurisdictionTags();
   } else if (item.customer) {
     const names = item.customer.split(" ");
     if (names.length > 0) elements.firstName.value = names[0];
@@ -1000,6 +1113,25 @@ function loadHistoryItem(item) {
       7000
     );
   }
+}
+
+// Re-screen a prior deal before delivery: prefill the form from the stored
+// customer (reusing the scan-autofill path) and immediately run all checks
+// against the current OFAC SDN list and MDOS portal.
+function reScreenHistoryItem(item) {
+  const cust = item.fullResults?.customer;
+  if (!cust) {
+    showToast("This entry has no saved customer to re-screen.", "info");
+    return;
+  }
+  hideModal(elements.historyModal);
+  applyCustomerData(elements, cust);
+  // Honor the original out-of-state gating on the re-run.
+  scanJurisdiction.buyer = cust.buyerIsMichigan ?? null;
+  scanJurisdiction.coBuyer = cust.coBuyerIsMichigan ?? null;
+  updateJurisdictionTags();
+  showToast("Re-screening against the latest data…", "info");
+  handleRunAllChecks();
 }
 
 // ---------- Screenshot modal ----------
@@ -1041,6 +1173,43 @@ function downloadScreenshotModal() {
   link.click();
 }
 
+// ---------- Slow-check messaging ----------
+// MDOS (government portal) checks can take up to ~90s with no intermediate
+// progress. If the bar stalls, surface a reassuring "still running" note rather
+// than a label that looks frozen. The stall clock resets whenever progress
+// actually advances, so a normal fast run never shows the slow message.
+let slowCheckTimers = [];
+let slowCheckLastProgress = 0;
+
+function clearSlowCheckTimers() {
+  slowCheckTimers.forEach((t) => clearTimeout(t));
+  slowCheckTimers = [];
+  if (elements.progressLabel) delete elements.progressLabel.dataset.locked;
+}
+
+function armSlowCheckTimers() {
+  slowCheckTimers.forEach((t) => clearTimeout(t));
+  slowCheckTimers = [];
+  const setSlowLabel = (text) => {
+    if (!elements.progressLabel) return;
+    // Lock so the progress animation loop won't overwrite the note.
+    elements.progressLabel.textContent = text;
+    elements.progressLabel.dataset.locked = "1";
+  };
+  slowCheckTimers.push(
+    setTimeout(
+      () => setSlowLabel("Still running — government checks can take up to ~90s…"),
+      30000
+    )
+  );
+  slowCheckTimers.push(
+    setTimeout(
+      () => setSlowLabel("Still running — almost there (up to ~90s total)…"),
+      60000
+    )
+  );
+}
+
 // ---------- Storage listener (worker -> UI sync) ----------
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -1050,7 +1219,15 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
   if (changes[STORAGE_KEYS.searchProgress]) {
     try {
-      updateProgress(elements, changes[STORAGE_KEYS.searchProgress].newValue || 0);
+      const pct = changes[STORAGE_KEYS.searchProgress].newValue || 0;
+      // Forward progress means a check advanced — reset the stall clock so the
+      // slow note only appears after ~30s with NO movement.
+      if (pct > slowCheckLastProgress) {
+        slowCheckLastProgress = pct;
+        clearSlowCheckTimers();
+        if (pct < 100) armSlowCheckTimers();
+      }
+      updateProgress(elements, pct);
     } catch (e) {
       console.error("[Sidepanel] progress update failed:", e);
     }
@@ -1109,6 +1286,8 @@ function handleSearchStatusChange(changes) {
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
     setCardsLoadingState(elements, true);
+    slowCheckLastProgress = 0;
+    armSlowCheckTimers();
 
     for (const el of [
       elements.ofacResultStatus,
@@ -1136,6 +1315,7 @@ function handleSearchStatusChange(changes) {
     setButtonsDisabled(elements, false);
     setInputCollapsed(true);
     setCardsLoadingState(elements, false);
+    clearSlowCheckTimers();
 
     const results = getCurrentResults();
     if (results) {
@@ -1160,6 +1340,7 @@ function handleSearchStatusChange(changes) {
     setButtonsDisabled(elements, false);
     resetInputPanel();
     setCardsLoadingState(elements, false);
+    clearSlowCheckTimers();
     const errorMsg = changes[STORAGE_KEYS.lastError]?.newValue;
     showToast("Error: " + (describeError({ message: errorMsg }) || "An error occurred."), "error");
     return;
@@ -1170,5 +1351,6 @@ function handleSearchStatusChange(changes) {
     setIsRunning(false);
     setButtonsDisabled(elements, false);
     setCardsLoadingState(elements, false);
+    clearSlowCheckTimers();
   }
 }

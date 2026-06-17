@@ -59,6 +59,8 @@ export async function handleOfacCheck(data) {
       firstName: data.firstName || "",
       middleName: data.middleName || "",
       lastName: data.lastName || "",
+      // Threaded through for DOB disambiguation (display-only confidence).
+      dob: data.dob || "",
     };
 
     const matches = searchSDNEntries(searchName, entries, OFAC_THRESHOLD);
@@ -80,6 +82,8 @@ export async function handleOfacCheck(data) {
           type: m.entry.type,
           program: m.entry.program,
           country: m.entry.country,
+          confidence: m.confidence,
+          sdnBirthDate: m.sdnBirthDate,
         })),
         entriesSearched: entries.length,
         lastUpdate: rawLastUpdate || "Unknown",

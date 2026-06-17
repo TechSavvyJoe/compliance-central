@@ -11,10 +11,10 @@ import { CONFIG } from "../../lib/config.js";
 import { generateKeyB64, decryptPayload } from "../../lib/crypto-pair.js";
 import { applyCustomerData } from "./form.js";
 
-const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCAN_PAGE = "https://techsavvyjoe.github.io/compliance-central/scan.html";
-const POLL_MS = 1500;
-const WINDOW_MS = 2 * 60 * 1000;
+const RELAY_BASE = CONFIG.backend.apiBaseUrl;
+const SCAN_PAGE = CONFIG.scanPairing.scanPageUrl;
+const POLL_MS = CONFIG.scanPairing.pollMs;
+const WINDOW_MS = CONFIG.scanPairing.windowMs;
 
 let active = null; // { sessionId, key, timer, deadline }
 

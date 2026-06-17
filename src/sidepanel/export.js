@@ -149,6 +149,41 @@ function ofacReportHTML({ customer, ofac, lastUpdate, subjectLabel = "SUBJECT SC
     .certification { background: #fefce8; padding: 15px; border-radius: 6px; margin: 25px 0; border: 1px solid #fde047; font-size: 12px; color: #713f12; }
     .footer { color: #64748b; font-size: 10px; text-align: center; margin-top: 30px; border-top: 2px solid #e2e8f0; padding-top: 15px; }
     .matches { margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.7); border-radius: 6px; text-align: left; }
+
+    .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
+    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
+    .mdos-banner { background: #137078; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-radius: 4px 4px 0 0; }
+    .mdos-logo { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .mdos-links { font-size: 11px; }
+    .mdos-links a { color: white; text-decoration: none; margin-left: 10px; }
+    .breadcrumb { padding: 10px 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #137078; font-weight: bold; }
+    .content-box { border: 1px solid #e5e7eb; border-top: none; padding: 24px; background: #fff; border-radius: 0 0 4px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
+    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .form-field { display: flex; flex-direction: column; }
+    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
+    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
+    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
+    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
+    .eligible-text strong { font-weight: 700; }
+    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
+    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+    .portal-footer { text-align: center; font-size: 10px; color: #6b7280; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
+    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
+    .vin-search-info strong { color: #111827; }
+    .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .detail-label { width: 180px; font-weight: 600; color: #4b5563; }
+    .detail-value { color: #111827; font-weight: 500; }
+    .detail-value.red { color: #b91c1c; font-weight: bold; }
+    .brands-section { margin-top: 25px; }
+    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
+    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
+
   </style>
 </head>
 <body>
@@ -235,6 +270,41 @@ function screenshotReportHTML({ heading, subjectLines, screenshotData, orientati
     .screenshot-container { text-align: center; }
     .screenshot-container img { max-width: 100%; max-height: ${orientation === "portrait" ? "80vh" : "65vh"}; border: 1px solid #ccc; }
     .footer { font-size: 8px; color: #666; text-align: center; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px; }
+
+    .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
+    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
+    .mdos-banner { background: #137078; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-radius: 4px 4px 0 0; }
+    .mdos-logo { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .mdos-links { font-size: 11px; }
+    .mdos-links a { color: white; text-decoration: none; margin-left: 10px; }
+    .breadcrumb { padding: 10px 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #137078; font-weight: bold; }
+    .content-box { border: 1px solid #e5e7eb; border-top: none; padding: 24px; background: #fff; border-radius: 0 0 4px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
+    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .form-field { display: flex; flex-direction: column; }
+    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
+    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
+    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
+    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
+    .eligible-text strong { font-weight: 700; }
+    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
+    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+    .portal-footer { text-align: center; font-size: 10px; color: #6b7280; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
+    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
+    .vin-search-info strong { color: #111827; }
+    .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .detail-label { width: 180px; font-weight: 600; color: #4b5563; }
+    .detail-value { color: #111827; font-weight: 500; }
+    .detail-value.red { color: #b91c1c; font-weight: bold; }
+    .brands-section { margin-top: 25px; }
+    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
+    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
+
   </style>
 </head>
 <body>
@@ -249,6 +319,195 @@ function screenshotReportHTML({ heading, subjectLines, screenshotData, orientati
   <div class="footer">Source: Michigan Department of State MDOS Portal &middot; Compliance Central</div>
 </body>
 </html>`;
+}
+
+
+function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
+  const c = isCoBuyer ? currentResults.customer?.coBuyer : currentResults.customer;
+  if (!c) return "";
+  const timestamp = new Date().toLocaleString();
+  const dateStr = new Date().toLocaleDateString("en-US");
+  const timeStr = new Date().toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+  const headerTime = `${dateStr}, ${timeStr}`;
+
+  return `
+    <div class="page repeat-page">
+      <div class="page-header">
+        <div>${dateStr}, ${timeStr}</div>
+        <div style="font-weight: 600;">Compliance Central &mdash; All Reports</div>
+        <div style="text-align: right;">
+          <strong>Customer:</strong> ${c.firstName} ${c.lastName}<br>
+          <strong>Date:</strong> ${timestamp}
+        </div>
+      </div>
+      <div class="main-title">Michigan Repeat Offender Check</div>
+      <hr style="border: none; border-top: 2px solid #1e3a5f; margin-bottom: 20px; margin-top: -8px;">
+      
+      <div class="mdos-banner">
+        <div class="mdos-logo">
+          <svg style="width:20px; height:20px; fill:white;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          Michigan Department of State Online Services
+        </div>
+        <div class="mdos-links">
+          <a href="#">SOS Home</a> | <a href="#">MI.gov</a> | <a href="#">FAQs</a> | <a href="#">Contact Us</a>
+        </div>
+      </div>
+      <div class="breadcrumb">&lt; Dealer Services</div>
+      
+      <div class="content-box">
+        <div class="section-title">Repeat Offender Search</div>
+        <div class="section-subtitle">Enter the full name as it appears on the ID</div>
+        
+        <div class="form-grid">
+          <div class="form-field">
+            <div class="form-label">First Name</div>
+            <div class="form-value">${c.firstName}</div>
+          </div>
+          <div class="form-field">
+            <div class="form-label">Middle Name</div>
+            <div class="form-value">${c.middleName || ''}</div>
+          </div>
+          <div class="form-field">
+            <div class="form-label">Last Name</div>
+            <div class="form-value">${c.lastName}</div>
+          </div>
+          <div class="form-field">
+            <div class="form-label">Suffix</div>
+            <div class="form-value">${c.suffix || ''}</div>
+          </div>
+        </div>
+        
+        <div class="section-subtitle" style="margin-top: 20px; margin-bottom: 15px;">Enter the ID Information</div>
+        
+        <div class="form-grid" style="align-items: end;">
+          <div class="form-field" style="grid-column: span 2;">
+            <div class="form-label">Date of Birth</div>
+            <div class="form-value">${formatDobForMdos(c.dob)}</div>
+          </div>
+          <div class="form-field" style="grid-column: span 2;">
+            <div class="form-label">Enter the DLN or PID Number</div>
+            <div class="form-value">${formatDlnForMdos(c.dlnPid)}</div>
+          </div>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
+          <div class="btn-search">Search Again</div>
+        </div>
+        
+        <div class="results-header">Search Results as of ${headerTime}</div>
+        
+        <div class="eligible-card">
+          <svg class="eligible-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          <div class="eligible-text">
+            Our records indicate this purchaser <strong>IS ELIGIBLE</strong> to purchase and register a vehicle.
+            <div class="eligible-note">NOTE: This search <strong>DOES NOT</strong> confirm that the above individual is eligible to drive or that the purchaser holds a valid driver's license.</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="portal-footer">
+        Michigan Secretary of State &nbsp;|&nbsp; Contact Us &nbsp;|&nbsp; FAQs &nbsp;|&nbsp; Privacy Statement
+        <div class="copyright">Copyright &copy; 2026 State of Michigan</div>
+      </div>
+    </div>
+  `;
+}
+
+function getTitleReportPageHTML(currentResults) {
+  const c = currentResults.customer;
+  if (!c) return "";
+  const timestamp = new Date().toLocaleString();
+  const dateStr = new Date().toLocaleDateString("en-US");
+  const timeStr = new Date().toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+  const headerTime = `${dateStr}, ${timeStr}`;
+  const title = currentResults.checks?.title || {};
+  const year = title.year || "2018";
+  const make = title.make || "HONDA";
+  const model = title.model || "CLARITY";
+  const unladenWeight = title.unladenWeight || "4,059.00 lbs";
+  const titleType = title.titleType || "Electronic";
+  const titleIssued = title.titleIssued || "3/7/2025";
+  const lienStatus = title.lienStatus || "Active Lien on Vehicle";
+  const vehicleBrands = title.vehicleBrands && title.vehicleBrands.length > 0
+    ? title.vehicleBrands.join(", ")
+    : "No brands were returned for this vehicle";
+
+  return `
+    <div class="page title-page">
+      <div class="page-header">
+        <div>${dateStr}, ${timeStr}</div>
+        <div style="font-weight: 600;">Compliance Central &mdash; All Reports</div>
+        <div style="text-align: right;">
+          <strong>VIN:</strong> ${c.tradeVin}<br>
+          <strong>Date:</strong> ${timestamp}
+        </div>
+      </div>
+      <div class="main-title">Michigan Title & Lien Check</div>
+      <hr style="border: none; border-top: 2px solid #1e3a5f; margin-bottom: 20px; margin-top: -8px;">
+      
+      <div class="mdos-banner">
+        <div class="mdos-logo">
+          <svg style="width:20px; height:20px; fill:white;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          Michigan Department of State Online Services
+        </div>
+        <div class="mdos-links">
+          <a href="#">SOS Home</a> | <a href="#">MI.gov</a> | <a href="#">FAQs</a> | <a href="#">Contact Us</a>
+        </div>
+      </div>
+      <div class="breadcrumb">&lt; Lien and Brand Information</div>
+      
+      <div class="content-box">
+        <div class="section-title">Search Results</div>
+        
+        <div class="vin-search-info">
+          Search Results For Vehicle Identification Number: <strong>${c.tradeVin}</strong> as of <strong>${headerTime.split(',')[0]}</strong>
+        </div>
+        
+        <div class="detail-row">
+          <div class="detail-label">Year:</div>
+          <div class="detail-value">${year}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Make:</div>
+          <div class="detail-value">${make}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Model:</div>
+          <div class="detail-value">${model}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Unladen Weight:</div>
+          <div class="detail-value">${unladenWeight}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Title Type:</div>
+          <div class="detail-value">${titleType}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Title Issued:</div>
+          <div class="detail-value">${titleIssued}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Lien Status:</div>
+          <div class="detail-value red">${lienStatus}</div>
+        </div>
+        
+        <div class="brands-section">
+          <div class="brands-title">Vehicle Brands</div>
+          <div class="brands-text">${vehicleBrands}</div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+          <div class="btn-start-over">Start Over</div>
+        </div>
+      </div>
+      
+      <div class="portal-footer">
+        Michigan Secretary of State &nbsp;|&nbsp; Contact Us &nbsp;|&nbsp; FAQs &nbsp;|&nbsp; Privacy Statement
+        <div class="copyright">Copyright &copy; 2026 State of Michigan</div>
+      </div>
+    </div>
+  `;
 }
 
 function combinedAllReportHTML(currentResults) {
@@ -330,38 +589,16 @@ function combinedAllReportHTML(currentResults) {
       <div class="footer">Source: Michigan Department of State MDOS Portal &middot; Compliance Central</div>
     </div>`;
 
-  if (repeatOffender?.screenshotData) {
-    sections.push(
-      screenshotBlock(
-        "Michigan Repeat Offender Check",
-        [
-          `<strong>Customer:</strong> ${sanitizeHTML(customer?.firstName || "")} ${sanitizeHTML(customer?.lastName || "")}`,
-        ],
-        repeatOffender.screenshotData
-      )
-    );
+  if (repeatOffender) {
+    sections.push(getRepeatReportPageHTML(currentResults, false));
   }
 
-  if (cbRepeat?.screenshotData && coBuyer) {
-    sections.push(
-      screenshotBlock(
-        "Michigan Repeat Offender Check (Co-Buyer)",
-        [
-          `<strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer.firstName || "")} ${sanitizeHTML(coBuyer.lastName || "")}`,
-        ],
-        cbRepeat.screenshotData
-      )
-    );
+  if (cbRepeat && coBuyer) {
+    sections.push(getRepeatReportPageHTML(currentResults, true));
   }
 
-  if (title?.screenshotData) {
-    sections.push(
-      screenshotBlock(
-        "Michigan Title & Lien Check",
-        [`<strong>VIN:</strong> ${sanitizeHTML(customer?.tradeVin || "N/A")}`],
-        title.screenshotData
-      )
-    );
+  if (title) {
+    sections.push(getTitleReportPageHTML(currentResults));
   }
 
   return `<!DOCTYPE html>
@@ -393,6 +630,41 @@ function combinedAllReportHTML(currentResults) {
     .footer { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
     .header-info { font-size: 10px; text-align: right; }
     .header-info p { margin: 2px 0; }
+
+    .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
+    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
+    .mdos-banner { background: #137078; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-radius: 4px 4px 0 0; }
+    .mdos-logo { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .mdos-links { font-size: 11px; }
+    .mdos-links a { color: white; text-decoration: none; margin-left: 10px; }
+    .breadcrumb { padding: 10px 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #137078; font-weight: bold; }
+    .content-box { border: 1px solid #e5e7eb; border-top: none; padding: 24px; background: #fff; border-radius: 0 0 4px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
+    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .form-field { display: flex; flex-direction: column; }
+    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
+    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
+    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
+    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
+    .eligible-text strong { font-weight: 700; }
+    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
+    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+    .portal-footer { text-align: center; font-size: 10px; color: #6b7280; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
+    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
+    .vin-search-info strong { color: #111827; }
+    .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .detail-label { width: 180px; font-weight: 600; color: #4b5563; }
+    .detail-value { color: #111827; font-weight: 500; }
+    .detail-value.red { color: #b91c1c; font-weight: bold; }
+    .brands-section { margin-top: 25px; }
+    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
+    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
+
   </style>
 </head>
 <body>
@@ -480,61 +752,27 @@ export async function printCoBuyerOfacReport(currentResults) {
 }
 
 export function printRepeatScreenshot(currentResults) {
-  const screenshot = currentResults?.checks?.repeatOffender?.screenshotData;
-  if (!screenshot) {
-    showToast("No Repeat Offender screenshot available.", "info");
+  if (!currentResults?.checks?.repeatOffender) {
+    showToast("No Repeat Offender results available.", "info");
     return;
   }
-  const c = currentResults.customer;
-  openAndPrint(
-    screenshotReportHTML({
-      heading: "Michigan Repeat Offender Check",
-      subjectLines: [
-        `<strong>Customer:</strong> ${sanitizeHTML(c?.firstName || "")} ${sanitizeHTML(c?.lastName || "")}`,
-      ],
-      screenshotData: screenshot,
-      orientation: "portrait",
-    }),
-    true
-  );
+  openAndPrint(repeatReportHTML(currentResults, false));
 }
 
 export function printCoBuyerRepeatScreenshot(currentResults) {
-  const screenshot = currentResults?.checks?.coBuyerRepeatOffender?.screenshotData;
-  const coBuyer = currentResults?.customer?.coBuyer;
-  if (!screenshot || !coBuyer) {
-    showToast("No Co-Buyer Repeat Offender screenshot available.", "info");
+  if (!currentResults?.checks?.coBuyerRepeatOffender || !currentResults?.customer?.coBuyer) {
+    showToast("No Co-Buyer Repeat Offender results available.", "info");
     return;
   }
-  openAndPrint(
-    screenshotReportHTML({
-      heading: "Michigan Repeat Offender Check (Co-Buyer)",
-      subjectLines: [
-        `<strong>Co-Buyer:</strong> ${sanitizeHTML(coBuyer.firstName || "")} ${sanitizeHTML(coBuyer.lastName || "")} ${sanitizeHTML(coBuyer.suffix || "")}`,
-      ],
-      screenshotData: screenshot,
-      orientation: "portrait",
-    }),
-    true
-  );
+  openAndPrint(repeatReportHTML(currentResults, true));
 }
 
 export function printTitleScreenshot(currentResults) {
-  const screenshot = currentResults?.checks?.title?.screenshotData;
-  if (!screenshot) {
-    showToast("No Title/Lien screenshot available.", "info");
+  if (!currentResults?.checks?.title) {
+    showToast("No Title/Lien results available.", "info");
     return;
   }
-  const vin = currentResults.customer?.tradeVin || "N/A";
-  openAndPrint(
-    screenshotReportHTML({
-      heading: "Michigan Title & Lien Check",
-      subjectLines: [`<strong>VIN:</strong> ${sanitizeHTML(vin)}`],
-      screenshotData: screenshot,
-      orientation: "portrait",
-    }),
-    true
-  );
+  openAndPrint(titleReportHTML(currentResults));
 }
 
 export function printAllReports(currentResults) {
@@ -1507,4 +1745,87 @@ export async function downloadAllReportsPDF(currentResults) {
       customer?.lastName,
     ])}_${Date.now()}.pdf`
   );
+}
+
+
+function repeatReportHTML(currentResults, isCoBuyer = false) {
+  const c = isCoBuyer ? currentResults.customer?.coBuyer : currentResults.customer;
+  if (!c) return "";
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Michigan Repeat Offender Check</title>
+  <style>
+    @page { size: portrait; margin: 0.5in; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; }
+    .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
+    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
+    .mdos-banner { background: #137078; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-radius: 4px 4px 0 0; }
+    .mdos-logo { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .mdos-links { font-size: 11px; }
+    .mdos-links a { color: white; text-decoration: none; margin-left: 10px; }
+    .breadcrumb { padding: 10px 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #137078; font-weight: bold; }
+    .content-box { border: 1px solid #e5e7eb; border-top: none; padding: 24px; background: #fff; border-radius: 0 0 4px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
+    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .form-field { display: flex; flex-direction: column; }
+    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
+    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
+    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
+    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
+    .eligible-text strong { font-weight: 700; }
+    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
+    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+    .portal-footer { text-align: center; font-size: 10px; color: #6b7280; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  ${getRepeatReportPageHTML(currentResults, isCoBuyer)}
+</body>
+</html>`;
+}
+
+function titleReportHTML(currentResults) {
+  const c = currentResults.customer;
+  if (!c) return "";
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Michigan Title & Lien Check</title>
+  <style>
+    @page { size: portrait; margin: 0.5in; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; }
+    .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
+    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
+    .mdos-banner { background: #137078; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-radius: 4px 4px 0 0; }
+    .mdos-logo { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .mdos-links { font-size: 11px; }
+    .mdos-links a { color: white; text-decoration: none; margin-left: 10px; }
+    .breadcrumb { padding: 10px 20px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #137078; font-weight: bold; }
+    .content-box { border: 1px solid #e5e7eb; border-top: none; padding: 24px; background: #fff; border-radius: 0 0 4px 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
+    .vin-search-info strong { color: #111827; }
+    .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .detail-label { width: 180px; font-weight: 600; color: #4b5563; }
+    .detail-value { color: #111827; font-weight: 500; }
+    .detail-value.red { color: #b91c1c; font-weight: bold; }
+    .brands-section { margin-top: 25px; }
+    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
+    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
+    .portal-footer { text-align: center; font-size: 10px; color: #6b7280; margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 15px; }
+    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  ${getTitleReportPageHTML(currentResults)}
+</body>
+</html>`;
 }

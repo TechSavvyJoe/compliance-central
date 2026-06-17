@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   cleanLienHolder,
   formatTitleType,
-  titleTypeNote,
   lienSummary,
   formatLienStatus,
 } from "../src/sidepanel/title-format.js";
@@ -17,12 +16,6 @@ test("formatTitleType labels paper vs electronic clearly", () => {
   assert.equal(formatTitleType(""), "");
   assert.equal(formatTitleType("UNKNOWN"), "");
   assert.equal(formatTitleType("Bonded"), "Bonded"); // passthrough for other types
-});
-
-test("titleTypeNote explains the transfer implication", () => {
-  assert.match(titleTypeNote("Electronic"), /Secretary of State|release/i);
-  assert.match(titleTypeNote("Paper"), /physical|assigned/i);
-  assert.equal(titleTypeNote(""), "");
 });
 
 test("cleanLienHolder accepts real names, rejects status words/garbage", () => {

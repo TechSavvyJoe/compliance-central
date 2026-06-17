@@ -1294,7 +1294,6 @@ function titleSubjectRows(t, vin) {
   const ttype = formatTitleType(t?.titleType);
   if (ttype) rows.push({ label: "Title Type", value: ttype });
   if (t?.titleIssued) rows.push({ label: "Title Issued", value: t.titleIssued });
-  if (t?.unladenWeight) rows.push({ label: "Unladen Weight", value: t.unladenWeight });
   rows.push({
     label: "Lien",
     value: formatLienStatus(t?.lienStatus, t?.hasLien),

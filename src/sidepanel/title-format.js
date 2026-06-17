@@ -48,18 +48,6 @@ export function formatTitleType(titleType) {
   return t;
 }
 
-// Plain-language note about what the title type means for the transaction.
-export function titleTypeNote(titleType) {
-  const t = String(titleType || "").toLowerCase();
-  if (/electronic|\belt\b|e-?title/.test(t)) {
-    return "Electronic title — held by the Secretary of State; the lienholder must release the lien before a paper title can be issued and transferred.";
-  }
-  if (/paper/.test(t)) {
-    return "Paper title — the physical title must be present and assigned at the time of sale.";
-  }
-  return "";
-}
-
 // One-line lien/payoff summary for the decision banner. NEVER shows "Unknown".
 export function lienSummary(title) {
   if (!title?.hasLien) return "";

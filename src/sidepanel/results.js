@@ -8,7 +8,6 @@ import { calculateFinalDecision } from "./checks.js";
 import { MISSING_API_KEY } from "../../lib/api-client.js";
 import {
   formatTitleType,
-  titleTypeNote,
   cleanLienHolder,
   formatLienStatus,
 } from "./title-format.js";
@@ -483,14 +482,6 @@ export function displayResults(elements, results) {
         lines.push(`Lien: ${formatLienStatus(title.lienStatus, false)}`);
       }
 
-      if (title.unladenWeight) {
-        lines.push(`Unladen weight: ${title.unladenWeight}`);
-      }
-
-      // Plain-language note on what the title type means for the deal.
-      const note = titleTypeNote(title.titleType);
-      if (note) lines.push(note);
-
       elements.titleResultDetail.textContent =
         lines.length > 0 ? lines.join("\n") : "Title information retrieved";
 
@@ -636,8 +627,6 @@ export function displayIndividualResult(elements, type, result) {
             : "Payoff / lien release required before sale"
         );
       }
-      const inote = titleTypeNote(result.titleType);
-      if (inote) dlines.push(inote);
       elements.titleResultDetail.textContent =
         dlines.join("\n") || "Title information retrieved";
     }

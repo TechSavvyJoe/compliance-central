@@ -28,6 +28,41 @@ function agoLabel(days) {
   return `${days} days ago`;
 }
 
+const HISTORY_DASH = '<span class="hchip-dash" aria-hidden="true">–</span>';
+
+// Decision pill styling/label, keyed off the stored decision level.
+function decisionMeta(decision) {
+  switch (decision) {
+    case "DENIED":
+      return { cls: "dec-denied", icon: ICONS.x, label: "Denied" };
+    case "REVIEW":
+      return { cls: "dec-review", icon: ICONS.alertTriangle, label: "Review" };
+    case "PARTIAL":
+      return { cls: "dec-review", icon: ICONS.alertTriangle, label: "Partial" };
+    default:
+      return { cls: "dec-approved", icon: ICONS.check, label: "Approved" };
+  }
+}
+
+// Map a stored per-check value to a chip state.
+//   true -> pass, false -> failState, "na" -> na, undefined -> none (not run)
+function checkState(value, failState = "fail") {
+  if (value === "na") return "na";
+  if (value === undefined) return "none";
+  return value ? "pass" : failState;
+}
+
+function statusChip(label, fullName, state) {
+  const meta = {
+    pass: { cls: "hchip-pass", icon: ICONS.check },
+    fail: { cls: "hchip-fail", icon: ICONS.x },
+    review: { cls: "hchip-review", icon: ICONS.alertTriangle },
+    na: { cls: "hchip-na", icon: HISTORY_DASH },
+    none: { cls: "hchip-none", icon: HISTORY_DASH },
+  }[state] || { cls: "hchip-none", icon: HISTORY_DASH };
+  return `<span class="hchip ${meta.cls}" title="${fullName}">${meta.icon}<span class="hchip-label">${label}</span></span>`;
+}
+
 /**
  * Full-run deals (not partial/individual checks) screened at least `days` ago.
  * Used to remind the user to re-screen before delivery. Returns newest first.
@@ -166,111 +201,128 @@ export async function populateHistoryModal(historyListEl) {
       return;
     }
 
-    historyListEl.innerHTML = history
-      .slice(0, MAX_ENTRIES)
-      .map((item, index) => {
-        const date = new Date(item.timestamp);
-        const timeStr = date.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        const dateStr = date.toLocaleDateString();
-        const days = daysSince(item.timestamp);
-        const aging = item.runType !== "individual" && days != null && days >= RESCREEN_DAYS;
-        const agoBadge =
-          days != null
-            ? `<span class="history-age${aging ? " is-aging" : ""}"${
-                aging
-                  ? ' title="Screened over a week ago — re-screen before delivery"'
-                  : ""
-              }>${agoLabel(days)}</span>`
+    const shown = history.slice(0, MAX_ENTRIES);
+    const summary = `<div class="history-summary">${history.length} record${
+      history.length === 1 ? "" : "s"
+    } · newest first</div>`;
+
+    historyListEl.innerHTML =
+      summary +
+      shown
+        .map((item, index) => {
+          const date = new Date(item.timestamp);
+          const timeStr = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const dateStr = date.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+          const days = daysSince(item.timestamp);
+          const isFull = item.runType !== "individual" && !!item.fullResults?.customer;
+          const aging = isFull && days != null && days >= RESCREEN_DAYS;
+          const agoBadge =
+            days != null
+              ? `<span class="history-age${aging ? " is-aging" : ""}"${
+                  aging
+                    ? ' title="Screened over a week ago — re-screen before delivery"'
+                    : ""
+                }>${agoLabel(days)}</span>`
+              : "";
+
+          const dm = decisionMeta(item.decision);
+          const decisionItemCls = `decision-${dm.cls.replace("dec-", "")}`;
+
+          const checks = item.checks || {};
+          const chips =
+            statusChip("OFAC", "OFAC sanctions screening", checkState(checks.ofac)) +
+            statusChip(
+              "Repeat",
+              "Michigan Repeat Offender check",
+              checkState(checks.repeatOffender)
+            ) +
+            statusChip(
+              "Title",
+              "Title & lien check",
+              checkState(checks.title, "review")
+            );
+
+          const tradeText = item.vin
+            ? `VIN …${sanitizeHTML(item.vin.slice(-6))}`
+            : "No trade-in";
+          const runText =
+            item.runType === "individual"
+              ? ` · ${sanitizeHTML(item.runLabel || "Partial")}`
+              : "";
+
+          const full = item.fullResults;
+          const hasOfac = !!full?.checks?.ofac;
+          const hasRepeat = !!full?.checks?.repeatOffender?.screenshotData;
+          const hasTitle = !!full?.checks?.title?.screenshotData;
+          const hasReports = hasOfac || hasRepeat || hasTitle;
+
+          // One tidy row per report: label + print + PDF (icon buttons).
+          const repRow = (label, present, printCls, dlCls, extraCls = "") =>
+            present
+              ? `<div class="rep-row ${extraCls}">
+                   <span class="rep-name">${label}</span>
+                   <span class="rep-btns">
+                     <button class="btn-rep ${printCls}" data-index="${index}" title="Print ${label}" aria-label="Print ${label}">${ICONS.printer}</button>
+                     <button class="btn-rep ${dlCls}" data-index="${index}" title="Download ${label} PDF" aria-label="Download ${label} PDF">${ICONS.download}</button>
+                   </span>
+                 </div>`
+              : "";
+
+          const reports = hasReports
+            ? `<details class="history-reports">
+                 <summary class="history-reports-toggle">
+                   <span class="reports-summary-icon">${ICONS.fileText}</span>
+                   Reports
+                   <span class="rep-chevron">${ICONS.chevron}</span>
+                 </summary>
+                 <div class="history-reports-panel">
+                   ${repRow(
+                     "Full deal jacket",
+                     true,
+                     "history-print-all",
+                     "history-download-all",
+                     "rep-row-all"
+                   )}
+                   ${repRow("OFAC", hasOfac, "history-print-ofac", "history-download-ofac")}
+                   ${repRow("Repeat Offender", hasRepeat, "history-print-repeat", "history-download-repeat")}
+                   ${repRow("Title & Lien", hasTitle, "history-print-title", "history-download-title")}
+                 </div>
+               </details>`
             : "";
 
-        let decisionClass = "status-pass";
-        let decisionIcon = ICONS.check;
-        if (item.decision === "DENIED") {
-          decisionClass = "status-fail";
-          decisionIcon = ICONS.x;
-        } else if (item.decision === "REVIEW" || item.decision === "PARTIAL") {
-          decisionClass = "status-warning";
-          decisionIcon = ICONS.alertTriangle;
-        }
-
-        const checks = item.checks || {};
-        const ofacStatus =
-          checks.ofac !== undefined
-            ? checks.ofac
-              ? `<span class="icon-success">${ICONS.check}</span>`
-              : `<span class="icon-danger">${ICONS.x}</span>`
-            : "—";
-        const repeatStatus =
-          checks.repeatOffender === "na"
-            ? `<span class="icon-muted" title="Not applicable — out-of-state ID">N/A</span>`
-            : checks.repeatOffender !== undefined
-              ? checks.repeatOffender
-                ? `<span class="icon-success">${ICONS.check}</span>`
-                : `<span class="icon-danger">${ICONS.x}</span>`
-              : "—";
-        const titleStatus =
-          checks.title !== undefined
-            ? checks.title
-              ? `<span class="icon-success">${ICONS.check}</span>`
-              : `<span class="icon-warning">${ICONS.alertTriangle}</span>`
-            : "—";
-
-        const full = item.fullResults;
-        const hasOfac = !!full?.checks?.ofac;
-        const hasRepeat = !!full?.checks?.repeatOffender?.screenshotData;
-        const hasTitle = !!full?.checks?.title?.screenshotData;
-
-        const actionBtn = (cls, label, icon) =>
-          `<button class="btn-sm ${cls}" data-index="${index}"><span class="icon-inline">${icon}</span>${label}</button>`;
-        const printBtn = (cls, label) => actionBtn(cls, label, ICONS.printer);
-        const downloadBtn = (cls, label) => actionBtn(cls, label, ICONS.download);
-
-        return `
-        <div class="history-item" data-index="${index}">
+          return `
+        <div class="history-item ${decisionItemCls}" data-index="${index}">
           <div class="history-item-header">
-            <span class="history-customer">${sanitizeHTML(item.customer)}</span>
-            <span class="history-decision ${decisionClass}">${decisionIcon} ${sanitizeHTML(item.decision)}</span>
+            <div class="history-id">
+              <span class="history-customer">${sanitizeHTML(item.customer)}</span>
+              <span class="history-meta">
+                <span>${dateStr} · ${timeStr}</span>
+                ${agoBadge}
+                <span class="history-meta-trade">${tradeText}${runText}</span>
+              </span>
+            </div>
+            <span class="history-decision ${dm.cls}">${dm.icon}<span>${dm.label}</span></span>
           </div>
-          <div class="history-meta">
-            ${dateStr} at ${timeStr} ${agoBadge}
-            ${item.runType === "individual" ? ` &middot; ${sanitizeHTML(item.runLabel || "Partial")}` : ""}
-            ${item.vin ? ` &middot; VIN: ...${sanitizeHTML(item.vin.slice(-6))}` : " &middot; No Trade-In"}
-          </div>
-          <div class="history-checks">
-            <span title="OFAC Screening"><span class="check-glyph">${ICONS.globe}</span>${ofacStatus}</span>
-            <span title="Repeat Offender"><span class="check-glyph">${ICONS.ban}</span>${repeatStatus}</span>
-            <span title="Title & Lien"><span class="check-glyph">${ICONS.fileText}</span>${titleStatus}</span>
-          </div>
+          <div class="history-checks">${chips}</div>
           <div class="history-actions">
-            <button class="btn-sm history-view-btn" data-index="${index}"><span class="icon-inline">${ICONS.eye}</span>View &amp; Restore</button>
+            <button class="btn-hist btn-hist-primary history-view-btn" data-index="${index}" title="View &amp; restore this deal to the form"><span class="btn-hist-ic">${ICONS.eye}</span>View &amp; Restore</button>
             ${
-              item.runType !== "individual" && full?.customer
-                ? `<button class="btn-sm history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}"><span class="icon-inline">${ICONS.play}</span>Re-screen</button>`
-                : ""
-            }
-            ${hasOfac ? printBtn("history-print-ofac", "Print OFAC") : ""}
-            ${hasOfac ? downloadBtn("history-download-ofac", "OFAC PDF") : ""}
-            ${hasRepeat ? printBtn("history-print-repeat", "Print Repeat") : ""}
-            ${hasRepeat ? downloadBtn("history-download-repeat", "Repeat PDF") : ""}
-            ${hasTitle ? printBtn("history-print-title", "Print Title") : ""}
-            ${hasTitle ? downloadBtn("history-download-title", "Title PDF") : ""}
-            ${
-              hasOfac || hasRepeat || hasTitle
-                ? `<button class="btn-sm history-print-all" data-index="${index}"><span class="icon-inline">${ICONS.printer}</span>Print All</button>`
-                : ""
-            }
-            ${
-              hasOfac || hasRepeat || hasTitle
-                ? `<button class="btn-sm history-download-all" data-index="${index}"><span class="icon-inline">${ICONS.download}</span>All PDF</button>`
+              isFull
+                ? `<button class="btn-hist history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}" title="Re-screen against the latest data"><span class="btn-hist-ic">${ICONS.play}</span>Re-screen</button>`
                 : ""
             }
           </div>
+          ${reports}
         </div>`;
-      })
-      .join("");
+        })
+        .join("");
   } catch (error) {
     console.error("Error populating history:", error);
     historyListEl.innerHTML = '<p class="history-empty">Error loading history</p>';

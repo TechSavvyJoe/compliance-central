@@ -19,6 +19,7 @@
     "node_modules/",
     "lib/jspdf.umd.min.js",
     "docs/lib/zxing.min.js",
+    "docs/lib/zxing-wasm/",
     "lib/qrcode.min.js"
   ]
 }

@@ -1,0 +1,88 @@
+/**
+ * Local zxing-wasm (ZXing-C++) reader, vendored under docs/lib/zxing-wasm.
+ * Loads the WASM from the same origin so GitHub Pages works offline-ish.
+ */
+
+import {
+  prepareZXingModule,
+  readBarcodesFromImageData,
+} from "./zxing-wasm/reader.js?v=20260717-3";
+
+let readyPromise = null;
+
+const WASM_URL = new URL(
+  "./zxing-wasm/zxing_reader.wasm?v=20260717-3",
+  import.meta.url
+).href;
+
+const PDF417_OPTIONS = {
+  formats: ["PDF417"],
+  tryHarder: true,
+  tryRotate: true,
+  tryInvert: true,
+  tryDownscale: true,
+  maxNumberOfSymbols: 2,
+  textMode: "Plain",
+  binarizer: "LocalAverage",
+};
+
+/**
+ * Ensure the WASM module is compiled. Safe to call repeatedly.
+ * @returns {Promise<boolean>} true when the reader is usable
+ */
+export function ensureWasmReader() {
+  if (!readyPromise) {
+    readyPromise = prepareZXingModule({
+      overrides: {
+        locateFile: (path, prefix) => {
+          if (String(path).endsWith(".wasm")) return WASM_URL;
+          return `${prefix || ""}${path}`;
+        },
+      },
+    })
+      .then(() => true)
+      .catch((err) => {
+        console.warn("zxing-wasm failed to load", err);
+        readyPromise = null;
+        return false;
+      });
+  }
+  return readyPromise;
+}
+
+/**
+ * Decode PDF417 from an ImageData ROI. Tries a couple of binarizers when the
+ * first pass misses — glare on Michigan cards is common.
+ * @param {ImageData} imageData
+ * @returns {Promise<string[]>}
+ */
+export async function decodePdf417Wasm(imageData) {
+  if (!imageData || !imageData.width || !imageData.height) return [];
+  const ok = await ensureWasmReader();
+  if (!ok) return [];
+
+  const texts = [];
+  const seen = new Set();
+  const binarizers = ["LocalAverage", "GlobalHistogram"];
+
+  for (const binarizer of binarizers) {
+    try {
+      const results = await readBarcodesFromImageData(imageData, {
+        ...PDF417_OPTIONS,
+        binarizer,
+      });
+      for (const result of results || []) {
+        const text = result && typeof result.text === "string" ? result.text : "";
+        if (!text || seen.has(text)) continue;
+        const format = String(result.format || "").toLowerCase();
+        if (format && format !== "pdf417") continue;
+        seen.add(text);
+        texts.push(text);
+      }
+      if (texts.length) return texts;
+    } catch {
+      // try next binarizer
+    }
+  }
+  return texts;
+}

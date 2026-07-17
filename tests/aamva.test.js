@@ -197,3 +197,21 @@ test("accepts extra whitespace between ANSI and issuer ID", () => {
   assert.equal(looksLikeAamva(spaced), true);
   assert.equal(acceptLicenseScan(spaced).isMichigan, true);
 });
+
+test("incomplete AAMVA (header + DAQ only) stays rejected as incomplete", () => {
+  const headerAndDaq =
+    "@\n\rANSI 636032100102DL00410279ZM03200008\nDLDAQS123456789012\nDAJMI\n\r";
+  const verdict = evaluateDetection(headerAndDaq);
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.reason, "incomplete");
+  assert.equal(acceptLicenseScan(headerAndDaq), null);
+});
+
+test("complete Michigan payload is accepted without relaxing field rules", () => {
+  const verdict = evaluateDetection(MI_REAL_LAYOUT);
+  assert.equal(verdict.ok, true);
+  assert.equal(verdict.person.firstName, "PAT");
+  assert.equal(verdict.person.lastName, "SAMPLE");
+  assert.equal(verdict.person.dob, "08/08/1985");
+  assert.ok(verdict.person.dlnPid);
+});

@@ -42,9 +42,16 @@ h2 { font-size: 18px; }
 .viewport { position: relative; width: 100%; aspect-ratio: 3 / 2;
   background: #000; border-radius: var(--radius); overflow: hidden; }
 #video { width: 100%; height: 100%; object-fit: cover; }
+/* Short, low guide: Michigan PDF417 sits under the 1D strip — keep 1D out. */
 .frame-guide {
-  position: absolute; inset: 28% 6%; border: 3px solid var(--gold);
-  border-radius: 8px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 46%;
+  bottom: 14%;
+  border: 3px solid var(--gold);
+  border-radius: 8px;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
 }
 .status { color: var(--text-muted); font-size: 14px; text-align: center; }
 .camera-actions { display: flex; gap: 12px; }

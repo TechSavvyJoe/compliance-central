@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "for f in $(find . -name '*.js' -not -path './lib/jspdf.umd.min.js' -not -path './docs/lib/zxing.min.js' -not -path './lib/qrcode.min.js' -not -path './node_modules/*'); do node --check \"$f\" || exit 1; done",
+    "check": "for f in $(find . -name '*.js' -not -path './lib/jspdf.umd.min.js' -not -path './docs/lib/zxing.min.js' -not -path './docs/lib/zxing-wasm/*' -not -path './lib/qrcode.min.js' -not -path './node_modules/*'); do node --check \"$f\" || exit 1; done",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "node --test",

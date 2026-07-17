@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260717-7" />
+  <link rel="stylesheet" href="scan.css?v=20260717-8" />
 </head>
 <body>
   <header class="cc-header">
@@ -20,53 +20,20 @@
     <!-- Camera / scanning screen -->
     <section id="cameraScreen" class="screen">
       <h2 id="captureHeading">Scan the buyer's license</h2>
-      <p class="hint" id="captureHint">
-        Take a clear photo of the <strong>wide barcode on the back</strong>
-        (the flat PDF417 rectangle — not the thin line above it).
-      </p>
-
-      <div class="photo-first" id="photoFirst">
-        <button id="capturePhotoBtn" class="btn btn-primary btn-xl" type="button">
-          Capture photo
-        </button>
-        <button id="galleryPhotoBtn" class="btn btn-ghost btn-lg" type="button">
-          Use a photo
-        </button>
-        <button id="liveScanBtn" class="btn btn-ghost" type="button">
-          Live scan (optional)
-        </button>
-        <input
-          id="captureInput"
-          class="visually-hidden"
-          type="file"
-          accept="image/*"
-          capture="environment"
-        />
-        <input
-          id="photoInput"
-          class="visually-hidden"
-          type="file"
-          accept="image/*"
-        />
+      <p class="hint">Center the <strong>wide PDF417 rectangle</strong> in the yellow frame.
+        It is okay if part of the thin barcode above it is visible.</p>
+      <div class="viewport">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="frame-guide" aria-hidden="true"></div>
       </div>
-
-      <div id="livePanel" class="live-panel hidden">
-        <div class="viewport">
-          <video id="video" playsinline muted autoplay></video>
-          <div class="frame-guide" aria-hidden="true"></div>
-        </div>
-        <p id="status" class="status" role="status" aria-live="polite">
-          Ready for a photo.
-        </p>
-        <p id="diag" class="diag"></p>
-        <div class="camera-actions">
-          <button id="torchBtn" class="btn btn-ghost hidden" type="button">Turn light on</button>
-          <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
-          <button id="stopLiveBtn" class="btn btn-ghost" type="button">Back to photo</button>
-        </div>
+      <p id="status" class="status" role="status" aria-live="polite">Starting camera…</p>
+      <p id="diag" class="diag"></p>
+      <div class="camera-actions">
+        <button id="torchBtn" class="btn btn-ghost hidden" type="button">Turn light on</button>
+        <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
+        <button id="photoBtn" class="btn btn-ghost" type="button">Use a photo</button>
+        <input id="photoInput" class="visually-hidden" type="file" accept="image/*" />
       </div>
-
-      <p id="photoStatus" class="status" role="status" aria-live="polite"></p>
     </section>
 
     <!-- Review screen -->
@@ -105,7 +72,7 @@
     <section id="errorBanner" class="error-banner hidden" role="alert"></section>
   </main>
 
-  <script src="lib/zxing.min.js?v=20260717-7"></script>
-  <script src="scan.js?v=20260717-7" type="module"></script>
+  <script src="lib/zxing.min.js?v=20260717-8"></script>
+  <script src="scan.js?v=20260717-8" type="module"></script>
 </body>
 </html>

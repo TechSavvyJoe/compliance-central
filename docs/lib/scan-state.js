@@ -1,4 +1,4 @@
-import { evaluateDetection } from "./aamva.js?v=20260717-5";
+import { evaluateDetection } from "./aamva.js?v=20260717-8";
 
 // A small, non-reversible fingerprint lets the camera loop debounce repeated
 // detector output without retaining another copy of the barcode's PII.

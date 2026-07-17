@@ -694,6 +694,7 @@ async function decodePhoto(file) {
 
   let loaded = null;
   let zxingReader = null;
+  let commercialNearMiss = "";
   try {
     loaded = await loadPhoto(file);
     const commercial = await commercialProviderReady;
@@ -712,6 +713,7 @@ async function decodePhoto(file) {
             show("review");
             return;
           }
+          if (raw.length > commercialNearMiss.length) commercialNearMiss = raw;
         }
         diag("provider Dynamsoft · photo miss · fallback zxing");
       } catch (error) {
@@ -740,7 +742,7 @@ async function decodePhoto(file) {
     crops.push(full);
     const canvas = document.createElement("canvas");
     const rotatedCanvas = document.createElement("canvas");
-    let bestNearMiss = "";
+    let bestNearMiss = commercialNearMiss;
 
     for (const crop of crops) {
       if (gen !== captureGen) return;

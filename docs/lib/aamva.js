@@ -121,6 +121,28 @@ export function looksLikeAamva(text) {
   return /ANSI\s*\d{6}/.test(t);
 }
 
+/**
+ * Prefer the longest AAMVA-looking symbol when a decoder sees more than one
+ * barcode. This prevents the neighboring 1D symbol (or short partial output)
+ * from winning merely because it was returned first.
+ */
+export function rankDecodedPayloads(payloads) {
+  const seen = new Set();
+  return (Array.isArray(payloads) ? payloads : [])
+    .filter((payload) => typeof payload === "string" && looksLikeAamva(payload))
+    .map((payload) => normalizeAamvaText(payload))
+    .filter((payload) => {
+      if (seen.has(payload)) return false;
+      seen.add(payload);
+      return true;
+    })
+    .sort((a, b) => b.length - a.length);
+}
+
+export function selectBestDecodedPayload(payloads) {
+  return rankDecodedPayloads(payloads)[0] || "";
+}
+
 function hasValidDob(dob) {
   const match = String(dob || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return false;

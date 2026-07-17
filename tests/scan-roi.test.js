@@ -5,6 +5,7 @@ import {
   buildDecodeCrops,
   focusPdf417Band,
   mapGuideToVideoPixels,
+  padCropHorizontally,
 } from "../docs/lib/scan-roi.js";
 
 test("mapGuideToVideoPixels maps cover-fit overlay back to source pixels", () => {
@@ -41,11 +42,27 @@ test("focusPdf417Band drops the top 1D strip from the yellow guide", () => {
   assert.equal(low.y, 200);
 });
 
-test("buildDecodeCrops prefers PDF417-focused bands over the full guide", () => {
-  const guide = { x: 0, y: 0, width: 800, height: 300 };
-  const crops = buildDecodeCrops(guide, 0);
-  assert.ok(crops.length >= 2);
+test("horizontal crop padding preserves bounds and quiet zones", () => {
+  assert.deepEqual(
+    padCropHorizontally({ x: 100, y: 40, width: 200, height: 80 }, 0.1, 500),
+    { x: 80, y: 40, width: 240, height: 80 }
+  );
+  assert.deepEqual(
+    padCropHorizontally({ x: 5, y: 40, width: 200, height: 80 }, 0.1, 210),
+    { x: 0, y: 40, width: 210, height: 80 }
+  );
+});
+
+test("buildDecodeCrops uses bottom 50/60/70 percent and never the full guide", () => {
+  const guide = { x: 100, y: 100, width: 800, height: 300 };
+  const crops = buildDecodeCrops(guide, 0, 1000);
+  assert.equal(crops.length, 3);
   assert.ok(crops.every((c) => c.height < guide.height));
-  const withFull = buildDecodeCrops(guide, 8);
-  assert.ok(withFull.some((c) => c.height === guide.height));
+  assert.deepEqual(crops.map((c) => c.height), [150, 180, 210]);
+  assert.deepEqual(crops.map((c) => c.y), [250, 220, 190]);
+  assert.ok(crops.every((c) => c.x < guide.x && c.width > guide.width));
+
+  const laterAttempt = buildDecodeCrops(guide, 2, 1000);
+  assert.ok(laterAttempt.every((c) => c.width > crops[0].width));
+  assert.ok(laterAttempt.every((c) => c.height !== guide.height));
 });

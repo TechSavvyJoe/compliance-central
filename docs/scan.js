@@ -1,15 +1,23 @@
-import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-4";
+import {
+  aamvaElementCodes,
+  evaluateDetection,
+  looksLikeAamva,
+  rankDecodedPayloads,
+} from "./lib/aamva.js?v=20260717-5";
 import { encryptPayload } from "./lib/crypto-pair.js";
-import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-4";
-import { createDetectionGate } from "./lib/scan-state.js?v=20260717-4";
-import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-4";
+import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-5";
+import { createDetectionGate } from "./lib/scan-state.js?v=20260717-5";
+import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-5";
 import {
   decodePdf417Wasm,
   ensureWasmReader,
-} from "./lib/zxing-wasm-loader.js?v=20260717-4";
+} from "./lib/zxing-wasm-loader.js?v=20260717-5";
+import {
+  createCommercialScannerProvider,
+} from "./lib/scanner-provider.js?v=20260717-6";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-17.4";
+const SCANNER_BUILD = "scanner-2026-07-17.6";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -22,6 +30,7 @@ const DEBUG = params.has("debug");
 const DETECT_COOLDOWN_MS = 1800;
 const FRAME_INTERVAL_MS = 70;
 const MAX_DECODE_WIDTH = 2200;
+const PARTIAL_HINT_THRESHOLD = 4;
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -30,6 +39,9 @@ const screens = {
   cobuyer: el("cobuyerPrompt"),
   done: el("doneScreen"),
 };
+const commercialProviderReady = createCommercialScannerProvider({
+  mount: el("video").parentElement,
+});
 
 const deal = { buyer: null, coBuyer: null };
 let capturing = "buyer"; // "buyer" | "coBuyer"
@@ -39,6 +51,7 @@ let activeRun = null;
 let resumeAfterVisibility = false;
 let torchEnabled = false;
 let wasmReady = false;
+let choosingPhoto = false;
 
 function show(name) {
   for (const [key, node] of Object.entries(screens)) {
@@ -60,6 +73,9 @@ function stopCamera(run = activeRun) {
   run.stopped = true;
   if (run.rafId) cancelAnimationFrame(run.rafId);
   if (run.cancel) run.cancel();
+  if (run.provider) {
+    Promise.resolve(run.provider.stop()).catch(() => {});
+  }
   if (run.reader) {
     try { run.reader.reset(); } catch {}
   }
@@ -122,7 +138,7 @@ function updateTorchButton(track) {
 
 function rejectHint(reason) {
   if (reason === "incomplete") {
-    return "Barcode partially read — fill the yellow frame with only the wide PDF417 (not the thin line above it), hold steady, and try again.";
+    return "Barcode detected — still decoding the full license. Hold steady and keep the wide barcode centered.";
   }
   if (reason === "not-aamva") {
     return "Point at the wide PDF417 barcode on the back of the license (not a QR code or the thin 1D line).";
@@ -234,25 +250,28 @@ function drawCropFrame(video, canvas, crop, scale = 1) {
   return context;
 }
 
+function rotateCanvas(source, target, degrees) {
+  if (!degrees) return source.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (target.width !== source.width) target.width = source.width;
+  if (target.height !== source.height) target.height = source.height;
+  const context = target.getContext("2d", { alpha: false, willReadFrequently: true });
+  context.save();
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, target.width, target.height);
+  context.translate(target.width / 2, target.height / 2);
+  context.rotate((degrees * Math.PI) / 180);
+  context.drawImage(source, -source.width / 2, -source.height / 2);
+  context.restore();
+  return context;
+}
+
 function canvasImageData(canvas, context) {
   try {
     return context.getImageData(0, 0, canvas.width, canvas.height);
   } catch {
     return null;
   }
-}
-
-function invertImageData(source) {
-  const copy = new ImageData(source.width, source.height);
-  const s = source.data;
-  const d = copy.data;
-  for (let i = 0; i < s.length; i += 4) {
-    d[i] = 255 - s[i];
-    d[i + 1] = 255 - s[i + 1];
-    d[i + 2] = 255 - s[i + 2];
-    d[i + 3] = s[i + 3];
-  }
-  return copy;
 }
 
 function decodePdf417CanvasJs(reader, canvas, hints, mode) {
@@ -265,16 +284,148 @@ function decodePdf417CanvasJs(reader, canvas, hints, mode) {
   return reader.decode(new ZXing.BinaryBitmap(binarizer), hints);
 }
 
+async function createNativePdf417Detector() {
+  if (!("BarcodeDetector" in window)) return null;
+  let formats = [];
+  try { formats = await window.BarcodeDetector.getSupportedFormats(); } catch {}
+  if (!formats.includes("pdf417")) return null;
+  try {
+    return new window.BarcodeDetector({ formats: LICENSE_FORMATS });
+  } catch {
+    return null;
+  }
+}
+
+function createJsPdf417Reader() {
+  if (typeof ZXing === "undefined") return { reader: null, hints: null };
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  hints.set(ZXing.DecodeHintType.PURE_BARCODE, false);
+  return { reader: new ZXing.PDF417Reader(), hints };
+}
+
+async function decodeCanvasCandidates(
+  canvas,
+  context,
+  { nativeDetector, zxingReader, hints, jsMode = 0 }
+) {
+  const candidates = [];
+
+  if (nativeDetector) {
+    try {
+      const codes = await nativeDetector.detect(canvas);
+      for (const code of codes || []) {
+        if (
+          code &&
+          code.rawValue &&
+          (!code.format || String(code.format).toLowerCase() === "pdf417")
+        ) {
+          candidates.push(code.rawValue);
+        }
+      }
+    } catch {}
+  }
+
+  if (wasmReady) {
+    const imageData = canvasImageData(canvas, context);
+    if (imageData) {
+      try {
+        candidates.push(...await decodePdf417Wasm(imageData));
+      } catch {}
+    }
+  }
+
+  if (zxingReader) {
+    try {
+      const result = decodePdf417CanvasJs(zxingReader, canvas, hints, jsMode);
+      if (result && result.getText()) candidates.push(result.getText());
+    } catch {
+      // A miss is expected on most live frames.
+    } finally {
+      try { zxingReader.reset(); } catch {}
+    }
+  }
+
+  return rankDecodedPayloads(candidates);
+}
+
 /**
  * Resolve with { person, raw } once a complete AAMVA license is decoded.
  * Keeps the same camera stream across rejected frames (no flash/restart loop).
  */
+async function scanCommercialLicenseBarcode(provider, gen) {
+  const gate = createDetectionGate(DETECT_COOLDOWN_MS);
+  const run = {
+    gen,
+    provider,
+    stopped: false,
+    cancel: null,
+  };
+  activeRun = run;
+  el("status").textContent = "Starting production-grade scanner…";
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    run.cancel = () => {
+      if (!settled) reject(new Error("cancelled"));
+    };
+
+    const onCandidates = (candidates) => {
+      if (settled || run.stopped || gen !== captureGen) return;
+      for (const raw of rankDecodedPayloads(candidates)) {
+        const verdict = gate.evaluate(raw);
+        if (verdict.ok) {
+          settled = true;
+          resolve(verdict);
+          return;
+        }
+        if (verdict.reason === "incomplete") {
+          el("status").textContent = "Barcode detected — decoding the full license…";
+          if (DEBUG) {
+            diag(`provider Dynamsoft · partial len ${raw.length}`);
+          }
+        }
+      }
+    };
+
+    provider.start(onCandidates).then(() => {
+      if (settled || run.stopped || gen !== captureGen) return;
+      el("status").textContent = "Point at the wide PDF417 on the back…";
+      diag("provider Dynamsoft · camera ready");
+    }).catch((error) => {
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
+    });
+  });
+}
+
 async function scanLicenseBarcode(gen) {
+  const commercial = await commercialProviderReady;
+  if (commercial.provider) {
+    try {
+      return await scanCommercialLicenseBarcode(commercial.provider, gen);
+    } catch (error) {
+      if (error && error.message === "cancelled") throw error;
+      stopCamera();
+      diag(`Dynamsoft unavailable (${commercial.reason || error.message || "start failed"}) · fallback zxing`);
+      el("status").textContent = "Starting camera fallback…";
+    }
+  } else {
+    diag(`provider zxing · ${commercial.reason || "commercial unavailable"}`);
+  }
+  return scanOpenSourceLicenseBarcode(gen);
+}
+
+async function scanOpenSourceLicenseBarcode(gen) {
   const video = el("video");
   let attempts = 0;
-  let lastErr = "";
   let lastHintAt = 0;
   let lastHintReason = "";
+  let nearMissFrames = 0;
+  let lastNearMissAttempt = -1;
   const gate = createDetectionGate(DETECT_COOLDOWN_MS);
   const run = {
     gen,
@@ -290,14 +441,26 @@ async function scanLicenseBarcode(gen) {
     if (run.stopped || gen !== captureGen) return { ok: false, reason: "cancelled" };
     const verdict = gate.evaluate(raw);
     if (verdict.ok) return verdict;
-    if (verdict.reason === "duplicate") return verdict;
+    const reason =
+      verdict.reason === "duplicate" ? verdict.originalReason : verdict.reason;
+    if (reason === "incomplete") {
+      if (lastNearMissAttempt !== attempts) {
+        nearMissFrames++;
+        lastNearMissAttempt = attempts;
+      }
+      if (nearMissFrames < PARTIAL_HINT_THRESHOLD) {
+        el("status").textContent = "Barcode detected — decoding…";
+        return verdict;
+      }
+    }
+    if (verdict.reason === "duplicate" && reason !== "incomplete") return verdict;
     const now = Date.now();
-    if (verdict.reason !== lastHintReason || now - lastHintAt >= DETECT_COOLDOWN_MS) {
-      const hint = rejectHint(verdict.reason);
+    if (reason !== lastHintReason || now - lastHintAt >= DETECT_COOLDOWN_MS) {
+      const hint = rejectHint(reason);
       el("status").textContent = hint;
       showError(hint);
       lastHintAt = now;
-      lastHintReason = verdict.reason;
+      lastHintReason = reason;
     }
     if (DEBUG) {
       diag(
@@ -319,18 +482,9 @@ async function scanLicenseBarcode(gen) {
     return ok;
   });
 
-  // Only select BarcodeDetector after the browser confirms PDF417 support and
-  // construction succeeds. Safari generally falls through to ZXing-C++ / JS.
-  let nativeDetector = null;
-  if ("BarcodeDetector" in window) {
-    let formats = [];
-    try { formats = await window.BarcodeDetector.getSupportedFormats(); } catch {}
-    if (formats.includes("pdf417")) {
-      try {
-        nativeDetector = new window.BarcodeDetector({ formats: LICENSE_FORMATS });
-      } catch {}
-    }
-  }
+  // Safari generally falls through to ZXing-C++ / JS.
+  const nativeDetector = await createNativePdf417Detector();
+  if (run.stopped || gen !== captureGen) throw new Error("cancelled");
 
   el("status").textContent = "Requesting camera…";
   run.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: HIRES });
@@ -350,17 +504,11 @@ async function scanLicenseBarcode(gen) {
     throw new Error("scanner-library-unavailable");
   }
 
-  const hints = new Map();
-  let zxingReader = null;
-  if (typeof ZXing !== "undefined") {
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    hints.set(ZXing.DecodeHintType.PURE_BARCODE, false);
-    zxingReader = new ZXing.PDF417Reader();
-    run.reader = zxingReader;
-  }
+  const { reader: zxingReader, hints } = createJsPdf417Reader();
+  run.reader = zxingReader;
 
   const canvas = document.createElement("canvas");
+  const rotatedCanvas = document.createElement("canvas");
   return new Promise((resolve, reject) => {
     let settled = false;
     let lastFrameAt = 0;
@@ -395,68 +543,26 @@ async function scanLicenseBarcode(gen) {
           return;
         }
 
-        const crops = buildDecodeCrops(guide, attempts);
+        const crops = buildDecodeCrops(guide, attempts, video.videoWidth);
         const scale = attempts % 6 === 0 ? 0.72 : attempts % 4 === 0 ? 1.15 : 1;
+        const deskewAngles = [0, -6, 6, -10, 10];
 
         for (const crop of crops) {
           if (settled || run.stopped || gen !== captureGen) break;
-          const context = drawCropFrame(video, canvas, crop, scale);
-
-          // Prefer the platform detector when it truly supports PDF417.
-          if (nativeDetector) {
-            try {
-              const codes = await nativeDetector.detect(canvas);
-              for (const code of codes) {
-                if (
-                  code &&
-                  code.rawValue &&
-                  (!code.format || String(code.format).toLowerCase() === "pdf417") &&
-                  finishIfAccepted(code.rawValue)
-                ) {
-                  return;
-                }
-              }
-            } catch (error) {
-              lastErr = error && error.name ? error.name : "native-detect-error";
-            }
-          }
-
-          // ZXing-C++ WASM — best open decoder for dense AAMVA PDF417.
-          if (wasmReady) {
-            const imageData = canvasImageData(canvas, context);
-            if (imageData) {
-              const passes = [imageData];
-              if (attempts % 3 === 1) passes.push(invertImageData(imageData));
-              for (const pass of passes) {
-                try {
-                  const texts = await decodePdf417Wasm(pass);
-                  for (const text of texts) {
-                    if (finishIfAccepted(text)) return;
-                  }
-                } catch (error) {
-                  lastErr = error && error.name ? error.name : "wasm-decode-error";
-                }
-              }
-            }
-          }
-
-          // Legacy JS ZXing as a final fallback (older Safari / WASM blocked).
-          if (zxingReader) {
-            try {
-              const result = decodePdf417CanvasJs(
-                zxingReader,
-                canvas,
-                hints,
-                attempts % 3
-              );
-              if (result && finishIfAccepted(result.getText())) return;
-            } catch (error) {
-              if (error && error.name && error.name !== "NotFoundException") {
-                lastErr = error.name;
-              }
-            } finally {
-              try { zxingReader.reset(); } catch {}
-            }
+          drawCropFrame(video, canvas, crop, scale);
+          const angle = deskewAngles[attempts % deskewAngles.length];
+          const decodeTarget = angle ? rotatedCanvas : canvas;
+          const context = angle
+            ? rotateCanvas(canvas, rotatedCanvas, angle)
+            : canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+          const candidates = await decodeCanvasCandidates(decodeTarget, context, {
+            nativeDetector,
+            zxingReader,
+            hints,
+            jsMode: attempts % 2,
+          });
+          for (const text of candidates) {
+            if (finishIfAccepted(text)) return;
           }
         }
 
@@ -464,9 +570,9 @@ async function scanLicenseBarcode(gen) {
           diag(
             `${nativeDetector ? "native+" : ""}${wasmReady ? "wasm+" : ""}js` +
               ` · ROI ${canvas.width}×${canvas.height}` +
+              ` · skew ${deskewAngles[attempts % deskewAngles.length]}°` +
               ` · cam ${settings.width || video.videoWidth || "?"}×${settings.height || video.videoHeight || "?"}` +
-              ` · tries ${attempts}` +
-              (lastErr ? " · " + lastErr : "")
+              ` · tries ${attempts}`
           );
         }
       } finally {
@@ -563,6 +669,128 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
     el("status").textContent = "Camera did not start.";
     el("startBtn").textContent = "Try camera again";
     el("startBtn").classList.remove("hidden");
+  }
+}
+
+function loadPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => resolve({ image, url });
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("photo-load-failed"));
+    };
+    image.src = url;
+  });
+}
+
+async function decodePhoto(file) {
+  const gen = ++captureGen;
+  stopCamera();
+  clearError();
+  show("camera");
+  el("status").textContent = "Reading photo…";
+
+  let loaded = null;
+  let zxingReader = null;
+  try {
+    loaded = await loadPhoto(file);
+    const commercial = await commercialProviderReady;
+    if (commercial.provider) {
+      try {
+        const candidates = rankDecodedPayloads(
+          await commercial.provider.decodeImage(file)
+        );
+        for (const raw of candidates) {
+          const verdict = evaluateDetection(raw);
+          if (verdict.ok) {
+            pending = verdict.person;
+            renderReview(verdict.person);
+            clearError();
+            diag(`provider Dynamsoft · photo len ${raw.length}`);
+            show("review");
+            return;
+          }
+        }
+        diag("provider Dynamsoft · photo miss · fallback zxing");
+      } catch (error) {
+        diag(`Dynamsoft photo error (${error.message || "decode failed"}) · fallback zxing`);
+      }
+    }
+
+    wasmReady = await ensureWasmReader();
+    const nativeDetector = await createNativePdf417Detector();
+    const js = createJsPdf417Reader();
+    zxingReader = js.reader;
+    if (!nativeDetector && !wasmReady && !zxingReader) {
+      throw new Error("scanner-library-unavailable");
+    }
+
+    const source = loaded.image;
+    const full = {
+      x: 0,
+      y: 0,
+      width: source.naturalWidth,
+      height: source.naturalHeight,
+    };
+    const crops = buildDecodeCrops(full, 1, source.naturalWidth);
+    // A loosely framed photo may place the symbol outside the lower windows.
+    // Keep one PDF417-only full-photo search as the still-image fallback.
+    crops.push(full);
+    const canvas = document.createElement("canvas");
+    const rotatedCanvas = document.createElement("canvas");
+    let bestNearMiss = "";
+
+    for (const crop of crops) {
+      if (gen !== captureGen) return;
+      drawCropFrame(source, canvas, crop);
+      for (const angle of [0, -6, 6, -10, 10]) {
+        const decodeTarget = angle ? rotatedCanvas : canvas;
+        const context = angle
+          ? rotateCanvas(canvas, rotatedCanvas, angle)
+          : canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+        const candidates = await decodeCanvasCandidates(decodeTarget, context, {
+          nativeDetector,
+          zxingReader,
+          hints: js.hints,
+          jsMode: 0,
+        });
+        for (const raw of candidates) {
+          const verdict = evaluateDetection(raw);
+          if (verdict.ok) {
+            pending = verdict.person;
+            renderReview(verdict.person);
+            clearError();
+            show("review");
+            return;
+          }
+          if (raw.length > bestNearMiss.length) bestNearMiss = raw;
+        }
+      }
+    }
+
+    const message = bestNearMiss
+      ? "The barcode was found, but the photo did not contain the full license data. Try another sharp, well-lit photo."
+      : "No PDF417 license barcode was found. Try a sharp, well-lit photo of the back of the license.";
+    el("status").textContent = message;
+    showError(message);
+    el("startBtn").textContent = "Try camera again";
+    el("startBtn").classList.remove("hidden");
+  } catch (error) {
+    const message =
+      error && error.message === "scanner-library-unavailable"
+        ? cameraErrorMessage(error)
+        : "That photo could not be read. Choose another photo or try the camera again.";
+    el("status").textContent = message;
+    showError(message);
+    el("startBtn").textContent = "Try camera again";
+    el("startBtn").classList.remove("hidden");
+  } finally {
+    if (zxingReader) {
+      try { zxingReader.reset(); } catch {}
+    }
+    if (loaded) URL.revokeObjectURL(loaded.url);
   }
 }
 
@@ -664,6 +892,17 @@ el("startBtn").addEventListener("click", () => {
   // Explicit user gesture — always attempt getUserMedia from here.
   beginCapture(capturing, { waitForGesture: false });
 });
+el("photoBtn").addEventListener("click", () => {
+  choosingPhoto = true;
+  el("photoInput").click();
+});
+el("photoInput").addEventListener("change", (event) => {
+  choosingPhoto = false;
+  const input = event.currentTarget;
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (file) decodePhoto(file);
+});
 el("torchBtn").addEventListener("click", async () => {
   const run = activeRun;
   const track = run && run.stream && run.stream.getVideoTracks()[0];
@@ -680,6 +919,12 @@ el("torchBtn").addEventListener("click", async () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    if (choosingPhoto) {
+      resumeAfterVisibility = false;
+      captureGen++;
+      stopCamera();
+      return;
+    }
     resumeAfterVisibility = Boolean(activeRun && !screens.camera.classList.contains("hidden"));
     if (resumeAfterVisibility) {
       captureGen++;

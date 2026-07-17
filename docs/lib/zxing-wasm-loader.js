@@ -6,12 +6,12 @@
 import {
   prepareZXingModule,
   readBarcodesFromImageData,
-} from "./zxing-wasm/reader.js?v=20260717-4";
+} from "./zxing-wasm/reader.js?v=20260717-5";
 
 let readyPromise = null;
 
 const WASM_URL = new URL(
-  "./zxing-wasm/zxing_reader.wasm?v=20260717-4",
+  "./zxing-wasm/zxing_reader.wasm?v=20260717-5",
   import.meta.url
 ).href;
 
@@ -19,9 +19,9 @@ const PDF417_OPTIONS = {
   formats: ["PDF417"],
   tryHarder: true,
   tryRotate: true,
-  tryInvert: true,
+  tryInvert: false,
   tryDownscale: true,
-  maxNumberOfSymbols: 2,
+  maxNumberOfSymbols: 4,
   textMode: "Plain",
   binarizer: "LocalAverage",
 };
@@ -96,7 +96,6 @@ export async function decodePdf417Wasm(imageData) {
         seen.add(text);
         texts.push(text);
       }
-      if (texts.length) return texts;
     } catch {
       // try next binarizer
     }

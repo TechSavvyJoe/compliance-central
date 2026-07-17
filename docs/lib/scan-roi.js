@@ -92,16 +92,37 @@ export function focusPdf417Band(crop, opts = {}) {
 }
 
 /**
- * Build a small set of decode ROIs from the yellow guide: PDF417-focused band,
- * slightly tighter band, and (rarely) the full guide as a last resort.
+ * Expand a crop sideways to preserve PDF417 quiet zones when the guide is
+ * framed tightly. The source width keeps the result inside the camera image.
  */
-export function buildDecodeCrops(guideCrop, attempt = 0) {
+export function padCropHorizontally(crop, padding = 0, sourceWidth = Infinity) {
+  if (!crop || !crop.width || !crop.height) return null;
+  const pad = Math.max(0, crop.width * padding);
+  const x = Math.max(0, crop.x - pad);
+  const right = Math.min(sourceWidth, crop.x + crop.width + pad);
+  return {
+    x: Math.round(x),
+    y: Math.round(crop.y),
+    width: Math.max(1, Math.round(right - x)),
+    height: Math.max(1, Math.round(crop.height)),
+  };
+}
+
+/**
+ * Build PDF417-only decode ROIs from the bottom of the yellow guide. Michigan
+ * cards commonly put a thin 1D barcode immediately above the PDF417 symbol.
+ * Never send the full guide to the decoder: that recreates the interference
+ * this crop is intended to remove.
+ */
+export function buildDecodeCrops(guideCrop, attempt = 0, sourceWidth = Infinity) {
   if (!guideCrop) return [];
-  const band = focusPdf417Band(guideCrop, { topSkip: 0.28 });
-  const tight = focusPdf417Band(guideCrop, { topSkip: 0.36 });
-  const low = focusPdf417Band(guideCrop, { bottomKeep: 0.62 });
-  const crops = [band, tight, low].filter(Boolean);
-  if (attempt % 9 === 8) crops.push(guideCrop);
+  const horizontalPads = [0.03, 0.08, 0.14];
+  const pad = horizontalPads[Math.abs(attempt) % horizontalPads.length];
+  const crops = [0.5, 0.6, 0.7]
+    .map((bottomKeep) => focusPdf417Band(guideCrop, { bottomKeep }))
+    .map((crop) => padCropHorizontally(crop, pad, sourceWidth))
+    .filter(Boolean);
+
   // De-dupe identical rectangles
   const seen = new Set();
   return crops.filter((c) => {

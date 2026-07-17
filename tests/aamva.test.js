@@ -7,6 +7,8 @@ import {
   acceptLicenseScan,
   evaluateDetection,
   normalizeAamvaText,
+  rankDecodedPayloads,
+  selectBestDecodedPayload,
 } from "../docs/lib/aamva.js";
 
 // Realistic AAMVA PDF417 payloads. Elements are LF-separated; the data segment
@@ -214,4 +216,18 @@ test("complete Michigan payload is accepted without relaxing field rules", () =>
   assert.equal(verdict.person.lastName, "SAMPLE");
   assert.equal(verdict.person.dob, "08/08/1985");
   assert.ok(verdict.person.dlnPid);
+});
+
+test("multiple decoder symbols prefer the longest AAMVA-looking payload", () => {
+  const partial =
+    "@\n\rANSI 636032100102DL00410279\nDLDCSAMPLE\nDCTPAT\nDBB08081985\nDAJMI\n\r";
+  const ranked = rankDecodedPayloads([
+    "012345678901234567890",
+    partial,
+    MI_REAL_LAYOUT,
+    MI_REAL_LAYOUT,
+  ]);
+  assert.deepEqual(ranked, [normalizeAamvaText(MI_REAL_LAYOUT), normalizeAamvaText(partial)]);
+  assert.equal(selectBestDecodedPayload(ranked), normalizeAamvaText(MI_REAL_LAYOUT));
+  assert.equal(selectBestDecodedPayload(["thin-1d", "https://example.com"]), "");
 });

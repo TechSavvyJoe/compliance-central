@@ -6,6 +6,7 @@ import {
   looksLikeAamva,
   acceptLicenseScan,
   evaluateDetection,
+  normalizeAamvaText,
 } from "../docs/lib/aamva.js";
 
 // Realistic AAMVA PDF417 payloads. Elements are LF-separated; the data segment
@@ -181,4 +182,18 @@ test("malformed ANSI header and separator-delimited payload handling", () => {
   const result = acceptLicenseScan(separated);
   assert.equal(result.dlnPid, "S123456789012");
   assert.equal(result.isMichigan, true);
+});
+
+test("normalizes scanner BOM, NUL, and AAMVA control separators", () => {
+  const noisy = `\uFEFF\u0000${MI_DL.replace(/\n/g, "\x1c")}`;
+  const normalized = normalizeAamvaText(noisy);
+  assert.ok(!normalized.includes("\uFEFF"));
+  assert.ok(!normalized.includes("\u0000"));
+  assert.equal(acceptLicenseScan(noisy).dlnPid, "S123456789012");
+});
+
+test("accepts extra whitespace between ANSI and issuer ID", () => {
+  const spaced = MI_DL.replace("ANSI 636032", "ANSI \t 636032");
+  assert.equal(looksLikeAamva(spaced), true);
+  assert.equal(acceptLicenseScan(spaced).isMichigan, true);
 });

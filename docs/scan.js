@@ -1,9 +1,10 @@
-import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-1";
+import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-2";
 import { encryptPayload } from "./lib/crypto-pair.js";
-import { createDetectionGate } from "./lib/scan-state.js?v=20260717-1";
+import { createDetectionGate } from "./lib/scan-state.js?v=20260717-2";
+import { mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-2";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-17.1";
+const SCANNER_BUILD = "scanner-2026-07-17.2";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -14,6 +15,8 @@ const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
 const DEBUG = params.has("debug");
 
 const DETECT_COOLDOWN_MS = 1800;
+const FRAME_INTERVAL_MS = 80;
+const MAX_DECODE_WIDTH = 1800;
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -49,6 +52,7 @@ function clearError() {
 function stopCamera(run = activeRun) {
   if (!run) return;
   run.stopped = true;
+  if (run.rafId) cancelAnimationFrame(run.rafId);
   if (run.cancel) run.cancel();
   if (run.reader) {
     try { run.reader.reset(); } catch {}
@@ -73,8 +77,8 @@ function diag(msg) {
 // A dense license PDF417 needs a high-resolution, focused frame to decode.
 const HIRES = {
   facingMode: { ideal: "environment" },
-  width: { ideal: 1920 },
-  height: { ideal: 1080 },
+  width: { ideal: 2560 },
+  height: { ideal: 1440 },
   aspectRatio: { ideal: 16 / 9 },
 };
 
@@ -154,6 +158,57 @@ function pairingConfigurationIssue() {
   return "";
 }
 
+function guideCrop(video, padding = 0.06) {
+  const viewport = video.parentElement;
+  const guide = viewport && viewport.querySelector(".frame-guide");
+  if (!viewport || !guide || !video.videoWidth || !video.videoHeight) return null;
+  const viewportRect = viewport.getBoundingClientRect();
+  const guideRect = guide.getBoundingClientRect();
+  return mapGuideToVideoPixels({
+    videoWidth: video.videoWidth,
+    videoHeight: video.videoHeight,
+    viewportWidth: viewportRect.width,
+    viewportHeight: viewportRect.height,
+    guideLeft: guideRect.left - viewportRect.left,
+    guideTop: guideRect.top - viewportRect.top,
+    guideWidth: guideRect.width,
+    guideHeight: guideRect.height,
+    padding,
+  });
+}
+
+function drawGuideFrame(video, canvas, crop, scale = 1) {
+  const targetWidth = Math.max(
+    1,
+    Math.round(Math.min(MAX_DECODE_WIDTH, crop.width * scale))
+  );
+  const targetHeight = Math.max(1, Math.round(targetWidth * crop.height / crop.width));
+  if (canvas.width !== targetWidth) canvas.width = targetWidth;
+  if (canvas.height !== targetHeight) canvas.height = targetHeight;
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  context.drawImage(
+    video,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
+}
+
+function decodePdf417Canvas(reader, canvas, hints, mode) {
+  let source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+  if (mode === 2) source = source.invert();
+  const binarizer =
+    mode === 1
+      ? new ZXing.GlobalHistogramBinarizer(source)
+      : new ZXing.HybridBinarizer(source);
+  return reader.decode(new ZXing.BinaryBitmap(binarizer), hints);
+}
+
 /**
  * Resolve with { person, raw } once a complete AAMVA license is decoded.
  * Keeps the same camera stream across rejected frames (no flash/restart loop).
@@ -162,6 +217,8 @@ async function scanLicenseBarcode(gen) {
   const video = el("video");
   let attempts = 0;
   let lastErr = "";
+  let lastHintAt = 0;
+  let lastHintReason = "";
   const gate = createDetectionGate(DETECT_COOLDOWN_MS);
   const run = {
     gen,
@@ -178,9 +235,14 @@ async function scanLicenseBarcode(gen) {
     const verdict = gate.evaluate(raw);
     if (verdict.ok) return verdict;
     if (verdict.reason === "duplicate") return verdict;
-    const hint = rejectHint(verdict.reason);
-    el("status").textContent = hint;
-    showError(hint);
+    const now = Date.now();
+    if (verdict.reason !== lastHintReason || now - lastHintAt >= DETECT_COOLDOWN_MS) {
+      const hint = rejectHint(verdict.reason);
+      el("status").textContent = hint;
+      showError(hint);
+      lastHintAt = now;
+      lastHintReason = verdict.reason;
+    }
     if (DEBUG) {
       diag(
         `rejected (${verdict.reason}) · len ${String(raw || "").length}` +
@@ -220,75 +282,97 @@ async function scanLicenseBarcode(gen) {
   await video.play();
   const track = await optimizeCamera(run.stream);
   const settings = track && track.getSettings ? track.getSettings() : {};
+  const hints = new Map();
+  let zxingReader = null;
+  if (typeof ZXing !== "undefined") {
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    hints.set(ZXing.DecodeHintType.PURE_BARCODE, false);
+    zxingReader = new ZXing.PDF417Reader();
+    run.reader = zxingReader;
+  }
 
-  if (nativeDetector) {
-    return new Promise((resolve, reject) => {
-      run.cancel = () => reject(new Error("cancelled"));
-      const tick = async () => {
-        if (run.stopped || gen !== captureGen) {
-          reject(new Error("cancelled"));
-          return;
-        }
-        attempts++;
+  const canvas = document.createElement("canvas");
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let lastFrameAt = 0;
+    run.cancel = () => {
+      if (!settled) reject(new Error("cancelled"));
+    };
+
+    const finishIfAccepted = (raw) => {
+      const outcome = tryAccept(raw);
+      if (!outcome.ok) return false;
+      settled = true;
+      resolve(outcome);
+      return true;
+    };
+
+    const tick = async (now) => {
+      if (settled || run.stopped || gen !== captureGen) return;
+      if (now - lastFrameAt < FRAME_INTERVAL_MS) {
+        run.rafId = requestAnimationFrame(tick);
+        return;
+      }
+      lastFrameAt = now;
+      attempts++;
+
+      const crop = guideCrop(video, attempts % 4 === 0 ? 0.14 : 0.06);
+      if (!crop) {
+        run.rafId = requestAnimationFrame(tick);
+        return;
+      }
+      drawGuideFrame(video, canvas, crop, attempts % 5 === 0 ? 0.75 : 1);
+
+      // Prefer the platform detector when it truly supports PDF417. Decode the
+      // guide canvas, not the full preview, so the 1D strip above it is ignored.
+      if (nativeDetector) {
         try {
-          const codes = await nativeDetector.detect(video);
+          const codes = await nativeDetector.detect(canvas);
           for (const code of codes) {
-            if (!code || !code.rawValue) continue;
-            const outcome = tryAccept(code.rawValue);
-            if (outcome.ok) {
-              resolve(outcome);
+            if (
+              code &&
+              code.rawValue &&
+              (!code.format || String(code.format).toLowerCase() === "pdf417") &&
+              finishIfAccepted(code.rawValue)
+            ) {
               return;
             }
           }
         } catch (error) {
-          lastErr = error && error.name ? error.name : "detect-error";
+          lastErr = error && error.name ? error.name : "native-detect-error";
         }
-        if (attempts % 15 === 0) {
-          diag(
-            `BarcodeDetector · cam ${settings.width || "?"}×${settings.height || "?"} · tries ${attempts}` +
-              (lastErr ? " · " + lastErr : "")
-          );
-        }
-        if (!run.stopped && gen === captureGen) {
-          run.rafId = requestAnimationFrame(tick);
-        }
-      };
-      run.rafId = requestAnimationFrame(tick);
-    });
-  }
+      }
 
-  const hints = new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-  run.reader = new ZXing.BrowserMultiFormatReader(hints);
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    run.cancel = () => reject(new Error("cancelled"));
-    Promise.resolve(
-      run.reader.decodeFromStream(run.stream, video, (result, error) => {
-        if (settled || run.stopped || gen !== captureGen) return;
-        attempts++;
-        if (result) {
-          const outcome = tryAccept(result.getText());
-          if (outcome.ok) {
-            settled = true;
-            resolve(outcome);
-            return;
+      // Safari normally uses this path. Alternate hybrid/global/inverted
+      // binarization and periodically downscale; dense Michigan symbols vary
+      // substantially with glare, focus, and camera distance.
+      if (zxingReader) {
+        try {
+          const result = decodePdf417Canvas(zxingReader, canvas, hints, attempts % 3);
+          if (result && finishIfAccepted(result.getText())) return;
+        } catch (error) {
+          if (error && error.name && error.name !== "NotFoundException") {
+            lastErr = error.name;
           }
+        } finally {
+          try { zxingReader.reset(); } catch {}
         }
-        if (error && error.name && error.name !== "NotFoundException") {
-          lastErr = error.name;
-        }
-        if (attempts % 15 === 0) {
-          diag(
-            `ZXing · cam ${settings.width || "?"}×${settings.height || "?"} · tries ${attempts}` +
-              (lastErr ? " · " + lastErr : "")
-          );
-        }
-      })
-    ).catch((error) => {
-      if (!settled && !run.stopped) reject(error);
-    });
+      }
+
+      if (attempts % 15 === 0) {
+        diag(
+          `${nativeDetector ? "native+" : ""}ZXing ROI ${canvas.width}×${canvas.height}` +
+            ` · cam ${settings.width || video.videoWidth || "?"}×${settings.height || video.videoHeight || "?"}` +
+            ` · tries ${attempts}` +
+            (lastErr ? " · " + lastErr : "")
+        );
+      }
+      if (!settled && !run.stopped && gen === captureGen) {
+        run.rafId = requestAnimationFrame(tick);
+      }
+    };
+    run.rafId = requestAnimationFrame(tick);
   });
 }
 

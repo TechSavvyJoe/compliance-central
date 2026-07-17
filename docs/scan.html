@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260717-1" />
+  <link rel="stylesheet" href="scan.css?v=20260717-2" />
 </head>
 <body>
   <header class="cc-header">
@@ -20,8 +20,8 @@
     <!-- Camera / scanning screen -->
     <section id="cameraScreen" class="screen">
       <h2 id="captureHeading">Scan the buyer's license</h2>
-      <p class="hint">Line up the <strong>barcode on the back</strong> of the Michigan
-        driver's license or state ID inside the frame.</p>
+      <p class="hint">Line up the wide <strong>PDF417 rectangle</strong> on the back of the
+        license inside the frame. Ignore the thin line barcode above it.</p>
       <div class="viewport">
         <video id="video" playsinline muted></video>
         <div class="frame-guide" aria-hidden="true"></div>
@@ -70,7 +70,7 @@
     <section id="errorBanner" class="error-banner hidden" role="alert"></section>
   </main>
 
-  <script src="lib/zxing.min.js"></script>
-  <script src="scan.js?v=20260717-1" type="module"></script>
+  <script src="lib/zxing.min.js?v=20260717-2"></script>
+  <script src="scan.js?v=20260717-2" type="module"></script>
 </body>
 </html>

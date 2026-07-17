@@ -43,7 +43,7 @@ h2 { font-size: 18px; }
   background: #000; border-radius: var(--radius); overflow: hidden; }
 #video { width: 100%; height: 100%; object-fit: cover; }
 .frame-guide {
-  position: absolute; inset: 18% 8%; border: 3px solid var(--gold);
+  position: absolute; inset: 28% 6%; border: 3px solid var(--gold);
   border-radius: 8px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
 }
 .status { color: var(--text-muted); font-size: 14px; text-align: center; }

@@ -22,12 +22,25 @@ const IIN_TO_STATE = {
   "636023": "OH",
 };
 
+/**
+ * Decoder implementations do not agree on how AAMVA control separators are
+ * represented. Canonicalize those separators without changing field content.
+ */
+export function normalizeAamvaText(text) {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/^\uFEFF/, "")
+    .replace(/\u0000/g, "")
+    .replace(/[\x01-\x09\x0b\x0c\x0e-\x1f]+/g, "\n")
+    .replace(/\r\n?/g, "\n");
+}
+
 // Split the payload into a { CODE: value } map. Elements are LF/CR-separated;
 // each begins with a 3-letter code. The first element of a subfile is prefixed
 // by the 2-char subfile type ("DL"/"ID"), which we strip.
 function parseElements(text) {
   const map = {};
-  for (const segRaw of text.split(/[\r\n\x1d\x1e]+/)) {
+  for (const segRaw of normalizeAamvaText(text).split(/\n+/)) {
     const seg = segRaw.trim();
     if (!seg) continue;
     let m = seg.match(/^(?:DL|ID)([A-Z]{3})(.*)$/); // first element w/ subfile prefix
@@ -101,11 +114,11 @@ function parseDob(raw) {
  */
 export function looksLikeAamva(text) {
   if (typeof text !== "string") return false;
-  const t = text.trim();
+  const t = normalizeAamvaText(text).trim();
   if (t.length < 40) return false;
   // Pairing QR / plain URLs must never be treated as a license.
   if (/^https?:\/\//i.test(t)) return false;
-  return /ANSI\s?\d{6}/.test(t);
+  return /ANSI\s*\d{6}/.test(t);
 }
 
 function hasValidDob(dob) {
@@ -159,14 +172,15 @@ export function evaluateDetection(raw) {
   if (!person) {
     return { ok: false, reason: "incomplete" };
   }
-  return { ok: true, person, raw };
+  return { ok: true, person, raw: normalizeAamvaText(raw) };
 }
 
 export function parseAAMVA(text) {
-  if (typeof text !== "string" || !text.includes("ANSI")) return null;
+  const normalized = normalizeAamvaText(text);
+  if (!normalized.includes("ANSI")) return null;
 
-  const map = parseElements(text);
-  const iinMatch = text.match(/ANSI\s?(\d{6})/);
+  const map = parseElements(normalized);
+  const iinMatch = normalized.match(/ANSI\s*(\d{6})/);
   const iin = iinMatch ? iinMatch[1] : "";
   const { firstName, middleName, lastName } = extractNames(map);
 

@@ -47,6 +47,8 @@ h2 { font-size: 18px; }
   border-radius: 8px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
 }
 .status { color: var(--text-muted); font-size: 14px; text-align: center; }
+.camera-actions { display: flex; gap: 12px; }
+.camera-actions:empty { display: none; }
 .diag { color: var(--text-muted); font-size: 11px; text-align: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.8;
   word-break: break-word; min-height: 14px; }
@@ -65,6 +67,7 @@ h2 { font-size: 18px; }
 .actions { display: flex; gap: 12px; }
 .btn { flex: 1; padding: 14px 16px; border: none; border-radius: var(--radius);
   font-size: 16px; font-weight: 600; cursor: pointer; }
+.btn:disabled { cursor: default; opacity: 0.55; }
 .btn-primary { background: var(--accent-gradient); color: #fff; }
 .btn-ghost { background: transparent; color: var(--text-secondary);
   border: 1px solid var(--border); }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css" />
+  <link rel="stylesheet" href="scan.css?v=20260717-1" />
 </head>
 <body>
   <header class="cc-header">
@@ -28,7 +28,10 @@
       </div>
       <p id="status" class="status" role="status" aria-live="polite">Starting camera…</p>
       <p id="diag" class="diag"></p>
-      <button id="startBtn" class="btn btn-primary hidden">Start camera</button>
+      <div class="camera-actions">
+        <button id="torchBtn" class="btn btn-ghost hidden" type="button">Turn light on</button>
+        <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
+      </div>
     </section>
 
     <!-- Review screen -->
@@ -59,6 +62,7 @@
       <div class="done-check" aria-hidden="true">✓</div>
       <h2>Scan complete</h2>
       <p class="hint">Return to your computer — the form will fill automatically.</p>
+      <p id="deliveryStatus" class="status" role="status" aria-live="polite"></p>
       <div id="captureSummary" class="capture-summary"></div>
       <button id="startOverBtn" class="btn btn-ghost">Start over</button>
     </section>
@@ -67,6 +71,6 @@
   </main>
 
   <script src="lib/zxing.min.js"></script>
-  <script src="scan.js" type="module"></script>
+  <script src="scan.js?v=20260717-1" type="module"></script>
 </body>
 </html>

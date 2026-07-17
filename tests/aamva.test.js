@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseAAMVA, aamvaElementCodes } from "../docs/lib/aamva.js";
+import {
+  parseAAMVA,
+  aamvaElementCodes,
+  looksLikeAamva,
+  acceptLicenseScan,
+  evaluateDetection,
+} from "../docs/lib/aamva.js";
 
 // Realistic AAMVA PDF417 payloads. Elements are LF-separated; the data segment
 // starts with the 2-char subfile type ("DL"/"ID"). DOB element DBB is MMDDCCYY.
@@ -116,4 +122,63 @@ test("returns null for non-AAMVA text", () => {
   assert.equal(parseAAMVA("not a license"), null);
   assert.equal(parseAAMVA(""), null);
   assert.equal(parseAAMVA(null), null);
+});
+
+test("looksLikeAamva rejects pairing QR URLs and short junk", () => {
+  assert.equal(looksLikeAamva("https://techsavvyjoe.github.io/compliance-central/scan.html?s=abc"), false);
+  assert.equal(looksLikeAamva("ANSI"), false);
+  assert.equal(looksLikeAamva(MI_DL), true);
+  assert.equal(looksLikeAamva(MI_REAL_LAYOUT), true);
+});
+
+test("acceptLicenseScan requires DAQ, first and last name, and valid DOB", () => {
+  const ok = acceptLicenseScan(MI_DL);
+  assert.equal(ok.dlnPid, "S123456789012");
+  // ANSI header present but no DAQ element — partial PDF417 read
+  const partial =
+    "@\n\rANSI 636032100102DL00410279ZM03200008\nDLDCSAMPLE\nDCTPAT\nDBB08081985\nDAJMI\n\r";
+  assert.equal(acceptLicenseScan(partial), null);
+  assert.equal(
+    acceptLicenseScan(
+      "@\n\rANSI 636032100102DL00410279\nDLDAQS123\nDCSSAMPLE\nDBB08081985\nDAJMI\n\r"
+    ),
+    null
+  );
+  assert.equal(
+    acceptLicenseScan(
+      "@\n\rANSI 636032100102DL00410279\nDLDAQS123\nDCSSAMPLE\nDCTPAT\nDBB13321985\nDAJMI\n\r"
+    ),
+    null
+  );
+  assert.equal(acceptLicenseScan("https://example.com/pair"), null);
+});
+
+test("evaluateDetection mode guard: ignore QR, accept MI DL, reject incomplete", () => {
+  const qr = evaluateDetection(
+    "https://techsavvyjoe.github.io/compliance-central/scan.html?s=sess#k=key"
+  );
+  assert.equal(qr.ok, false);
+  assert.equal(qr.reason, "not-aamva");
+
+  const good = evaluateDetection(MI_REAL_LAYOUT);
+  assert.equal(good.ok, true);
+  assert.equal(good.person.firstName, "PAT");
+  assert.equal(good.person.isMichigan, true);
+
+  const incomplete = evaluateDetection(
+    "@\n\rANSI 636032100102DL00410279ZM03200008\nDLDCSAMPLE\nDCTPAT\nDBB08081985\nDAJMI\n\r"
+  );
+  assert.equal(incomplete.ok, false);
+  assert.equal(incomplete.reason, "incomplete");
+
+  assert.equal(evaluateDetection("").ok, false);
+  assert.equal(evaluateDetection("").reason, "empty");
+});
+
+test("malformed ANSI header and separator-delimited payload handling", () => {
+  assert.equal(looksLikeAamva("ANSI XXXXXX\nDLDAQS123\nDCSSAMPLE\nDCTPAT\nDBB08081985"), false);
+  const separated = MI_DL.replace(/\n/g, "\x1e");
+  const result = acceptLicenseScan(separated);
+  assert.equal(result.dlnPid, "S123456789012");
+  assert.equal(result.isMichigan, true);
 });

@@ -27,7 +27,7 @@ const IIN_TO_STATE = {
 // by the 2-char subfile type ("DL"/"ID"), which we strip.
 function parseElements(text) {
   const map = {};
-  for (const segRaw of text.split(/[\r\n]+/)) {
+  for (const segRaw of text.split(/[\r\n\x1d\x1e]+/)) {
     const seg = segRaw.trim();
     if (!seg) continue;
     let m = seg.match(/^(?:DL|ID)([A-Z]{3})(.*)$/); // first element w/ subfile prefix
@@ -92,6 +92,74 @@ function parseDob(raw) {
     return `${d.slice(4, 6)}/${d.slice(6, 8)}/${d.slice(0, 4)}`; // CCYYMMDD
   }
   return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)}`; // MMDDCCYY
+}
+
+/**
+ * True when raw barcode text is worth attempting an AAMVA parse.
+ * Used by the camera loop to reject pairing-QR URLs, empty frames, and other
+ * non-license payloads without stopping the camera.
+ */
+export function looksLikeAamva(text) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  if (t.length < 40) return false;
+  // Pairing QR / plain URLs must never be treated as a license.
+  if (/^https?:\/\//i.test(t)) return false;
+  return /ANSI\s?\d{6}/.test(t);
+}
+
+function hasValidDob(dob) {
+  const match = String(dob || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return false;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    year >= 1900 &&
+    year <= new Date().getUTCFullYear() &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+/**
+ * Parse and require the identity fields needed by Compliance Central. A DAQ
+ * alone is not enough: partial PDF417 reads commonly contain a valid header
+ * and license number while dropping a name or DOB element.
+ */
+export function acceptLicenseScan(raw) {
+  if (!looksLikeAamva(raw)) return null;
+  const parsed = parseAAMVA(raw);
+  if (
+    !parsed ||
+    !parsed.dlnPid ||
+    !parsed.firstName ||
+    !parsed.lastName ||
+    !hasValidDob(parsed.dob)
+  ) {
+    return null;
+  }
+  return parsed;
+}
+
+/**
+ * Camera-loop gate: classify a detector hit without touching the DOM.
+ * @returns {{ ok: true, person: object, raw: string } | { ok: false, reason: string }}
+ */
+export function evaluateDetection(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { ok: false, reason: "empty" };
+  }
+  if (!looksLikeAamva(raw)) {
+    return { ok: false, reason: "not-aamva" };
+  }
+  const person = acceptLicenseScan(raw);
+  if (!person) {
+    return { ok: false, reason: "incomplete" };
+  }
+  return { ok: true, person, raw };
 }
 
 export function parseAAMVA(text) {

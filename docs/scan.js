@@ -1,15 +1,19 @@
-import { parseAAMVA, aamvaElementCodes } from "./lib/aamva.js";
+import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-1";
 import { encryptPayload } from "./lib/crypto-pair.js";
+import { createDetectionGate } from "./lib/scan-state.js?v=20260717-1";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
+const SCANNER_BUILD = "scanner-2026-07-17.1";
 
-// Phase 1: sessionId + key are parsed to lock the URL contract but NOT used yet.
-// Phase 2 will encrypt the payload with `keyB64` and POST to the relay for `sessionId`.
+// Pairing data is split between query and fragment so the relay never receives
+// the AES key in the URL request.
 const params = new URLSearchParams(location.search);
 const sessionId = params.get("s") || "";
 const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
 // Diagnostics (camera resolution, element codes) only show with ?debug=1.
 const DEBUG = params.has("debug");
+
+const DETECT_COOLDOWN_MS = 1800;
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -20,12 +24,12 @@ const screens = {
 };
 
 const deal = { buyer: null, coBuyer: null };
-let lastPayload = null; // assembled on finish(); Phase 2 encrypts + relays it
 let capturing = "buyer"; // "buyer" | "coBuyer"
 let pending = null; // last parsed result awaiting confirmation
-let stream = null;
-let zxingReader = null;
-let detectorLoop = false;
+let captureGen = 0; // bumped to cancel an in-flight scan without killing UX mid-frame
+let activeRun = null;
+let resumeAfterVisibility = false;
+let torchEnabled = false;
 
 function show(name) {
   for (const [key, node] of Object.entries(screens)) {
@@ -42,22 +46,28 @@ function clearError() {
   el("errorBanner").classList.add("hidden");
 }
 
-function stopCamera() {
-  detectorLoop = false;
-  if (zxingReader) {
-    try { zxingReader.reset(); } catch {}
+function stopCamera(run = activeRun) {
+  if (!run) return;
+  run.stopped = true;
+  if (run.cancel) run.cancel();
+  if (run.reader) {
+    try { run.reader.reset(); } catch {}
   }
-  if (stream) {
-    stream.getTracks().forEach((t) => t.stop());
-    stream = null;
+  if (run.stream) {
+    run.stream.getTracks().forEach((track) => track.stop());
   }
+  const video = el("video");
+  if (video && video.srcObject === run.stream) video.srcObject = null;
+  if (activeRun === run) activeRun = null;
+  torchEnabled = false;
+  updateTorchButton(null);
 }
 
 // On-screen diagnostics (we can't see the phone's console). Off unless ?debug=1.
 function diag(msg) {
   if (!DEBUG) return;
   const d = el("diag");
-  if (d) d.textContent = msg;
+  if (d) d.textContent = `${SCANNER_BUILD} · ${msg}`;
 }
 
 // A dense license PDF417 needs a high-resolution, focused frame to decode.
@@ -65,80 +75,220 @@ const HIRES = {
   facingMode: { ideal: "environment" },
   width: { ideal: 1920 },
   height: { ideal: 1080 },
+  aspectRatio: { ideal: 16 / 9 },
 };
 
+// License scan: PDF417 only. Never QR — that would re-read the pairing QR.
+const LICENSE_FORMATS = ["pdf417"];
+
 // Best-effort continuous autofocus (advanced constraint; support varies).
-async function applyContinuousFocus(mediaStream) {
-  try {
-    const track = mediaStream.getVideoTracks()[0];
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    if (caps.focusMode && caps.focusMode.includes("continuous")) {
+async function optimizeCamera(mediaStream) {
+  const track = mediaStream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  if (!track) return null;
+  if (caps.focusMode && caps.focusMode.includes("continuous")) {
+    try {
       await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-    }
-    return track;
-  } catch {
-    return mediaStream.getVideoTracks()[0];
+    } catch {}
   }
+  if (caps.zoom && Number.isFinite(caps.zoom.max) && caps.zoom.max > 1) {
+    const minimum = Number.isFinite(caps.zoom.min) ? caps.zoom.min : 1;
+    const target = Math.max(minimum, Math.min(caps.zoom.max, 1.35));
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: target }] });
+    } catch {}
+  }
+  updateTorchButton(caps.torch ? track : null);
+  return track;
 }
 
-// Resolve with the raw AAMVA barcode text from the camera.
-async function scanRawBarcode() {
+function updateTorchButton(track) {
+  const button = el("torchBtn");
+  if (!button) return;
+  button.classList.toggle("hidden", !track);
+  button.disabled = !track;
+  button.textContent = torchEnabled ? "Turn light off" : "Turn light on";
+}
+
+function rejectHint(reason) {
+  if (reason === "incomplete") {
+    return "Barcode partially read — hold steady, fill the frame, and try again.";
+  }
+  if (reason === "not-aamva") {
+    return "Point at the PDF417 barcode on the back of the license (not a QR code).";
+  }
+  return "Couldn't read that barcode. Hold steady and well-lit.";
+}
+
+function cameraErrorMessage(error) {
+  const name = error && error.name;
+  const message = error && error.message;
+  if (message === "camera-unsupported") {
+    return "This browser does not support camera scanning. Open this link in Safari or Chrome on a camera-equipped phone.";
+  }
+  if (message === "scanner-library-unavailable") {
+    return "The barcode scanner did not load. Check your connection, reload the page, and try again.";
+  }
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Camera access is blocked. Allow camera access for this site in your browser settings, then tap Try camera again.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No usable camera was found on this device.";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "The camera is busy in another app. Close the other app, then tap Try camera again.";
+  }
+  if (name === "OverconstrainedError") {
+    return "This camera could not use the requested scan settings. Tap Try camera again.";
+  }
+  return "The camera could not start. Check permission and reload or tap Try camera again.";
+}
+
+function pairingConfigurationIssue() {
+  if (sessionId && !keyB64) {
+    return "This pairing link is missing its encryption key. Scan a new QR code from Compliance Central.";
+  }
+  if (!sessionId && keyB64) {
+    return "This pairing link is missing its session. Scan a new QR code from Compliance Central.";
+  }
+  return "";
+}
+
+/**
+ * Resolve with { person, raw } once a complete AAMVA license is decoded.
+ * Keeps the same camera stream across rejected frames (no flash/restart loop).
+ */
+async function scanLicenseBarcode(gen) {
   const video = el("video");
   let attempts = 0;
   let lastErr = "";
+  const gate = createDetectionGate(DETECT_COOLDOWN_MS);
+  const run = {
+    gen,
+    stream: null,
+    reader: null,
+    rafId: 0,
+    stopped: false,
+    cancel: null,
+  };
+  activeRun = run;
 
-  // Path 1: native BarcodeDetector (Android Chrome) on high-res frames.
+  const tryAccept = (raw) => {
+    if (run.stopped || gen !== captureGen) return { ok: false, reason: "cancelled" };
+    const verdict = gate.evaluate(raw);
+    if (verdict.ok) return verdict;
+    if (verdict.reason === "duplicate") return verdict;
+    const hint = rejectHint(verdict.reason);
+    el("status").textContent = hint;
+    showError(hint);
+    if (DEBUG) {
+      diag(
+        `rejected (${verdict.reason}) · len ${String(raw || "").length}` +
+          (looksLikeAamva(raw) ? ` · codes ${aamvaElementCodes(raw).join(" ")}` : "")
+      );
+    }
+    return verdict;
+  };
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("camera-unsupported");
+  }
+
+  // Only select BarcodeDetector after the browser confirms PDF417 support and
+  // construction succeeds. Safari generally falls through to stable ZXing.
+  let nativeDetector = null;
   if ("BarcodeDetector" in window) {
     let formats = [];
     try { formats = await window.BarcodeDetector.getSupportedFormats(); } catch {}
     if (formats.includes("pdf417")) {
-      stream = await navigator.mediaDevices.getUserMedia({ video: HIRES });
-      video.srcObject = stream;
-      await video.play();
-      const track = await applyContinuousFocus(stream);
-      const s = track && track.getSettings ? track.getSettings() : {};
-      const detector = new window.BarcodeDetector({ formats: ["pdf417"] });
-      detectorLoop = true;
-      return new Promise((resolve) => {
-        const tick = async () => {
-          if (!detectorLoop) return;
-          attempts++;
-          try {
-            const codes = await detector.detect(video);
-            if (codes.length && codes[0].rawValue) { resolve(codes[0].rawValue); return; }
-          } catch (e) { lastErr = e && e.name ? e.name : "detect-error"; }
-          if (attempts % 15 === 0) {
-            diag(`BarcodeDetector · cam ${s.width || "?"}×${s.height || "?"} · video ${video.videoWidth}×${video.videoHeight} · tries ${attempts}${lastErr ? " · " + lastErr : ""}`);
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      });
+      try {
+        nativeDetector = new window.BarcodeDetector({ formats: LICENSE_FORMATS });
+      } catch {}
     }
   }
 
-  // Path 2: ZXing fallback (iOS Safari) on high-res frames.
-  if (typeof ZXing === "undefined") throw new Error("Barcode scanner failed to load.");
+  if (!nativeDetector && typeof ZXing === "undefined") {
+    throw new Error("scanner-library-unavailable");
+  }
+
+  run.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: HIRES });
+  if (run.stopped || gen !== captureGen) {
+    stopCamera(run);
+    throw new Error("cancelled");
+  }
+  video.srcObject = run.stream;
+  await video.play();
+  const track = await optimizeCamera(run.stream);
+  const settings = track && track.getSettings ? track.getSettings() : {};
+
+  if (nativeDetector) {
+    return new Promise((resolve, reject) => {
+      run.cancel = () => reject(new Error("cancelled"));
+      const tick = async () => {
+        if (run.stopped || gen !== captureGen) {
+          reject(new Error("cancelled"));
+          return;
+        }
+        attempts++;
+        try {
+          const codes = await nativeDetector.detect(video);
+          for (const code of codes) {
+            if (!code || !code.rawValue) continue;
+            const outcome = tryAccept(code.rawValue);
+            if (outcome.ok) {
+              resolve(outcome);
+              return;
+            }
+          }
+        } catch (error) {
+          lastErr = error && error.name ? error.name : "detect-error";
+        }
+        if (attempts % 15 === 0) {
+          diag(
+            `BarcodeDetector · cam ${settings.width || "?"}×${settings.height || "?"} · tries ${attempts}` +
+              (lastErr ? " · " + lastErr : "")
+          );
+        }
+        if (!run.stopped && gen === captureGen) {
+          run.rafId = requestAnimationFrame(tick);
+        }
+      };
+      run.rafId = requestAnimationFrame(tick);
+    });
+  }
+
   const hints = new Map();
   hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
   hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-  zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+  run.reader = new ZXing.BrowserMultiFormatReader(hints);
   return new Promise((resolve, reject) => {
-    let focusApplied = false;
-    zxingReader
-      .decodeFromConstraints({ video: HIRES }, video, (result, err) => {
+    let settled = false;
+    run.cancel = () => reject(new Error("cancelled"));
+    Promise.resolve(
+      run.reader.decodeFromStream(run.stream, video, (result, error) => {
+        if (settled || run.stopped || gen !== captureGen) return;
         attempts++;
-        if (!focusApplied && video.srcObject) {
-          focusApplied = true;
-          applyContinuousFocus(video.srcObject);
+        if (result) {
+          const outcome = tryAccept(result.getText());
+          if (outcome.ok) {
+            settled = true;
+            resolve(outcome);
+            return;
+          }
         }
-        if (result) { resolve(result.getText()); return; }
-        if (err && err.name && err.name !== "NotFoundException") lastErr = err.name;
+        if (error && error.name && error.name !== "NotFoundException") {
+          lastErr = error.name;
+        }
         if (attempts % 15 === 0) {
-          diag(`ZXing · video ${video.videoWidth}×${video.videoHeight} · tries ${attempts}${lastErr ? " · " + lastErr : ""}`);
+          diag(
+            `ZXing · cam ${settings.width || "?"}×${settings.height || "?"} · tries ${attempts}` +
+              (lastErr ? " · " + lastErr : "")
+          );
         }
       })
-      .catch(reject);
+    ).catch((error) => {
+      if (!settled && !run.stopped) reject(error);
+    });
   });
 }
 
@@ -171,31 +321,38 @@ function renderReview(person) {
 
 async function beginCapture(which) {
   capturing = which;
+  const gen = ++captureGen;
+  stopCamera();
   clearError();
+  const pairingIssue = pairingConfigurationIssue();
+  if (pairingIssue) showError(pairingIssue);
   el("captureHeading").textContent =
     which === "buyer" ? "Scan the buyer's license" : "Scan the co-buyer's license";
   show("camera");
-  el("status").textContent = "Point the camera at the barcode…";
+  el("status").textContent = "Point the camera at the barcode on the back…";
+  el("startBtn").classList.add("hidden");
   try {
-    const raw = await scanRawBarcode();
+    const { person, raw } = await scanLicenseBarcode(gen);
+    if (gen !== captureGen) return;
     stopCamera();
-    const parsed = parseAAMVA(raw);
-    if (!parsed || !parsed.dlnPid) {
-      showError("Couldn't read that barcode. Try again, holding steady and well-lit.");
-      return beginCapture(which);
-    }
-    pending = parsed;
-    renderReview(parsed);
-    // Privacy-safe diagnostic (codes only, no values), shown with ?debug=1.
+    pending = person;
+    renderReview(person);
     const rd = el("reviewDiag");
     if (rd && DEBUG) {
       const lf = (raw.match(/\n/g) || []).length;
       rd.textContent = `codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
     }
+    clearError();
+    if (pairingIssue) showError(pairingIssue);
     show("review");
   } catch (e) {
+    if (gen !== captureGen) return;
     stopCamera();
-    showError("Camera error: " + (e && e.message ? e.message : "unable to access camera."));
+    const msg = e && e.message ? e.message : "unable to access camera.";
+    if (msg === "cancelled") return;
+    showError(cameraErrorMessage(e));
+    el("startBtn").textContent = "Try camera again";
+    el("startBtn").classList.remove("hidden");
   }
 }
 
@@ -213,8 +370,9 @@ async function finish() {
   // Guard: same license scanned twice.
   if (deal.coBuyer && deal.buyer && deal.coBuyer.dlnPid === deal.buyer.dlnPid) {
     showError("Buyer and co-buyer have the same license number — did you scan the same card twice?");
+    return;
   }
-  lastPayload = {
+  const payload = {
     buyer: deal.buyer,
     coBuyer: deal.coBuyer || null,
     scannedAt: new Date().toISOString(),
@@ -228,6 +386,11 @@ async function finish() {
   }
   const cs = el("captureSummary");
   if (cs) cs.innerHTML = rows;
+  const delivery = el("deliveryStatus");
+  if (delivery) {
+    delivery.textContent =
+      sessionId && keyB64 ? "Encrypting and sending to your computer…" : "Saved only for this screen.";
+  }
   show("done");
 
   // If we arrived via a paired QR (session + key in the URL), encrypt the
@@ -235,7 +398,12 @@ async function finish() {
   // works standalone (the summary above is the result).
   if (sessionId && keyB64) {
     try {
-      const blob = await encryptPayload(keyB64, lastPayload);
+      let blob;
+      try {
+        blob = await encryptPayload(keyB64, payload);
+      } catch {
+        throw new Error("The pairing encryption key is invalid. Scan a new QR code from Compliance Central.");
+      }
       const res = await fetch(
         `${RELAY_BASE}/pair/${encodeURIComponent(sessionId)}/submit`,
         {
@@ -244,12 +412,24 @@ async function finish() {
           body: JSON.stringify(blob),
         }
       );
-      if (!res.ok) throw new Error("relay " + res.status);
+      if (!res.ok) {
+        let detail = "The relay could not accept the scan.";
+        if (res.status === 404 || res.status === 410) {
+          detail = "The pairing session expired. Scan a new QR code from Compliance Central.";
+        } else if (res.status === 409) {
+          detail = "This pairing session was already used. Scan a new QR code from Compliance Central.";
+        } else if (res.status >= 500) {
+          detail = "The relay service is temporarily unavailable. Try again with a new pairing session.";
+        }
+        throw new Error(detail);
+      }
+      if (delivery) delivery.textContent = "Sent securely to your computer.";
     } catch (e) {
+      if (delivery) delivery.textContent = "Not sent.";
       showError(
         "Couldn't send to your computer: " +
           (e && e.message ? e.message : "network error") +
-          ". The data stayed on this phone."
+          ". The data stayed on this phone — tap Start over after fixing the connection, or enter details on the computer."
       );
     }
   }
@@ -269,7 +449,41 @@ el("rescanBtn").addEventListener("click", () => beginCapture(capturing));
 el("yesCoBuyerBtn").addEventListener("click", () => beginCapture("coBuyer"));
 el("noCoBuyerBtn").addEventListener("click", finish);
 el("startOverBtn").addEventListener("click", resetAll);
-el("startBtn").addEventListener("click", () => beginCapture(capturing));
+el("startBtn").addEventListener("click", () => {
+  el("startBtn").classList.add("hidden");
+  beginCapture(capturing);
+});
+el("torchBtn").addEventListener("click", async () => {
+  const run = activeRun;
+  const track = run && run.stream && run.stream.getVideoTracks()[0];
+  if (!track || run.stopped) return;
+  const next = !torchEnabled;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: next }] });
+    torchEnabled = next;
+    updateTorchButton(track);
+  } catch {
+    showError("This camera could not change the light setting. Scanning can continue.");
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    resumeAfterVisibility = Boolean(activeRun && !screens.camera.classList.contains("hidden"));
+    if (resumeAfterVisibility) {
+      captureGen++;
+      stopCamera();
+    }
+  } else if (resumeAfterVisibility) {
+    resumeAfterVisibility = false;
+    beginCapture(capturing);
+  }
+});
+
+window.addEventListener("pagehide", () => {
+  captureGen++;
+  stopCamera();
+});
 
 // Auto-start the camera on load (button is the manual fallback if blocked).
 beginCapture("buyer");

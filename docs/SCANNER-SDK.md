@@ -1,36 +1,39 @@
-# Production scanner setup
+# Optional commercial scanner (off by default)
 
-Compliance Central prefers Dynamsoft Barcode Reader in the browser when a
-license is configured. If it is unavailable, the scanner automatically falls
-back to the local ZXing-WASM/JavaScript readers.
+Compliance Central's **default** license scanner is free forever: photo capture +
+local ZXing-WASM with aggressive preprocessing. No trial key and no per-scan fee.
 
-## Enable the 30-day Dynamsoft trial
+## Default (recommended)
 
-1. Request a **JavaScript Web** trial key at
-   <https://www.dynamsoft.com/customer/license/trialLicense/?package=js&product=dbr>.
-2. In `scanner-config.json`, paste the key into `dynamsoft.licenseKey`.
-3. In the Dynamsoft portal, restrict the key to the deployment domain
-   `techsavvyjoe.github.io` and add the local development origin if needed.
-4. Open `scan.html?debug=1`. The diagnostic line should report
-   `provider Dynamsoft`.
+Leave `scanner-config.json` as:
 
-The browser must receive this client-side SDK key, so it is not a server secret.
-Domain restriction is the protection against reuse elsewhere. Do not put API
-secrets or server credentials in this file.
+```json
+{
+  "provider": "zxing",
+  "dynamsoft": { "licenseKey": "", "sdkUrl": "..." }
+}
+```
 
-The trial lasts 30 days and does not require a credit card. Dynamsoft does not
-publish a fixed production price for this deployment; production requires a
-JavaScript runtime/deployment license quoted by Dynamsoft. Their current
-licensing documentation describes deployment licenses as non-usage-based (no
-per-scan fee), with per-domain licensing available through sales/support.
+The phone page never loads Dynamsoft in this mode.
+
+## Optional Dynamsoft (paid / trial)
+
+Only if you deliberately want the commercial SDK:
+
+1. Set `"provider": "auto"` (or `"dynamsoft"`).
+2. Paste a JavaScript Web license into `dynamsoft.licenseKey`.
+3. Restrict the key to `techsavvyjoe.github.io` in the Dynamsoft portal.
+4. Open `scan.html?debug=1` — diagnostics may show `provider Dynamsoft`.
+
+If the key is missing or the SDK fails to load, the free scanner runs instead.
+Normal UI never asks the user to buy or start a Dynamsoft trial.
 
 ## Data handling
 
-Barcode recognition runs in WebAssembly in the phone browser. The license image
-and raw AAMVA barcode are not uploaded to Compliance Central. After the user
-confirms the locally parsed fields, the existing pairing code encrypts those
-fields in the browser and sends only the encrypted payload through the relay.
+Barcode recognition runs in the phone browser (WebAssembly / JS). The license
+image and raw AAMVA barcode are not uploaded to Compliance Central. After the
+user confirms the locally parsed fields, pairing encrypts those fields in the
+browser and sends only the encrypted payload through the relay.
 
-The **Use a photo** path gives the original high-resolution file directly to
-Dynamsoft's local `CaptureVisionRouter.capture()` API. If Dynamsoft cannot read
-it, the existing local ZXing photo pipeline is tried next.
+**Best free results:** use **Capture photo** / **Use a photo** — still images
+decode far more reliably than live video on iPhone Safari.

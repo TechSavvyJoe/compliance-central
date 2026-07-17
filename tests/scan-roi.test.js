@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildDecodeCrops,
+  buildPhotoDecodeCrops,
   focusPdf417Band,
   mapGuideToVideoPixels,
   padCropHorizontally,
@@ -65,4 +66,12 @@ test("buildDecodeCrops uses bottom 50/60/70 percent and never the full guide", (
   const laterAttempt = buildDecodeCrops(guide, 2, 1000);
   assert.ok(laterAttempt.every((c) => c.width > crops[0].width));
   assert.ok(laterAttempt.every((c) => c.height !== guide.height));
+});
+
+test("buildPhotoDecodeCrops prefers bottom bands and includes full frame", () => {
+  const full = { x: 0, y: 0, width: 1200, height: 800 };
+  const crops = buildPhotoDecodeCrops(full, 1200);
+  assert.ok(crops.length > 3);
+  assert.deepEqual(crops[crops.length - 1], full);
+  assert.ok(crops.some((c) => c.height === Math.round(800 * 0.45)));
 });

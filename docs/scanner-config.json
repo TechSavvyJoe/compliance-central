@@ -1,5 +1,5 @@
 {
-  "provider": "auto",
+  "provider": "zxing",
   "dynamsoft": {
     "licenseKey": "",
     "sdkUrl": "https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader-bundle@11.4.2000/dist/dbr.bundle.js"

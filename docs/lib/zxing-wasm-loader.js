@@ -6,12 +6,12 @@
 import {
   prepareZXingModule,
   readBarcodesFromImageData,
-} from "./zxing-wasm/reader.js?v=20260717-5";
+} from "./zxing-wasm/reader.js?v=20260717-7";
 
 let readyPromise = null;
 
 const WASM_URL = new URL(
-  "./zxing-wasm/zxing_reader.wasm?v=20260717-5",
+  "./zxing-wasm/zxing_reader.wasm?v=20260717-7",
   import.meta.url
 ).href;
 

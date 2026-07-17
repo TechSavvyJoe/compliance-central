@@ -132,3 +132,50 @@ export function buildDecodeCrops(guideCrop, attempt = 0, sourceWidth = Infinity)
     return true;
   });
 }
+
+/**
+ * Still-photo ROI set for Michigan DL backs. Prefers the wide PDF417 band near
+ * the bottom, skips the thin 1D strip above it, and keeps a full-frame fallback
+ * for loosely framed shots.
+ *
+ * @param {{ x: number, y: number, width: number, height: number }} full
+ * @param {number} [sourceWidth]
+ */
+export function buildPhotoDecodeCrops(full, sourceWidth = Infinity) {
+  if (!full || !full.width || !full.height) return [];
+  const width = Number.isFinite(sourceWidth) ? sourceWidth : full.width;
+  const bands = [0.45, 0.55, 0.65, 0.75];
+  const pads = [0.04, 0.1];
+  const crops = [];
+
+  for (const pad of pads) {
+    for (const bottomKeep of bands) {
+      const band = focusPdf417Band(full, { bottomKeep });
+      const padded = padCropHorizontally(band, pad, width);
+      if (padded) crops.push(padded);
+    }
+  }
+
+  // Mid-card window when the user framed the barcode higher than expected.
+  const mid = focusPdf417Band(
+    {
+      x: full.x,
+      y: full.y + Math.round(full.height * 0.35),
+      width: full.width,
+      height: Math.round(full.height * 0.45),
+    },
+    { bottomKeep: 0.85 }
+  );
+  if (mid) crops.push(padCropHorizontally(mid, 0.08, width));
+
+  crops.push(full);
+
+  const seen = new Set();
+  return crops.filter((c) => {
+    if (!c || !c.width || !c.height) return false;
+    const key = `${c.x},${c.y},${c.width},${c.height}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

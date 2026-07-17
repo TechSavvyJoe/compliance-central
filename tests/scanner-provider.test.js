@@ -38,9 +38,9 @@ test("runtime scanner config fails closed to an empty config", async () => {
   assert.deepEqual(
     await loadScannerConfig("/scanner-config.json", async () => ({
       ok: true,
-      json: async () => ({ provider: "auto", dynamsoft: { licenseKey: "" } }),
+      json: async () => ({ provider: "zxing", dynamsoft: { licenseKey: "" } }),
     })),
-    { provider: "auto", dynamsoft: { licenseKey: "" } }
+    { provider: "zxing", dynamsoft: { licenseKey: "" } }
   );
 
   assert.deepEqual(
@@ -49,4 +49,17 @@ test("runtime scanner config fails closed to an empty config", async () => {
     }),
     {}
   );
+});
+
+test("empty Dynamsoft key keeps commercial provider dormant", async () => {
+  const { createCommercialScannerProvider } = await import(
+    "../docs/lib/scanner-provider.js"
+  );
+  const result = await createCommercialScannerProvider({
+    mount: { insertBefore() {} },
+    configUrl: "/scanner-config.json",
+  });
+  // Without a fetchable key the factory returns null provider.
+  assert.equal(result.provider, null);
+  assert.ok(result.reason);
 });

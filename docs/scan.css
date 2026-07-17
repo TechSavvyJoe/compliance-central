@@ -54,8 +54,9 @@ h2 { font-size: 18px; }
   box-shadow: 0 0 0 100vmax rgba(0,0,0,0.35);
 }
 .status { color: var(--text-muted); font-size: 14px; text-align: center; }
-.camera-actions { display: flex; gap: 12px; }
+.camera-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .camera-actions:empty { display: none; }
+.camera-actions .btn-primary { min-height: 48px; }
 .diag { color: var(--text-muted); font-size: 11px; text-align: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.8;
   word-break: break-word; min-height: 14px; }

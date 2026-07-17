@@ -1,14 +1,15 @@
-import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-3";
+import { aamvaElementCodes, looksLikeAamva } from "./lib/aamva.js?v=20260717-4";
 import { encryptPayload } from "./lib/crypto-pair.js";
-import { createDetectionGate } from "./lib/scan-state.js?v=20260717-3";
-import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-3";
+import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-4";
+import { createDetectionGate } from "./lib/scan-state.js?v=20260717-4";
+import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-4";
 import {
   decodePdf417Wasm,
   ensureWasmReader,
-} from "./lib/zxing-wasm-loader.js?v=20260717-3";
+} from "./lib/zxing-wasm-loader.js?v=20260717-4";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-17.3";
+const SCANNER_BUILD = "scanner-2026-07-17.4";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -163,6 +164,32 @@ function pairingConfigurationIssue() {
   return "";
 }
 
+function browseContextIssue() {
+  const ctx = classifyBrowseContext(window);
+  if (ctx.embedded) {
+    return "Camera cannot run inside another app's browser. Open this link in Safari or Chrome, then tap Start camera.";
+  }
+  if (ctx.tinyPopup) {
+    return "Camera needs a full browser page. Close this small window, open the link in Safari or Chrome, then tap Start camera.";
+  }
+  return "";
+}
+
+/** Prefer a top-level tab so getUserMedia is allowed (iframes/popups often block it). */
+function promoteToTopLevelIfNeeded() {
+  const ctx = classifyBrowseContext(window);
+  if (!ctx.embedded) return false;
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.location.href = location.href;
+      return true;
+    }
+  } catch {
+    // Cross-origin parent — caller shows browseContextIssue().
+  }
+  return false;
+}
+
 function guideCrop(video, padding = 0.04) {
   const viewport = video.parentElement;
   const guide = viewport && viewport.querySelector(".frame-guide");
@@ -285,8 +312,12 @@ async function scanLicenseBarcode(gen) {
     throw new Error("camera-unsupported");
   }
 
-  // Warm WASM early so the first good frame can decode immediately.
-  wasmReady = await ensureWasmReader();
+  // Start the camera immediately. Do NOT await WASM first — that delayed
+  // getUserMedia and, when the loader threw, aborted camera startup entirely.
+  const wasmWarm = ensureWasmReader().then((ok) => {
+    wasmReady = ok;
+    return ok;
+  });
 
   // Only select BarcodeDetector after the browser confirms PDF417 support and
   // construction succeeds. Safari generally falls through to ZXing-C++ / JS.
@@ -301,10 +332,7 @@ async function scanLicenseBarcode(gen) {
     }
   }
 
-  if (!nativeDetector && !wasmReady && typeof ZXing === "undefined") {
-    throw new Error("scanner-library-unavailable");
-  }
-
+  el("status").textContent = "Requesting camera…";
   run.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: HIRES });
   if (run.stopped || gen !== captureGen) {
     stopCamera(run);
@@ -314,6 +342,14 @@ async function scanLicenseBarcode(gen) {
   await video.play();
   const track = await optimizeCamera(run.stream);
   const settings = track && track.getSettings ? track.getSettings() : {};
+  el("status").textContent = "Point at the wide PDF417 on the back…";
+
+  wasmReady = await wasmWarm;
+  if (!nativeDetector && !wasmReady && typeof ZXing === "undefined") {
+    stopCamera(run);
+    throw new Error("scanner-library-unavailable");
+  }
+
   const hints = new Map();
   let zxingReader = null;
   if (typeof ZXing !== "undefined") {
@@ -471,22 +507,39 @@ function renderReview(person) {
   }
 }
 
-async function beginCapture(which) {
+async function beginCapture(which, { waitForGesture = false } = {}) {
   capturing = which;
   const gen = ++captureGen;
   stopCamera();
   clearError();
   const pairingIssue = pairingConfigurationIssue();
+  const contextIssue = waitForGesture ? browseContextIssue() : "";
   if (pairingIssue) showError(pairingIssue);
+  else if (contextIssue) showError(contextIssue);
   el("captureHeading").textContent =
     which === "buyer" ? "Scan the buyer's license" : "Scan the co-buyer's license";
   show("camera");
-  el("status").textContent = "Point at the wide PDF417 on the back…";
+  el("status").textContent = "Starting camera…";
+
+  // Iframes / tiny popups: show UI + instructions; wait for an explicit tap.
+  if (waitForGesture) {
+    el("startBtn").textContent = "Start camera";
+    el("startBtn").classList.remove("hidden");
+    el("status").textContent = contextIssue
+      ? "Open in Safari or Chrome, then tap Start camera."
+      : "Tap Start camera to allow access.";
+    return;
+  }
+
   el("startBtn").classList.add("hidden");
-  // Kick WASM compile in parallel with camera start.
+
+  // Warm WASM in parallel — never block or abort camera on loader failure.
   ensureWasmReader().then((ok) => {
     wasmReady = ok;
+  }).catch(() => {
+    wasmReady = false;
   });
+
   try {
     const { person, raw } = await scanLicenseBarcode(gen);
     if (gen !== captureGen) return;
@@ -507,6 +560,7 @@ async function beginCapture(which) {
     const msg = e && e.message ? e.message : "unable to access camera.";
     if (msg === "cancelled") return;
     showError(cameraErrorMessage(e));
+    el("status").textContent = "Camera did not start.";
     el("startBtn").textContent = "Try camera again";
     el("startBtn").classList.remove("hidden");
   }
@@ -607,7 +661,8 @@ el("noCoBuyerBtn").addEventListener("click", finish);
 el("startOverBtn").addEventListener("click", resetAll);
 el("startBtn").addEventListener("click", () => {
   el("startBtn").classList.add("hidden");
-  beginCapture(capturing);
+  // Explicit user gesture — always attempt getUserMedia from here.
+  beginCapture(capturing, { waitForGesture: false });
 });
 el("torchBtn").addEventListener("click", async () => {
   const run = activeRun;
@@ -641,8 +696,18 @@ window.addEventListener("pagehide", () => {
   stopCamera();
 });
 
-// Auto-start the camera on load (button is the manual fallback if blocked).
-ensureWasmReader().then((ok) => {
-  wasmReady = ok;
-});
-beginCapture("buyer");
+// Prefer a full top-level page so the phone camera permission prompt can appear.
+if (promoteToTopLevelIfNeeded()) {
+  // Navigating the parent frame — do not start camera in this embed.
+} else {
+  // Warm WASM without blocking camera; never let a loader throw abort init.
+  ensureWasmReader()
+    .then((ok) => {
+      wasmReady = ok;
+    })
+    .catch(() => {
+      wasmReady = false;
+    });
+  const ctx = classifyBrowseContext(window);
+  beginCapture("buyer", { waitForGesture: ctx.constrained });
+}

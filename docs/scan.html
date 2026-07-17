@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260717-3" />
+  <link rel="stylesheet" href="scan.css?v=20260717-4" />
 </head>
 <body>
   <header class="cc-header">
@@ -23,7 +23,7 @@
       <p class="hint">Fill the yellow frame with the <strong>wide PDF417 rectangle</strong> only
         (bottom barcode on the back). Keep the thin 1D line <strong>above</strong> the frame.</p>
       <div class="viewport">
-        <video id="video" playsinline muted></video>
+        <video id="video" playsinline muted autoplay></video>
         <div class="frame-guide" aria-hidden="true"></div>
       </div>
       <p id="status" class="status" role="status" aria-live="polite">Starting camera…</p>
@@ -70,7 +70,7 @@
     <section id="errorBanner" class="error-banner hidden" role="alert"></section>
   </main>
 
-  <script src="lib/zxing.min.js?v=20260717-3"></script>
-  <script src="scan.js?v=20260717-3" type="module"></script>
+  <script src="lib/zxing.min.js?v=20260717-4"></script>
+  <script src="scan.js?v=20260717-4" type="module"></script>
 </body>
 </html>

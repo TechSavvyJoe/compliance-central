@@ -6,12 +6,12 @@
 import {
   prepareZXingModule,
   readBarcodesFromImageData,
-} from "./zxing-wasm/reader.js?v=20260717-3";
+} from "./zxing-wasm/reader.js?v=20260717-4";
 
 let readyPromise = null;
 
 const WASM_URL = new URL(
-  "./zxing-wasm/zxing_reader.wasm?v=20260717-3",
+  "./zxing-wasm/zxing_reader.wasm?v=20260717-4",
   import.meta.url
 ).href;
 
@@ -27,25 +27,42 @@ const PDF417_OPTIONS = {
 };
 
 /**
+ * Options for prepareZXingModule. fireImmediately must be true — without it the
+ * library only stores overrides and returns undefined (not a Promise).
+ * @param {string} wasmUrl
+ */
+export function buildPrepareOptions(wasmUrl) {
+  return {
+    overrides: {
+      locateFile: (path, prefix) => {
+        if (String(path).endsWith(".wasm")) return wasmUrl;
+        return `${prefix || ""}${path}`;
+      },
+    },
+    fireImmediately: true,
+  };
+}
+
+/**
  * Ensure the WASM module is compiled. Safe to call repeatedly.
+ * Never throws — returns false when the reader cannot load.
  * @returns {Promise<boolean>} true when the reader is usable
  */
 export function ensureWasmReader() {
   if (!readyPromise) {
-    readyPromise = prepareZXingModule({
-      overrides: {
-        locateFile: (path, prefix) => {
-          if (String(path).endsWith(".wasm")) return WASM_URL;
-          return `${prefix || ""}${path}`;
-        },
-      },
-    })
-      .then(() => true)
-      .catch((err) => {
-        console.warn("zxing-wasm failed to load", err);
-        readyPromise = null;
-        return false;
-      });
+    try {
+      const prepared = prepareZXingModule(buildPrepareOptions(WASM_URL));
+      readyPromise = Promise.resolve(prepared)
+        .then(() => true)
+        .catch((err) => {
+          console.warn("zxing-wasm failed to load", err);
+          readyPromise = null;
+          return false;
+        });
+    } catch (err) {
+      console.warn("zxing-wasm failed to start", err);
+      readyPromise = Promise.resolve(false);
+    }
   }
   return readyPromise;
 }

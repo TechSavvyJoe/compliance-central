@@ -1,7 +1,7 @@
 /**
  * Print + PDF download for compliance reports.
  *
- * - Print path: opens a print-formatted window and triggers window.print().
+ * - Print path: print-runner tab (side-panel safe), then iframe / popup fallback.
  * - PDF download path: uses jsPDF (loaded globally from lib/jspdf.umd.min.js).
  *
  * jsPDF is loaded as a global UMD bundle, so we read it off `window.jspdf` lazily.
@@ -14,8 +14,12 @@ import {
   cleanLienHolder,
   formatLienStatus,
 } from "./title-format.js";
-
-const PRINT_TIMEOUT_MS = 5 * 60 * 1000;
+import {
+  PRINT_TIMEOUT_MS,
+  createPrintJobId,
+  htmlContainsImages,
+  schedulePrint,
+} from "../../lib/print-html.js";
 
 // DOB-disambiguation confidence labels for the OFAC report (mirrors the card).
 const OFAC_CONF_LABEL = {
@@ -24,84 +28,209 @@ const OFAC_CONF_LABEL = {
   low: "DOB differs",
 };
 
-function setupPrintWindowCleanup(printWindow, timeoutMs = PRINT_TIMEOUT_MS) {
-  let closed = false;
-  const closeWindow = () => {
-    if (!closed && printWindow && !printWindow.closed) {
-      closed = true;
+/** MDOS portal-style DOB display (already MM/DD/YYYY from the form). */
+export function formatDobForMdos(dob) {
+  return String(dob || "").trim();
+}
+
+/** MDOS portal-style DLN/PID display. */
+export function formatDlnForMdos(dln) {
+  return String(dln || "")
+    .trim()
+    .toUpperCase();
+}
+
+/**
+ * Print an HTML document from the side panel.
+ * Prefer print-runner.html — Chrome side panels often open a report tab but
+ * never show the system print dialog from window.open()/iframe.print().
+ *
+ * @param {string} html
+ * @param {{ waitForImages?: boolean }} [options]
+ * @returns {boolean} true if a print attempt was started
+ */
+export function printHtmlDocument(html, { waitForImages = false } = {}) {
+  if (!html || typeof html !== "string") {
+    showToast("Nothing to print.", "info");
+    return false;
+  }
+
+  const shouldWait = waitForImages || htmlContainsImages(html);
+
+  if (tryPrintViaRunner(html, shouldWait)) return true;
+  if (tryPrintViaIframe(html, shouldWait)) return true;
+  return tryPrintViaPopup(html, shouldWait);
+}
+
+function tryPrintViaRunner(html, waitForImages) {
+  if (
+    typeof chrome === "undefined" ||
+    !chrome.runtime?.getURL ||
+    !chrome.storage?.session?.set
+  ) {
+    return false;
+  }
+
+  const id = createPrintJobId();
+  let runner;
+  try {
+    runner = window.open(
+      chrome.runtime.getURL(`print-runner.html?id=${encodeURIComponent(id)}`),
+      "_blank"
+    );
+  } catch {
+    return false;
+  }
+  if (!runner) return false;
+
+  chrome.storage.session
+    .set({
+      [id]: {
+        html,
+        waitForImages: Boolean(waitForImages),
+        createdAt: Date.now(),
+      },
+    })
+    .catch(() => {
       try {
-        printWindow.close();
+        runner.close();
       } catch {
-        // already closed
+        // ignore
       }
+      showToast("Could not prepare the print document.", "error");
+    });
+
+  return true;
+}
+
+function tryPrintViaIframe(html, waitForImages) {
+  let iframe;
+  try {
+    iframe = document.createElement("iframe");
+    iframe.setAttribute("title", "Print preview");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:800px;height:1100px;opacity:0;border:0;pointer-events:none;z-index:-1;";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) {
+      iframe.remove();
+      return false;
+    }
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      try {
+        iframe.remove();
+      } catch {
+        // already removed
+      }
+    };
+
+    const triggerPrint = () => {
+      try {
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+        showToast("Could not open the print dialog.", "warning");
+        return;
+      }
+      win.addEventListener("afterprint", cleanup, { once: true });
+      setTimeout(cleanup, PRINT_TIMEOUT_MS);
+    };
+
+    schedulePrint(win, doc, waitForImages, triggerPrint).catch(() => {
+      cleanup();
+      showToast("Could not open the print dialog.", "warning");
+    });
+    return true;
+  } catch {
+    try {
+      iframe?.remove();
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+}
+
+function tryPrintViaPopup(html, waitForImages) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    showToast("Popup blocked. Allow popups for this extension.", "warning");
+    return false;
+  }
+
+  try {
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } catch {
+    try {
+      printWindow.close();
+    } catch {
+      // ignore
+    }
+    showToast("Could not prepare the print document.", "error");
+    return false;
+  }
+
+  const triggerPrint = () => {
+    try {
+      printWindow.focus();
+      printWindow.print();
+    } catch {
+      showToast(
+        "Could not open the print dialog. Use File → Print in the report tab.",
+        "warning"
+      );
     }
   };
 
-  printWindow.onafterprint = closeWindow;
-  setTimeout(() => {
-    if (!closed && printWindow && !printWindow.closed) closeWindow();
-  }, timeoutMs);
-
-  let printStarted = false;
-  printWindow.onbeforeprint = () => {
-    printStarted = true;
-  };
-  window.addEventListener(
-    "focus",
+  schedulePrint(printWindow, printWindow.document, waitForImages, triggerPrint).catch(
     () => {
-      if (printStarted && !closed) {
-        setTimeout(() => {
-          if (!closed && printWindow && !printWindow.closed) closeWindow();
-        }, 1000);
-      }
+      showToast("Could not open the print dialog.", "warning");
+    }
+  );
+
+  let closed = false;
+  const closeWindow = () => {
+    if (closed || printWindow.closed) return;
+    closed = true;
+    try {
+      printWindow.close();
+    } catch {
+      // already closed
+    }
+  };
+  printWindow.addEventListener(
+    "afterprint",
+    () => {
+      setTimeout(closeWindow, 250);
     },
     { once: true }
   );
+  setTimeout(closeWindow, PRINT_TIMEOUT_MS);
+
+  return true;
 }
 
 function openAndPrint(html, waitForImages = false) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    showToast("Popup blocked. Allow popups for this page.", "warning");
-    return;
+  try {
+    printHtmlDocument(html, { waitForImages });
+  } catch (err) {
+    console.error("Print failed:", err);
+    showToast("Could not prepare the print document.", "error");
   }
-  printWindow.document.write(html);
-  printWindow.document.close();
-  setupPrintWindowCleanup(printWindow);
-
-  if (!waitForImages) {
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-    }, 400);
-    return;
-  }
-
-  const images = printWindow.document.querySelectorAll("img");
-  if (images.length === 0) {
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-    }, 400);
-    return;
-  }
-
-  let loaded = 0;
-  const tryPrint = () => {
-    if (++loaded === images.length) {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 400);
-    }
-  };
-  images.forEach((img) => {
-    if (img.complete) tryPrint();
-    else {
-      img.onload = tryPrint;
-      img.onerror = tryPrint;
-    }
-  });
 }
 
 function ensureDataUrl(data) {

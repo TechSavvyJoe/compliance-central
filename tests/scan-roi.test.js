@@ -53,16 +53,18 @@ test("horizontal crop padding preserves bounds and quiet zones", () => {
   );
 });
 
-test("buildDecodeCrops uses bottom 50/60/70 percent and never the full guide", () => {
+test("buildDecodeCrops leads with the full guide, then bottom/top-skip bands", () => {
   const guide = { x: 100, y: 100, width: 800, height: 300 };
   const crops = buildDecodeCrops(guide, 0, 1000);
-  assert.equal(crops.length, 3);
-  assert.ok(crops.every((c) => c.height < guide.height));
-  assert.deepEqual(crops.map((c) => c.height), [150, 180, 210]);
-  assert.deepEqual(crops.map((c) => c.y), [250, 220, 190]);
-  assert.ok(crops.every((c) => c.x < guide.x && c.width > guide.width));
+  assert.ok(crops.length >= 3);
+  // First crop is the full guide (horizontally padded).
+  assert.equal(crops[0].height, guide.height);
+  assert.ok(crops[0].width > guide.width);
+  assert.ok(crops[0].x < guide.x);
+  // Later crops are shorter PDF417-focused bands.
+  assert.ok(crops.slice(1).every((c) => c.height < guide.height));
 
   const laterAttempt = buildDecodeCrops(guide, 2, 1000);
-  assert.ok(laterAttempt.every((c) => c.width > crops[0].width));
-  assert.ok(laterAttempt.every((c) => c.height !== guide.height));
+  assert.equal(laterAttempt[0].height, guide.height);
+  assert.ok(laterAttempt[0].width > crops[0].width);
 });

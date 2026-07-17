@@ -3,36 +3,40 @@ import {
   evaluateDetection,
   looksLikeAamva,
   rankDecodedPayloads,
-} from "./lib/aamva.js?v=20260717-8";
+} from "./lib/aamva.js?v=20260717-9";
 import { encryptPayload } from "./lib/crypto-pair.js";
-import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-8";
-import { createDetectionGate } from "./lib/scan-state.js?v=20260717-8";
-import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-8";
+import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-9";
+import { createDetectionGate } from "./lib/scan-state.js?v=20260717-9";
+import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-9";
 import {
   decodePdf417Wasm,
   ensureWasmReader,
-} from "./lib/zxing-wasm-loader.js?v=20260717-8";
+} from "./lib/zxing-wasm-loader.js?v=20260717-9";
 import {
   createCommercialScannerProvider,
-} from "./lib/scanner-provider.js?v=20260717-8";
+} from "./lib/scanner-provider.js?v=20260717-9";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-17.8-live";
+const SCANNER_BUILD = "scanner-2026-07-17.9-js";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
 const params = new URLSearchParams(location.search);
 const sessionId = params.get("s") || "";
 const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
-// Diagnostics (camera resolution, element codes) only show with ?debug=1.
-const DEBUG = params.has("debug");
+// Always-on decode diagnostics for this build so phone retests can report
+// accept/reject without remembering ?debug=1. Still honors ?debug=1 explicitly.
+const DEBUG = true;
 
 const DETECT_COOLDOWN_MS = 1800;
-/** ~4–5 Hz live decode — heavy per-frame preprocess kills FPS on phones. */
-const FRAME_INTERVAL_MS = 220;
+/** Match the pre-wasm live loop (~12 Hz). Faster frames beat fancy preprocess. */
+const FRAME_INTERVAL_MS = 80;
 const MAX_DECODE_WIDTH = 1800;
-const PARTIAL_HINT_THRESHOLD = 4;
-const LIVE_DESKEW = [0, -6, 6, -10, 10];
+const PARTIAL_HINT_THRESHOLD = 3;
+/** Occasional deskew only — rotating every frame hurt pure-JS hit rate. */
+const LIVE_DESKEW = [0, 0, 0, -6, 0, 6];
+/** WASM is secondary: run at most every Nth live attempt after JS misses. */
+const WASM_EVERY_N = 4;
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -140,7 +144,7 @@ function updateTorchButton(track) {
 
 function rejectHint(reason) {
   if (reason === "incomplete") {
-    return "Barcode detected — still decoding the full license. Hold steady and keep the wide barcode centered.";
+    return "Partial PDF417 read — hold steady, fill the yellow frame with the wide barcode, and wait for a full decode.";
   }
   if (reason === "not-aamva") {
     return "Point at the wide PDF417 barcode on the back of the license (not a QR code or the thin 1D line).";
@@ -307,12 +311,28 @@ function createJsPdf417Reader() {
   return { reader: new ZXing.PDF417Reader(), hints };
 }
 
+/**
+ * Free decoder path: pure-JS ZXing first (historically worked on MI cards),
+ * then optional native BarcodeDetector, then zxing-wasm only when asked.
+ */
 async function decodeCanvasCandidates(
   canvas,
   context,
-  { nativeDetector, zxingReader, hints, jsMode = 0 }
+  { nativeDetector, zxingReader, hints, jsMode = 0, useWasm = false }
 ) {
   const candidates = [];
+
+  // Primary: pure JS PDF417Reader (pre-wasm path).
+  if (zxingReader) {
+    try {
+      const result = decodePdf417CanvasJs(zxingReader, canvas, hints, jsMode);
+      if (result && result.getText()) candidates.push(result.getText());
+    } catch {
+      // A miss is expected on most live frames.
+    } finally {
+      try { zxingReader.reset(); } catch {}
+    }
+  }
 
   if (nativeDetector) {
     try {
@@ -329,23 +349,13 @@ async function decodeCanvasCandidates(
     } catch {}
   }
 
-  if (wasmReady) {
+  // Secondary: WASM only on selected frames so it cannot starve JS FPS.
+  if (useWasm && wasmReady) {
     const imageData = canvasImageData(canvas, context);
     if (imageData) {
       try {
         candidates.push(...await decodePdf417Wasm(imageData));
       } catch {}
-    }
-  }
-
-  if (zxingReader) {
-    try {
-      const result = decodePdf417CanvasJs(zxingReader, canvas, hints, jsMode);
-      if (result && result.getText()) candidates.push(result.getText());
-    } catch {
-      // A miss is expected on most live frames.
-    } finally {
-      try { zxingReader.reset(); } catch {}
     }
   }
 
@@ -428,6 +438,9 @@ async function scanOpenSourceLicenseBarcode(gen) {
   let lastHintReason = "";
   let nearMissFrames = 0;
   let lastNearMissAttempt = -1;
+  let lastRawLen = 0;
+  let lastReject = "";
+  let lastCodes = "";
   const gate = createDetectionGate(DETECT_COOLDOWN_MS);
   const run = {
     gen,
@@ -441,10 +454,17 @@ async function scanOpenSourceLicenseBarcode(gen) {
 
   const tryAccept = (raw) => {
     if (run.stopped || gen !== captureGen) return { ok: false, reason: "cancelled" };
+    lastRawLen = String(raw || "").length;
     const verdict = gate.evaluate(raw);
-    if (verdict.ok) return verdict;
+    if (verdict.ok) {
+      lastReject = "accept";
+      lastCodes = aamvaElementCodes(raw).join(" ");
+      return verdict;
+    }
     const reason =
       verdict.reason === "duplicate" ? verdict.originalReason : verdict.reason;
+    lastReject = verdict.reason;
+    lastCodes = looksLikeAamva(raw) ? aamvaElementCodes(raw).join(" ") : "";
     if (reason === "incomplete") {
       if (lastNearMissAttempt !== attempts) {
         nearMissFrames++;
@@ -452,6 +472,11 @@ async function scanOpenSourceLicenseBarcode(gen) {
       }
       if (nearMissFrames < PARTIAL_HINT_THRESHOLD) {
         el("status").textContent = "Barcode detected — decoding…";
+        diag(
+          `partial len ${lastRawLen}` +
+            (lastCodes ? ` · codes ${lastCodes}` : "") +
+            ` · tries ${attempts}`
+        );
         return verdict;
       }
     }
@@ -464,12 +489,11 @@ async function scanOpenSourceLicenseBarcode(gen) {
       lastHintAt = now;
       lastHintReason = reason;
     }
-    if (DEBUG) {
-      diag(
-        `rejected (${verdict.reason}) · len ${String(raw || "").length}` +
-          (looksLikeAamva(raw) ? ` · codes ${aamvaElementCodes(raw).join(" ")}` : "")
-      );
-    }
+    diag(
+      `rejected (${verdict.reason}) · len ${lastRawLen}` +
+        (lastCodes ? ` · codes ${lastCodes}` : "") +
+        ` · tries ${attempts}`
+    );
     return verdict;
   };
 
@@ -477,14 +501,12 @@ async function scanOpenSourceLicenseBarcode(gen) {
     throw new Error("camera-unsupported");
   }
 
-  // Start the camera immediately. Do NOT await WASM first — that delayed
-  // getUserMedia and, when the loader threw, aborted camera startup entirely.
+  // Start camera immediately. WASM warms in the background only.
   const wasmWarm = ensureWasmReader().then((ok) => {
     wasmReady = ok;
     return ok;
   });
 
-  // Safari generally falls through to ZXing-C++ / JS.
   const nativeDetector = await createNativePdf417Detector();
   if (run.stopped || gen !== captureGen) throw new Error("cancelled");
 
@@ -499,28 +521,27 @@ async function scanOpenSourceLicenseBarcode(gen) {
   const track = await optimizeCamera(run.stream);
   const settings = track && track.getSettings ? track.getSettings() : {};
   el("status").textContent = "Point at the wide PDF417 on the back…";
+  diag(`js-primary · cam starting · wasm warm…`);
 
-  // Do not stall the live loop on a slow WASM compile — JS ZXing can decode
-  // first; flip wasmReady when the module finishes.
-  const wasmTimed = await Promise.race([
-    wasmWarm,
-    new Promise((resolve) => setTimeout(() => resolve(false), 600)),
-  ]);
-  wasmReady = Boolean(wasmTimed);
+  // Do not stall live decode on WASM — pure JS is the primary path.
   wasmWarm.then((ok) => {
     wasmReady = ok;
+    if (ok) diag(`js-primary · wasm ready · cam ${settings.width || "?"}×${settings.height || "?"}`);
   });
-  if (!nativeDetector && !wasmReady && typeof ZXing === "undefined") {
-    // Give WASM one more beat before failing closed.
+  if (!nativeDetector && typeof ZXing === "undefined") {
     wasmReady = await wasmWarm;
-  }
-  if (!nativeDetector && !wasmReady && typeof ZXing === "undefined") {
-    stopCamera(run);
-    throw new Error("scanner-library-unavailable");
+    if (!wasmReady) {
+      stopCamera(run);
+      throw new Error("scanner-library-unavailable");
+    }
   }
 
   const { reader: zxingReader, hints } = createJsPdf417Reader();
   run.reader = zxingReader;
+  if (!zxingReader && !nativeDetector && !wasmReady) {
+    stopCamera(run);
+    throw new Error("scanner-library-unavailable");
+  }
 
   const canvas = document.createElement("canvas");
   const rotatedCanvas = document.createElement("canvas");
@@ -536,6 +557,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
       const outcome = tryAccept(raw);
       if (!outcome.ok) return false;
       settled = true;
+      diag(`ACCEPT len ${String(raw || "").length} · ${aamvaElementCodes(raw).join(" ")}`);
       resolve(outcome);
       return true;
     };
@@ -551,14 +573,14 @@ async function scanOpenSourceLicenseBarcode(gen) {
       decoding = true;
 
       try {
-        const guide = guideCrop(video, attempts % 5 === 0 ? 0.1 : 0.04);
+        // Alternate tight/loose padding like the known-good 7f50f5a loop.
+        const guide = guideCrop(video, attempts % 4 === 0 ? 0.14 : 0.06);
         if (!guide) {
           decoding = false;
           run.rafId = requestAnimationFrame(tick);
           return;
         }
 
-        // One ROI + one deskew per tick (cycle variants across frames).
         const crops = buildDecodeCrops(guide, attempts, video.videoWidth);
         const crop = crops[attempts % Math.max(1, crops.length)];
         if (!crop) {
@@ -566,28 +588,35 @@ async function scanOpenSourceLicenseBarcode(gen) {
           run.rafId = requestAnimationFrame(tick);
           return;
         }
-        const scale = attempts % 5 === 0 ? 1.12 : 1;
+        // Occasional downscale (old loop used 0.75) plus rare deskew.
+        const scale = attempts % 5 === 0 ? 0.75 : 1;
         const angle = LIVE_DESKEW[attempts % LIVE_DESKEW.length];
         drawCropFrame(video, canvas, crop, scale);
         const decodeTarget = angle ? rotatedCanvas : canvas;
         const context = angle
           ? rotateCanvas(canvas, rotatedCanvas, angle)
           : canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+        const useWasm = wasmReady && attempts % WASM_EVERY_N === 0;
         const candidates = await decodeCanvasCandidates(decodeTarget, context, {
           nativeDetector,
           zxingReader,
           hints,
-          jsMode: attempts % 2,
+          jsMode: attempts % 3,
+          useWasm,
         });
         for (const text of candidates) {
           if (finishIfAccepted(text)) return;
         }
 
-        if (attempts % 10 === 0) {
+        if (attempts % 8 === 0) {
           diag(
-            `${nativeDetector ? "native+" : ""}${wasmReady ? "wasm+" : ""}js` +
+            `js${wasmReady ? "+wasm" : ""}${nativeDetector ? "+native" : ""}` +
               ` · ROI ${canvas.width}×${canvas.height}` +
+              ` · crop ${crop.width}×${crop.height}` +
               ` · skew ${angle}°` +
+              ` · lastLen ${lastRawLen || 0}` +
+              (lastReject ? ` · ${lastReject}` : "") +
+              (lastCodes ? ` · ${lastCodes}` : "") +
               ` · cam ${settings.width || video.videoWidth || "?"}×${settings.height || video.videoHeight || "?"}` +
               ` · tries ${attempts}`
           );
@@ -670,9 +699,9 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
     pending = person;
     renderReview(person);
     const rd = el("reviewDiag");
-    if (rd && DEBUG) {
+    if (rd) {
       const lf = (raw.match(/\n/g) || []).length;
-      rd.textContent = `codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
+      rd.textContent = `${SCANNER_BUILD} · codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
     }
     clearError();
     if (pairingIssue) showError(pairingIssue);
@@ -774,6 +803,7 @@ async function decodePhoto(file) {
           zxingReader,
           hints: js.hints,
           jsMode: 0,
+          useWasm: true,
         });
         for (const raw of candidates) {
           const verdict = evaluateDetection(raw);

@@ -36,7 +36,8 @@ async function openSession() {
   if (!res.ok) throw new Error("Could not start pairing (" + res.status + ")");
   const { sessionId } = await res.json();
   const key = generateKeyB64();
-  const url = `${SCAN_PAGE}?s=${encodeURIComponent(sessionId)}#k=${key}`;
+  const sep = SCAN_PAGE.includes("?") ? "&" : "?";
+  const url = `${SCAN_PAGE}${sep}s=${encodeURIComponent(sessionId)}&cb=20260717-9#k=${key}`;
   return { sessionId, key, url };
 }
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260717-8" />
+  <link rel="stylesheet" href="scan.css?v=20260717-9" />
 </head>
 <body>
   <header class="cc-header">
@@ -20,8 +20,8 @@
     <!-- Camera / scanning screen -->
     <section id="cameraScreen" class="screen">
       <h2 id="captureHeading">Scan the buyer's license</h2>
-      <p class="hint">Center the <strong>wide PDF417 rectangle</strong> in the yellow frame.
-        It is okay if part of the thin barcode above it is visible.</p>
+      <p class="hint">Fill the yellow frame with the <strong>wide PDF417</strong> on the back
+        (bottom barcode). A bit of the thin 1D line above it is OK — hold steady.</p>
       <div class="viewport">
         <video id="video" playsinline muted autoplay></video>
         <div class="frame-guide" aria-hidden="true"></div>
@@ -72,7 +72,7 @@
     <section id="errorBanner" class="error-banner hidden" role="alert"></section>
   </main>
 
-  <script src="lib/zxing.min.js?v=20260717-8"></script>
-  <script src="scan.js?v=20260717-8" type="module"></script>
+  <script src="lib/zxing.min.js?v=20260717-9"></script>
+  <script src="scan.js?v=20260717-9" type="module"></script>
 </body>
 </html>

@@ -109,17 +109,24 @@ export function padCropHorizontally(crop, padding = 0, sourceWidth = Infinity) {
 }
 
 /**
- * Build PDF417-only decode ROIs from the bottom of the yellow guide. Michigan
- * cards commonly put a thin 1D barcode immediately above the PDF417 symbol.
- * Never send the full guide to the decoder: that recreates the interference
- * this crop is intended to remove.
+ * Build decode ROIs for the yellow guide.
+ *
+ * Lead with the FULL guide (the pre-wasm path that historically worked), then
+ * add bottom-band crops so a thin 1D strip above the PDF417 can be skipped when
+ * both symbols sit in the frame. Bottom-only crops alone caused partial AAMVA
+ * reads when the PDF417 was centered in a tall guide.
  */
 export function buildDecodeCrops(guideCrop, attempt = 0, sourceWidth = Infinity) {
   if (!guideCrop) return [];
   const horizontalPads = [0.03, 0.08, 0.14];
   const pad = horizontalPads[Math.abs(attempt) % horizontalPads.length];
-  const crops = [0.5, 0.6, 0.7]
-    .map((bottomKeep) => focusPdf417Band(guideCrop, { bottomKeep }))
+  const crops = [
+    guideCrop,
+    focusPdf417Band(guideCrop, { bottomKeep: 0.65 }),
+    focusPdf417Band(guideCrop, { bottomKeep: 0.5 }),
+    focusPdf417Band(guideCrop, { topSkip: 0.28 }),
+  ]
+    .filter(Boolean)
     .map((crop) => padCropHorizontally(crop, pad, sourceWidth))
     .filter(Boolean);
 

@@ -37,7 +37,7 @@ async function openSession() {
   const { sessionId } = await res.json();
   const key = generateKeyB64();
   const sep = SCAN_PAGE.includes("?") ? "&" : "?";
-  const url = `${SCAN_PAGE}${sep}s=${encodeURIComponent(sessionId)}&cb=20260722-19#k=${key}`;
+  const url = `${SCAN_PAGE}${sep}s=${encodeURIComponent(sessionId)}&cb=20260722-20#k=${key}`;
   return { sessionId, key, url };
 }
 

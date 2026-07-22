@@ -33,7 +33,7 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.19";
+const SCANNER_BUILD = "scanner-2026-07-22.20";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -233,7 +233,7 @@ function rejectHint(reason) {
     return "Hold steady…";
   }
   if (reason === "not-aamva") {
-    return "Show the second barcode from the top on the right — the large, wide one.";
+    return "Show the large, wide second barcode on the right — directly under the thin one.";
   }
   return "Try again in better light.";
 }

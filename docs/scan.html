@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260722-19" />
+  <link rel="stylesheet" href="scan.css?v=20260722-20" />
 </head>
 <body>
   <header class="cc-header">
@@ -19,45 +19,49 @@
     <!-- Camera / scanning screen -->
     <section id="cameraScreen" class="screen" aria-labelledby="captureHeading">
       <h2 id="captureHeading">Scan the back of the buyer's ID</h2>
-      <p class="hint">Turn the Michigan license or state ID over.</p>
-      <div class="id-examples" role="group" aria-label="Which side of the ID to scan">
-        <figure class="id-example" aria-label="Front of ID: turn it over">
-          <img src="images/mi-id-front-demo.webp" width="640" height="402" alt=""
-            aria-hidden="true" decoding="async" />
-          <figcaption>
-            <span class="example-icon" aria-hidden="true">↻</span>
-            <span><strong>Front</strong><small>Turn it over</small></span>
-          </figcaption>
-        </figure>
-        <figure class="id-example is-target" aria-label="Back of ID: scan the second barcode on the right">
-          <img src="images/mi-id-back-demo.webp" width="640" height="404" alt=""
-            aria-hidden="true" decoding="async" />
-          <figcaption>
-            <span class="example-icon" aria-hidden="true">✓</span>
-            <span><strong>Back</strong><small>Scan 2nd barcode</small></span>
-          </figcaption>
-        </figure>
-      </div>
-      <p id="captureInstructions" class="scan-instruction">
-        <strong>Scan the second barcode from the top on the right.</strong>
-        <span>It is the large, wide barcode under the thin one.</span><span class="visually-hidden">
-          It can be tilted or off-center. Scanning is automatic.</span>
-      </p>
-      <div class="viewport-shell">
-        <div class="viewport" role="img"
-          aria-label="Live camera preview. Hold the back of the Michigan license or state ID in view and aim at the second barcode from the top on the right—the large, wide barcode directly under the thin one. It may be tilted or off-center. Scanning is automatic.">
-          <video id="video" playsinline muted autoplay aria-hidden="true"></video>
-          <div class="frame-guide" aria-hidden="true"></div>
-        </div>
-        <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Starting camera…</p>
-      </div>
+      <ol class="scan-steps" role="list" aria-label="How to scan the ID">
+        <li class="scan-step">
+          <figure class="id-example" aria-label="Step 1. Turn it over. Show the back of the ID.">
+            <img src="images/mi-id-front-demo.webp?v=20260722-20" width="640" height="404" alt=""
+              aria-hidden="true" decoding="async" />
+            <figcaption id="step1Title">
+              <span class="step-number" aria-hidden="true">1</span>
+              <span><strong>Turn it over</strong><small>Show the back</small></span>
+            </figcaption>
+          </figure>
+        </li>
+        <li class="scan-step">
+          <figure class="id-example is-target" aria-label="Step 2. Find the wide barcode. It is the second barcode from the top on the right, directly below the thin barcode.">
+            <img src="images/mi-id-back-demo.webp?v=20260722-20" width="640" height="404" alt=""
+              aria-hidden="true" decoding="async" />
+            <figcaption id="step2Title">
+              <span class="step-number" aria-hidden="true">2</span>
+              <span><strong>Find the wide barcode</strong><small>Second from top, on the right</small></span>
+            </figcaption>
+          </figure>
+        </li>
+        <li class="scan-step scan-step-camera">
+          <div class="viewport-shell">
+            <div id="captureInstructions" class="camera-step">
+              <span class="step-number" aria-hidden="true">3</span>
+              <span><strong>Hold barcode in view</strong><small>Scanning is automatic. Tilted or off-center is okay.</small></span>
+            </div>
+            <div class="viewport" role="img"
+              aria-label="Live camera preview. Hold the back of the Michigan license or state ID in view and aim at the second barcode from the top on the right—the large, wide barcode directly under the thin one. It may be tilted or off-center. Scanning is automatic.">
+              <video id="video" playsinline muted autoplay aria-hidden="true"></video>
+              <div class="frame-guide" aria-hidden="true"></div>
+            </div>
+            <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Starting camera…</p>
+          </div>
+        </li>
+      </ol>
       <p id="diag" class="diag hidden"></p>
       <div class="camera-actions">
         <button id="torchBtn" class="btn btn-ghost hidden" type="button"
           aria-label="Turn camera light on" aria-pressed="false">Light</button>
         <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
         <button id="photoBtn" class="btn btn-ghost" type="button" aria-controls="photoInput"
-          aria-label="Choose a photo of the back of the license or state ID">Photo</button>
+          aria-label="Choose a photo of the back of the license or state ID">Use a photo</button>
         <input id="photoInput" class="visually-hidden" type="file" accept="image/*"
           aria-label="Choose a photo of the back of the license or state ID" tabindex="-1" />
       </div>
@@ -101,6 +105,6 @@
   </main>
 
   <script src="lib/zxing.min.js?v=20260717-10"></script>
-  <script src="scan.js?v=20260722-19" type="module"></script>
+  <script src="scan.js?v=20260722-20" type="module"></script>
 </body>
 </html>

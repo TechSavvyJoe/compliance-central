@@ -24,6 +24,10 @@ const FIXTURE_URL = new URL(
   "./fixtures/synthetic-mi-license-pdf417.base64",
   import.meta.url
 );
+const DEMO_ART_URLS = [
+  new URL("../docs/images/mi-id-front-demo.webp", import.meta.url),
+  new URL("../docs/images/mi-id-back-demo.webp", import.meta.url),
+];
 
 function paethPredictor(left, above, upperLeft) {
   const prediction = left + above - upperLeft;
@@ -240,6 +244,22 @@ test("vendored WASM decodes a synthetic Michigan license photo end to end", asyn
       isMichigan: true,
     }
   );
+});
+
+test("fictional scanner guidance art does not contain a decodable PDF417", async () => {
+  const wasm = await readFile(WASM_URL);
+  for (const assetUrl of DEMO_ART_URLS) {
+    const image = await readFile(assetUrl);
+    const decodedPayloads = await decodePdf417File(image, {
+      overrides: { wasmBinary: wasm },
+      fireImmediately: true,
+    });
+    assert.deepEqual(
+      decodedPayloads,
+      [],
+      `${assetUrl.pathname.split("/").pop()} must remain non-scannable training art`
+    );
+  }
 });
 
 test("live ImageData decoder accepts a padded, off-center, rotated barcode", async () => {

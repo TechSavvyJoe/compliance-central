@@ -63,6 +63,7 @@ test("a backend HTTP error with no JSON body falls back to the status code", asy
 test("retries on a 503 'busy' response, then succeeds", async () => {
   stubStorage("test-key");
   let calls = 0;
+  let cancelledBodies = 0;
   globalThis.fetch = async () => {
     calls++;
     if (calls === 1) {
@@ -70,6 +71,7 @@ test("retries on a 503 'busy' response, then succeeds", async () => {
         ok: false,
         status: 503,
         headers: { get: () => "0" }, // Retry-After: 0 -> retry immediately
+        body: { async cancel() { cancelledBodies++; } },
         json: async () => ({ error: "busy" }),
       };
     }
@@ -80,7 +82,109 @@ test("retries on a 503 'busy' response, then succeeds", async () => {
   };
   const res = await backendRepeatOffenderCheck({ firstName: "A", lastName: "B" });
   assert.equal(calls, 2, "should retry once after the 503");
+  assert.equal(cancelledBodies, 1, "should release the discarded response body");
   assert.equal(res.success, true);
+});
+
+test("a successful HTTP response with invalid JSON gets a useful error", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => {
+      throw new SyntaxError("Unexpected end of JSON input");
+    },
+  });
+
+  await assert.rejects(
+    () => backendTitleCheck({ vin: "1HGBH41JXMN109186" }),
+    /invalid response/i
+  );
+});
+
+test("an incomplete title response fails closed", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ success: true, passed: true, details: {} }),
+  });
+
+  const result = await backendTitleCheck({ vin: "1HGBH41JXMN109186" });
+  assert.equal(result.success, false);
+  assert.match(result.error, /incomplete title result/i);
+});
+
+test("an unknown title status can never become a clean pass", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      success: true,
+      passed: true,
+      details: {
+        titleStatus: "Unexpected Portal State",
+        titleBrand: "CLEAN",
+        hasLien: false,
+      },
+    }),
+  });
+
+  const result = await backendTitleCheck({ vin: "1HGBH41JXMN109186" });
+  assert.equal(result.success, true);
+  assert.equal(result.result.passed, false);
+  assert.equal(result.result.titleBrand, "UNKNOWN");
+});
+
+test("No Record Found remains review even if an older backend calls it CLEAN", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      success: true,
+      passed: true,
+      details: {
+        titleStatus: "No Record Found",
+        titleBrand: "CLEAN",
+        hasLien: false,
+      },
+    }),
+  });
+
+  const result = await backendTitleCheck({ vin: "1HGBH41JXMN109186" });
+  assert.equal(result.success, true);
+  assert.equal(result.result.passed, false);
+  assert.equal(result.result.titleBrand, "UNKNOWN");
+});
+
+test("an in-flight backend request can be cancelled", async () => {
+  stubStorage("test-key");
+  const controller = new AbortController();
+  let markFetchStarted;
+  const fetchStarted = new Promise((resolve) => {
+    markFetchStarted = resolve;
+  });
+  globalThis.fetch = async (_url, options) => {
+    markFetchStarted();
+    return new Promise((_resolve, reject) => {
+      options.signal.addEventListener(
+        "abort",
+        () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        },
+        { once: true }
+      );
+    });
+  };
+
+  const pending = backendRepeatOffenderCheck(
+    { firstName: "A", lastName: "B" },
+    { signal: controller.signal }
+  );
+  await fetchStarted;
+  controller.abort();
+  await assert.rejects(() => pending, /cancelled/i);
 });
 
 test("isBackendAvailable reflects the health endpoint result", async () => {

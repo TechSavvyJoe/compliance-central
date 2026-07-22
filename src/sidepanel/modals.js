@@ -24,6 +24,7 @@ function getFocusable(modalEl) {
 function handleKeydown(e) {
   if (!activeModal) return;
   if (e.key === "Escape") {
+    e.preventDefault();
     hideModal(activeModal);
     return;
   }
@@ -71,9 +72,11 @@ export function showModal(modalEl, opts = {}) {
   activeModal = modalEl;
   activeOnClose = typeof opts.onClose === "function" ? opts.onClose : null;
   modalEl.classList.remove("hidden");
+  modalEl.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
 
   const focusEl = opts.focusEl || modalEl.querySelector(".modal-close");
-  if (focusEl) setTimeout(() => focusEl.focus(), 80);
+  if (focusEl) requestAnimationFrame(() => focusEl.focus());
 
   document.addEventListener("keydown", handleKeydown);
   modalEl.addEventListener("click", handleBackdropClick);
@@ -82,20 +85,25 @@ export function showModal(modalEl, opts = {}) {
 export function hideModal(modalEl) {
   if (!modalEl) return;
   modalEl.classList.add("hidden");
+  modalEl.setAttribute("aria-hidden", "true");
   modalEl.removeEventListener("click", handleBackdropClick);
+
+  // A late async callback can try to close a pairing modal after another
+  // dialog has opened. Do not tear down that newer dialog's focus trap or
+  // restore its opener in that case.
+  if (activeModal !== modalEl) return;
+
   document.removeEventListener("keydown", handleKeydown);
 
   // Run and clear the close hook before restoring focus, guarding against
   // re-entrancy if the hook itself triggers another hide.
-  const onClose = activeModal === modalEl ? activeOnClose : null;
-  if (activeModal === modalEl) {
-    activeModal = null;
-    activeOnClose = null;
-  }
+  const onClose = activeOnClose;
+  activeModal = null;
+  activeOnClose = null;
+  document.body.classList.remove("modal-open");
   if (onClose) onClose();
 
-  if (lastFocusedElement?.focus) {
-    lastFocusedElement.focus();
-    lastFocusedElement = null;
-  }
+  const focusTarget = lastFocusedElement;
+  lastFocusedElement = null;
+  if (focusTarget?.isConnected && focusTarget?.focus) focusTarget.focus();
 }

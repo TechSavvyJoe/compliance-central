@@ -34,8 +34,8 @@ export async function runOfacCheck(customerData) {
     },
   });
 
-  if (!response.success) {
-    throw new Error(response.error || "OFAC check failed");
+  if (!response?.success) {
+    throw new Error(response?.error || "OFAC check failed");
   }
 
   return {
@@ -44,6 +44,8 @@ export async function runOfacCheck(customerData) {
     matchCount: response.result.matchCount || 0,
     entriesSearched: response.result.entriesSearched || 0,
     lastUpdate: response.result.lastUpdate,
+    stale: !!response.result.stale,
+    dataAgeHours: response.result.dataAgeHours,
     timestamp: new Date().toISOString(),
   };
 }
@@ -61,8 +63,8 @@ export async function runRepeatOffenderCheck(customerData) {
     },
   });
 
-  if (!response.success) {
-    throw new Error(response.error || "Repeat Offender check failed");
+  if (!response?.success) {
+    throw new Error(response?.error || "Repeat Offender check failed");
   }
 
   let screenshotData = response.result.screenshotData;
@@ -95,11 +97,24 @@ export async function runTitleCheck(customerData) {
     data: { vin: customerData.tradeVin },
   });
 
-  if (!response.success) {
-    throw new Error(response.error || "Title check failed");
+  if (!response?.success) {
+    throw new Error(response?.error || "Title check failed");
   }
 
   const result = response.result;
+  if (
+    !result ||
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    typeof result.passed !== "boolean" ||
+    typeof result.hasLien !== "boolean" ||
+    typeof result.titleBrand !== "string" ||
+    result.titleBrand.trim().length === 0
+  ) {
+    throw new Error(
+      "The title check returned an incomplete result. Please try again."
+    );
+  }
   let screenshotData = result.screenshotData;
   if (!screenshotData) {
     try {
@@ -114,19 +129,17 @@ export async function runTitleCheck(customerData) {
   }
 
   return {
-    passed:
-      result.passed ??
-      (result.titleBrand === "CLEAN" && !result.hasLien),
+    passed: result.passed,
     year: result.year,
     make: result.make,
     model: result.model,
     unladenWeight: result.unladenWeight,
     titleStatus: result.titleStatus,
-    titleBrand: result.titleBrand || "CLEAN",
+    titleBrand: result.titleBrand,
     titleType: result.titleType || "UNKNOWN",
     titleIssued: result.titleIssued,
     lienStatus: result.lienStatus || "UNKNOWN",
-    hasLien: result.hasLien || false,
+    hasLien: result.hasLien,
     lienHolder: result.lienHolder,
     vehicleBrands: result.vehicleBrands || [],
     screenshotData,
@@ -173,14 +186,6 @@ export function calculateFinalDecision(checks) {
     };
   }
 
-  if (checks.title?.error) {
-    return {
-      approved: false,
-      level: "REVIEW",
-      reason: "Title/Lien check could not be completed - review trade documents before proceeding",
-    };
-  }
-
   const ofacPass = checks.ofac.passed;
   // An out-of-state subject's Michigan Repeat Offender check is "not_applicable"
   // (passed: null) — that is NOT a failure, so treat it as non-blocking.
@@ -223,6 +228,15 @@ export function calculateFinalDecision(checks) {
   }
 
   if (checks.title) {
+    if (checks.title.error || checks.title.passed !== true) {
+      return {
+        approved: false,
+        level: "REVIEW",
+        reason:
+          "Title/Lien check could not confirm a clear result - review trade documents before proceeding",
+      };
+    }
+
     const titleBrand = checks.title.titleBrand;
 
     const hasProblemBrand =

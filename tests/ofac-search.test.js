@@ -12,6 +12,7 @@ import {
 
 test("normalizeName strips punctuation, lowercases, and collapses whitespace", () => {
   assert.equal(normalizeName("  O'Brien-Smith,  Jr. "), "o brien smith jr");
+  assert.equal(normalizeName("Jos\u00e9 Mu\u00f1oz"), "jose munoz");
   assert.equal(normalizeName(""), "");
   assert.equal(normalizeName(null), "");
 });
@@ -64,6 +65,57 @@ test("checkNameMatch matches against aliases, not just the primary name", () => 
   assert.equal(result.matchedName, "Abu Ali");
 });
 
+test("compound sanctioned surnames with suffixes cannot fall below threshold", () => {
+  // OFAC canonical family names can include a suffix. A naive last-name
+  // comparison treats "JR." as part of the surname and can push an exact
+  // compound name below the review threshold.
+  const result = checkNameMatch(
+    { firstName: "Rogelio", middleName: "", lastName: "Gonzalez Pizana" },
+    {
+      firstName: "Rogelio",
+      middleName: "GONZALEZ PIZANA",
+      lastName: "JR.",
+      fullName: "Rogelio GONZALEZ PIZANA JR.",
+      aliases: [],
+    },
+    85
+  );
+
+  assert.equal(result.isMatch, true);
+  assert.equal(result.score, 100);
+
+  const unrelated = checkNameMatch(
+    { firstName: "Rogelio", middleName: "", lastName: "Gonzalez Pizana" },
+    {
+      firstName: "Rogelio",
+      middleName: "BAHENA",
+      lastName: "MARTINEZ",
+      fullName: "Rogelio BAHENA MARTINEZ",
+      aliases: [],
+    },
+    85
+  );
+  assert.equal(unrelated.isMatch, false);
+});
+
+test("comma-reversed sanctioned aliases are screened in both orders", () => {
+  const result = checkNameMatch(
+    { firstName: "Ahmed", middleName: "", lastName: "Garbaya" },
+    {
+      firstName: "Hasan",
+      middleName: "",
+      lastName: "Izz-al-Din",
+      fullName: "Hasan IZZ-AL-DIN",
+      aliases: ["GARBAYA, AHMED"],
+    },
+    85
+  );
+
+  assert.equal(result.isMatch, true);
+  assert.equal(result.score, 100);
+  assert.equal(result.matchedName, "GARBAYA, AHMED");
+});
+
 test("searchSDNEntries returns only above-threshold matches, highest score first", () => {
   const entries = [
     { firstName: "John", middleName: "", lastName: "Doe", fullName: "John Doe", aliases: [] },
@@ -100,7 +152,7 @@ test("dobConfidence: missing DOB on either side is medium (cannot disambiguate)"
 });
 
 test("dobConfidence: multi-value SDN birth_date matches if ANY year is near", () => {
-  // OpenSanctions can carry several semicolon-separated dates.
+  // OFAC can publish several dates for one entry.
   assert.equal(dobConfidence("1969-08-18", "1944-01-01;1969-12-31"), "high");
   assert.equal(dobConfidence("1969-08-18", "1944-01-01;1955-12-31"), "low");
 });

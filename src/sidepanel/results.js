@@ -18,7 +18,17 @@ const MISSING_KEY_DETAIL =
 /** Map raw check errors to user-facing copy (e.g. the missing-key case). */
 function friendlyCheckError(message, fallback) {
   if (message === MISSING_API_KEY) return MISSING_KEY_DETAIL;
-  return message || fallback;
+  const text = String(message || "").trim();
+  if (/timed?\s*out|timeout/i.test(text)) {
+    return "The check timed out. Confirm the internet connection, then try again.";
+  }
+  if (/network|offline|failed to fetch|failed to connect|connection/i.test(text)) {
+    return "The check could not connect. Confirm the internet connection, then try again.";
+  }
+  if (/unauthori[sz]ed|forbidden|\b40[13]\b/i.test(text)) {
+    return "The check could not authenticate. Open Settings to verify backend access, then try again.";
+  }
+  return text || fallback;
 }
 
 /**
@@ -151,7 +161,10 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
   if (ofac.error || ofac.status === "error") {
     setResultStatus(statusEl, "warning", "Error");
     if (detailEl) {
-      detailEl.textContent = ofac.error || "OFAC screening could not be completed";
+      detailEl.textContent = friendlyCheckError(
+        ofac.error,
+        "OFAC screening could not be completed. Try again."
+      );
     }
     setActionVisibility(printBtn, false);
     setActionVisibility(downloadBtn, false);
@@ -251,6 +264,7 @@ export function setCardsLoadingState(elements, isLoading) {
 let currentProgress = 0;
 let targetProgress = 0;
 let progressAnimationId = null;
+let progressSpinnerHideTimer = null;
 
 export function resetProgress(elements) {
   currentProgress = 0;
@@ -259,8 +273,18 @@ export function resetProgress(elements) {
     cancelAnimationFrame(progressAnimationId);
     progressAnimationId = null;
   }
+  if (progressSpinnerHideTimer) {
+    clearTimeout(progressSpinnerHideTimer);
+    progressSpinnerHideTimer = null;
+  }
+  if (elements.progressSpinner) {
+    elements.progressSpinner.style.display = "inline-block";
+  }
   if (elements.progressFill) elements.progressFill.style.width = "0%";
   if (elements.progressPercent) elements.progressPercent.textContent = "0%";
+  const progressBar = elements.progressFill?.parentElement;
+  progressBar?.setAttribute("aria-valuenow", "0");
+  progressBar?.setAttribute("aria-valuetext", "Starting");
 
   setCheckStatus(elements.ofacStatus, "waiting");
   setCheckStatus(elements.repeatStatus, "waiting");
@@ -268,17 +292,31 @@ export function resetProgress(elements) {
 }
 
 export function updateProgress(elements, percent, label) {
-  targetProgress = percent;
+  targetProgress = Math.max(0, Math.min(100, Number(percent) || 0));
+  if (progressSpinnerHideTimer) {
+    clearTimeout(progressSpinnerHideTimer);
+    progressSpinnerHideTimer = null;
+  }
+  if (targetProgress < 100 && elements.progressSpinner) {
+    elements.progressSpinner.style.display = "inline-block";
+  }
   if (label && elements.progressLabel) {
     elements.progressLabel.textContent = label;
   }
+  const progressBar = elements.progressFill?.parentElement;
+  if (label) progressBar?.setAttribute("aria-valuetext", label);
   if (!progressAnimationId) {
     animateProgress(elements);
   }
 }
 
 function animateProgress(elements) {
-  if (currentProgress < targetProgress) {
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (reduceMotion) {
+    currentProgress = targetProgress;
+  } else if (currentProgress < targetProgress) {
     const delta = targetProgress - currentProgress;
     const step = Math.max(0.1, delta * 0.05);
     currentProgress = Math.min(targetProgress, currentProgress + step);
@@ -292,6 +330,11 @@ function animateProgress(elements) {
   }
   if (elements.progressPercent) {
     elements.progressPercent.textContent = Math.round(displayPercent) + "%";
+  }
+  const progressBar = elements.progressFill?.parentElement;
+  const roundedPercent = String(Math.round(displayPercent));
+  if (progressBar && progressBar.getAttribute("aria-valuenow") !== roundedPercent) {
+    progressBar.setAttribute("aria-valuenow", roundedPercent);
   }
 
   if (elements.progressLabel && !elements.progressLabel.dataset.locked) {
@@ -307,13 +350,20 @@ function animateProgress(elements) {
       elements.progressLabel.textContent = "Complete";
     }
   }
+  if (elements.progressLabel?.textContent) {
+    const ariaText = elements.progressLabel.textContent;
+    if (progressBar && progressBar.getAttribute("aria-valuetext") !== ariaText) {
+      progressBar.setAttribute("aria-valuetext", ariaText);
+    }
+  }
 
   // At target: stop the rAF loop until updateProgress sets a new target.
   if (Math.abs(currentProgress - targetProgress) < 0.1) {
     currentProgress = targetProgress;
     progressAnimationId = null;
     if (targetProgress >= 100 && elements.progressSpinner) {
-      setTimeout(() => {
+      progressSpinnerHideTimer = setTimeout(() => {
+        progressSpinnerHideTimer = null;
         elements.progressSpinner.style.display = "none";
       }, 400);
     }

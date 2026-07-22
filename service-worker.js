@@ -8,7 +8,13 @@
 import { handleMessage } from "./src/worker/message-router.js";
 import { registerAlarmListeners } from "./src/worker/alarms.js";
 
-console.log("[SW] Compliance Central service worker starting…");
+// Keep API-key/history storage private to trusted extension pages. Chrome's
+// local storage area is otherwise readable by any future content script.
+Promise.all(
+  [chrome.storage.local, chrome.storage.session].map((area) =>
+    area.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
+  )
+).catch((err) => console.error("[SW] storage access restriction failed:", err));
 
 // ---------- Side panel opening ----------
 //
@@ -19,7 +25,6 @@ console.log("[SW] Compliance Central service worker starting…");
 
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
-  .then(() => console.log("[SW] setPanelBehavior OK"))
   .catch((err) => console.error("[SW] setPanelBehavior failed:", err));
 
 // ---------- Message routing ----------
@@ -27,12 +32,15 @@ chrome.sidePanel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender)
     .then((response) => sendResponse(response))
-    .catch((error) => sendResponse({ success: false, error: error.message }));
+    .catch((error) =>
+      sendResponse({
+        success: false,
+        error: error instanceof Error ? error.message : "Unexpected error",
+      })
+    );
   return true; // async response
 });
 
 // ---------- Alarms ----------
 
 registerAlarmListeners();
-
-console.log("[SW] Service worker initialized.");

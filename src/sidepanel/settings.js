@@ -46,6 +46,9 @@ export function initSettings(elements) {
   els.saveApiKeyBtn?.addEventListener("click", saveKey);
   els.clearApiKeyBtn?.addEventListener("click", clearKey);
   els.toggleApiKeyVisibility?.addEventListener("click", toggleVisibility);
+  els.apiKeyInput?.addEventListener("input", () =>
+    els.apiKeyInput.removeAttribute("aria-invalid")
+  );
 
   if (els.supportEmailLink) {
     els.supportEmailLink.href = `mailto:${CONFIG.support.email}`;
@@ -56,8 +59,7 @@ export function initSettings(elements) {
 export async function openSettings() {
   if (!els?.settingsModal) return;
   await refreshKeyStatus();
-  showModal(els.settingsModal);
-  setTimeout(() => els.apiKeyInput?.focus(), 120);
+  showModal(els.settingsModal, { focusEl: els.apiKeyInput });
 }
 
 async function refreshKeyStatus() {
@@ -66,6 +68,11 @@ async function refreshKeyStatus() {
     els.apiKeyInput.value = override;
     els.apiKeyInput.type = "password";
   }
+  els.toggleApiKeyVisibility?.setAttribute("aria-pressed", "false");
+  els.toggleApiKeyVisibility?.setAttribute(
+    "aria-label",
+    "Show custom backend key"
+  );
   setStatus(!!(await getBackendApiKey()));
 }
 
@@ -75,7 +82,8 @@ function setStatus(active) {
     els.apiKeyStatus.textContent = "All checks active — no setup needed.";
     els.apiKeyStatus.className = "settings-status connected";
   } else {
-    els.apiKeyStatus.textContent = "Not connected.";
+    els.apiKeyStatus.textContent =
+      "Backend checks are unavailable. Enter a custom key or contact support.";
     els.apiKeyStatus.className = "settings-status disconnected";
   }
 }
@@ -84,10 +92,13 @@ async function saveKey() {
   const key = (els.apiKeyInput?.value || "").trim();
   if (!key) {
     showToast("Enter a key to override the built-in access.", "warning");
+    els.apiKeyInput?.setAttribute("aria-invalid", "true");
+    els.apiKeyInput?.focus();
     return;
   }
   try {
     await chrome.storage.local.set({ [STORAGE_KEYS.backendApiKey]: key });
+    els.apiKeyInput?.removeAttribute("aria-invalid");
     setStatus(true);
     showToast("Custom backend key saved.", "success");
   } catch {
@@ -103,11 +114,16 @@ async function clearKey() {
   }
   if (els.apiKeyInput) els.apiKeyInput.value = "";
   setStatus(!!(await getBackendApiKey()));
-  showToast("Reverted to built-in access.", "info");
+  showToast("Using built-in access.", "info");
 }
 
 function toggleVisibility() {
   if (!els.apiKeyInput) return;
-  els.apiKeyInput.type =
-    els.apiKeyInput.type === "password" ? "text" : "password";
+  const show = els.apiKeyInput.type === "password";
+  els.apiKeyInput.type = show ? "text" : "password";
+  els.toggleApiKeyVisibility?.setAttribute("aria-pressed", String(show));
+  els.toggleApiKeyVisibility?.setAttribute(
+    "aria-label",
+    show ? "Hide custom backend key" : "Show custom backend key"
+  );
 }

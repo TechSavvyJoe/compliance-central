@@ -17,9 +17,12 @@ zip -r -X "$OUT" \
   manifest.json \
   service-worker.js \
   sidepanel.html sidepanel.js sidepanel.css \
+  print-runner.html print-runner.js \
   src lib ofac \
   icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png \
   -x "**/.DS_Store" >/dev/null
+
+node tools/verify-extension-package.mjs "$OUT"
 
 echo "Created $OUT ($(du -h "$OUT" | cut -f1))"
 echo "Contents:"

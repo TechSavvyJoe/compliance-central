@@ -1,7 +1,7 @@
 I need help finishing a Chrome Web Store listing submission. Everything you need is in this message. Please complete it.
 
 WHAT THIS IS
-- Extension: "Compliance Central - Michigan Dealer Compliance Hub", version 1.2.0. A Chrome Manifest V3 side-panel tool for Michigan auto dealers that runs three compliance screenings: OFAC sanctions (local), MDOS Repeat Offender, and Title/Lien (via a secure backend).
+- Extension: "Compliance Central - Michigan Dealer Compliance Hub", version 1.3.0. A Chrome Manifest V3 side-panel tool for Michigan auto dealers that runs three compliance screenings: OFAC sanctions (local), MDOS Repeat Offender, and Title/Lien (via a secure backend).
 - The item already exists in my Chrome Web Store Developer Dashboard (Status: Published - public, with a draft in progress). I am logged in as the developer, and the "Store listing" edit page is open in Chrome.
 
 WHAT I NEED YOU TO DO
@@ -34,20 +34,24 @@ Key Features:
 
 ✅ Unified Compliance Dashboard — Run every essential check from one intuitive interface. Enter customer and trade-in data once and screen the buyer (and co-buyer) in a single click.
 
-✅ Instant OFAC Screening — 100% On-Device — Real-time checks against the U.S. Treasury's Specially Designated Nationals (SDN) list. OFAC runs entirely on your computer — no account, no setup, and no customer data ever leaves your device. Advanced fuzzy + alias matching improves accuracy so real matches aren't missed.
+✅ Instant OFAC Screening — 100% On-Device — Checks against the official U.S. Treasury OFAC Specially Designated Nationals (SDN) list, refreshed daily. OFAC runs entirely on your computer — no account, no setup, and no customer data ever leaves your device. Fuzzy and alias matching helps surface spelling and name variations for human review.
 
-✅ Repeat Offender Checks — Verifies a customer's Michigan Department of State (MDOS) Repeat Offender eligibility. Our secure backend queries the MDOS portal on your behalf and returns the official result plus a screenshot for your records.
+✅ Repeat Offender Checks — Verifies a customer's Michigan Department of State (MDOS) Repeat Offender eligibility. Our secure backend returns the official result plus a portal screenshot as current-run evidence for viewing, printing, or PDF export. Screenshots are session-only and are not retained in long-term history.
 
 ✅ Title & Lien Verification — Instantly retrieve key trade-in details:
 • Title Brand (Clean, Salvage, Rebuilt, etc.)
 • Active Liens & Lienholder Information
 • Vehicle Weight & Model Year
 
-✅ Professional "Deal Jacket" Reports — Generate a timestamped proof-of-compliance report in one click. Print or save as a PDF for the deal jacket. Recent checks are kept locally so you can re-open, re-print, or export them anytime.
+✅ Scan a License with Your Phone — Tap "Scan license with phone," scan the QR, then scan the barcode on the back of a driver's license or state ID. Buyer and co-buyer fields fill automatically. The fields are end-to-end encrypted and the license image is never uploaded.
+
+✅ Professional "Deal Jacket" Reports — Generate a timestamped proof-of-compliance report in one click. Print or save as a PDF for the deal jacket. Bounded text history is stored locally for up to 30 days and 50 records so you can review or re-screen recent deals.
 
 ✅ Privacy-Conscious by Design
 • OFAC screening is processed entirely on your device — nothing is transmitted.
 • For Repeat Offender and Title checks, the customer's name, date of birth, DLN/PID (and VIN) are sent over encrypted HTTPS to our secure backend, used to obtain the official MDOS result, then immediately discarded — never stored or logged on our servers.
+• The optional phone scan relays only an encrypted, single-use package the backend cannot read; the license image is never transmitted.
+• Local text history can include customer name, date of birth, DLN/PID, VIN, and check results. It is limited to 30 days / 50 records and can be deleted with Clear All History.
 • No tracking. No analytics. We never sell your data.
 Full policy: https://techsavvyjoe.github.io/compliance-central/
 
@@ -66,13 +70,20 @@ Requirements:
 Take the headache out of compliance. Install Compliance Central today and deal with confidence.
 -----END DESCRIPTION-----
 
-GRAPHIC ASSETS (already uploaded and correct — do NOT change unless a slot is empty or shows a white/blank image):
-- Store icon: a 128x128 opaque navy tile with a gold check. Correct.
-- 5 screenshots (1280x800, dark navy). Correct.
-- Small promo tile (440x280) and Marquee promo tile (1400x560). Correct.
-If any asset slot is wrong, the correct files are on this Mac at:
+GRAPHIC ASSETS:
+- Keep the existing store icon, screenshots 01–03, small promo tile, and marquee tile if they already match the files below.
+- Replace the old DOB screenshot with 04-phone-license-scan-1280x800.jpg.
+- Replace the history screenshot with 05-compliance-history-1280x800.jpg so the retention wording is current.
+- Use exactly five screenshots, ordered 01 through 05.
+The current upload-ready files are on this Mac at:
   /Users/joegallant/AI App Development Projects/compliance-central/store-assets/upload/
-  (store icon = cc-store-icon-v2-128.png; DOB screenshot = screenshot-dob-v2-1280x800.jpg; others named by number.)
+  Store icon: cc-store-icon-128.png
+  Screenshots: 01-run-all-approved-1280x800.jpg
+               02-ofac-only-local-1280x800.jpg
+               03-title-lien-1280x800.jpg
+               04-phone-license-scan-1280x800.jpg
+               05-compliance-history-1280x800.jpg
+  Promo tiles: small-promo-440x280.jpg and marquee-promo-1400x560.jpg
 
 OFFICIAL URL / HOMEPAGE / SUPPORT URL (optional): you may set the Support URL to https://techsavvyjoe.github.io/compliance-central/
 
@@ -85,18 +96,19 @@ Compliance Central lets Michigan automotive dealers screen buyers and co-buyers 
 
 PERMISSION JUSTIFICATIONS (there is one box per permission — paste the matching text):
 - sidePanel: The entire user interface is a Chrome side panel; this permission opens and renders it.
-- storage: Saves the dealer's compliance history, preferences, and (optionally) a custom backend API key locally on the device.
-- unlimitedStorage: The OFAC SDN sanctions dataset plus historical compliance records (with evidence screenshots) can exceed the default storage quota.
+- storage: Saves bounded compliance text history (up to 30 days / 50 records), preferences, and (optionally) a custom backend API key locally on the device. History can include customer name, date of birth, DLN/PID, VIN, and check results. Portal screenshots are session-only and are not retained in long-term history.
+- unlimitedStorage: Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded local text history. Portal screenshots are session-only current-run evidence, not retained in long-term compliance history.
 - alarms: Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
-- Host permission https://data.opensanctions.org/: Downloads the public OFAC SDN sanctions list used for on-device screening.
-- Host permission https://compliance-central-api.fly.dev/: The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal.
+- Host permission https://sanctionslistservice.ofac.treas.gov/: Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
+- Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/: Allows Treasury's signed OFAC-list download redirect to its dedicated AWS GovCloud file host.
+- Host permission https://compliance-central-api.fly.dev/: Performs Repeat Offender and Title/Lien checks and relays the optional end-to-end encrypted phone scan package, which the backend cannot read.
 
 ARE YOU USING REMOTE CODE? → No. (All code is bundled in the package; nothing is fetched and executed remotely.)
 
 DATA USAGE (the checkbox form):
 - "Does this item collect or use user data?" → Yes.
-- Data collected: Personally identifiable information — name, date of birth, government ID (Michigan driver's license number / PID). (The trade-in VIN is sent only for the optional title check.)
-- Do NOT check: location, web history, financial/payment info, health, authentication info, personal communications.
+- Data collected: Personally identifiable information — name, date of birth, government ID (driver's license number / PID); and Authentication information — an optional custom backend API key, stored locally and sent securely only to the selected compliance backend for requested checks. The trade-in VIN is sent only for the optional title check. Local text history can retain customer fields and check results for up to 30 days / 50 records; portal screenshots are session-only and excluded from long-term history.
+- Do NOT check: location, web history, financial/payment info, health, personal communications.
 - Check all three required certifications (all are true for this extension):
    (1) I do not sell or transfer user data to third parties, outside of the approved use cases.
    (2) I do not use or transfer user data for purposes that are unrelated to my item's single purpose.

@@ -10,6 +10,7 @@ const TOAST_VARIANTS = {
   success: { icon: ICONS.check, className: "toast-success" },
   info: { icon: ICONS.info, className: "toast-info" },
 };
+const MAX_VISIBLE_TOASTS = 3;
 
 function getContainer() {
   let container = document.getElementById("toast-container");
@@ -26,8 +27,15 @@ function getContainer() {
 
 function dismissToast(toast) {
   if (!toast || !toast.parentNode) return;
+  if (toast._dismissTimer) clearTimeout(toast._dismissTimer);
   toast.classList.add("toast-leaving");
   setTimeout(() => toast.remove(), 200);
+}
+
+function scheduleDismiss(toast, duration) {
+  if (duration <= 0) return;
+  if (toast._dismissTimer) clearTimeout(toast._dismissTimer);
+  toast._dismissTimer = setTimeout(() => dismissToast(toast), duration);
 }
 
 export function showToast(message, type = "info", duration = 5000) {
@@ -36,11 +44,14 @@ export function showToast(message, type = "info", duration = 5000) {
 
   const toast = document.createElement("div");
   toast.className = `toast ${variant.className}`;
-  toast.setAttribute("role", "alert");
-  toast.setAttribute("aria-live", "polite");
+  const urgent = type === "error";
+  toast.setAttribute("role", urgent ? "alert" : "status");
+  toast.setAttribute("aria-live", urgent ? "assertive" : "polite");
+  toast.setAttribute("aria-atomic", "true");
 
   const iconWrap = document.createElement("span");
   iconWrap.className = "toast-icon";
+  iconWrap.setAttribute("aria-hidden", "true");
   iconWrap.innerHTML = variant.icon;
 
   const messageEl = document.createElement("div");
@@ -58,9 +69,32 @@ export function showToast(message, type = "info", duration = 5000) {
   toast.appendChild(closeBtn);
   container.appendChild(toast);
 
-  if (duration > 0) {
-    setTimeout(() => dismissToast(toast), duration);
+  while (container.children.length > MAX_VISIBLE_TOASTS) {
+    container.firstElementChild?.remove();
   }
+
+  const accessibleDuration =
+    duration <= 0
+      ? duration
+      : type === "error"
+        ? Math.max(duration, 10000)
+        : type === "warning"
+          ? Math.max(duration, 8000)
+          : duration;
+  scheduleDismiss(toast, accessibleDuration);
+
+  toast.addEventListener("pointerenter", () => {
+    if (toast._dismissTimer) clearTimeout(toast._dismissTimer);
+  });
+  toast.addEventListener("pointerleave", () =>
+    scheduleDismiss(toast, accessibleDuration)
+  );
+  toast.addEventListener("focusin", () => {
+    if (toast._dismissTimer) clearTimeout(toast._dismissTimer);
+  });
+  toast.addEventListener("focusout", () =>
+    scheduleDismiss(toast, accessibleDuration)
+  );
 
   return toast;
 }

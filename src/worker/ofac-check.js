@@ -41,9 +41,12 @@ export async function handleOfacCheck(data) {
     // If the refresh fails but a cached copy exists, we still screen against it
     // and flag the result as stale so the user knows the data wasn't current.
     let entries = await getAllSDNEntries();
-    const staleBefore = needsUpdate(await getSetting("lastUpdate"));
+    const lastUpdateBefore = await getSetting("lastUpdate");
+    const dataSourceBefore = await getSetting("dataSource");
+    const staleBefore = needsUpdate(lastUpdateBefore);
+    const sourceChanged = dataSourceBefore !== CONFIG.ofac.sourceId;
 
-    if (entries.length === 0 || staleBefore) {
+    if (entries.length === 0 || staleBefore || sourceChanged) {
       await performSDNUpdate();
       entries = await getAllSDNEntries();
     }
@@ -65,11 +68,15 @@ export async function handleOfacCheck(data) {
 
     const matches = searchSDNEntries(searchName, entries, OFAC_THRESHOLD);
 
-    // Compute freshness from the raw stored timestamp (null/garbage => stale),
-    // not the "Unknown" display fallback — otherwise a missing timestamp would
-    // be reported as fresh and suppress the stale warning.
+    // Freshness is based on when this device last retrieved the official feed,
+    // not Publish_Date. OFAC publishes a new date when the list changes rather
+    // than regenerating an unchanged file daily, so an older publication date
+    // can still be the current official list.
     const rawLastUpdate = await getSetting("lastUpdate");
-    const stale = needsUpdate(rawLastUpdate);
+    const rawPublishDate = await getSetting("publishDate");
+    const rawDataSource = await getSetting("dataSource");
+    const stale =
+      needsUpdate(rawLastUpdate) || rawDataSource !== CONFIG.ofac.sourceId;
 
     return {
       success: true,
@@ -87,6 +94,9 @@ export async function handleOfacCheck(data) {
         })),
         entriesSearched: entries.length,
         lastUpdate: rawLastUpdate || "Unknown",
+        downloadedAt: rawLastUpdate || "Unknown",
+        publishDate: rawPublishDate || "Unknown",
+        dataSource: rawDataSource || "Unknown",
         stale,
         dataAgeHours: dataAgeHours(rawLastUpdate),
         timestamp: new Date().toISOString(),
@@ -103,30 +113,25 @@ export async function handleGetDataStatus() {
     await initDB();
     const lastUpdate = await getSetting("lastUpdate");
     const publishDate = await getSetting("publishDate");
-    const entryCount =
-      (await getSetting("entryCount")) || (await getSDNCount());
+    const dataSource = await getSetting("dataSource");
+    const entryCount = await getSDNCount();
     const updateStatus = await getSetting("updateStatus");
     const lastError = await getSetting("lastError");
 
     return {
       success: true,
       lastUpdate,
+      downloadedAt: lastUpdate,
       publishDate,
+      dataSource,
       entryCount,
       updateStatus,
       lastError,
-      needsUpdate: needsUpdate(lastUpdate) || entryCount === 0,
+      needsUpdate:
+        needsUpdate(lastUpdate) ||
+        dataSource !== CONFIG.ofac.sourceId ||
+        entryCount === 0,
     };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function handleGetSDNEntries() {
-  try {
-    await initDB();
-    const entries = await getAllSDNEntries();
-    return { success: true, entries };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -177,6 +182,7 @@ async function runSDNUpdate() {
 
     await saveSetting("lastUpdate", result.downloadedAt);
     await saveSetting("publishDate", result.publishDate);
+    await saveSetting("dataSource", CONFIG.ofac.sourceId);
     await saveSetting("entryCount", result.count);
     await saveSetting("updateStatus", "complete");
 

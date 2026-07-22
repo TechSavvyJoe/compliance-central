@@ -31,8 +31,10 @@ function agoLabel(days) {
 const HISTORY_DASH = '<span class="hchip-dash" aria-hidden="true">–</span>';
 
 // Decision pill styling/label, keyed off the stored decision level.
-function decisionMeta(decision) {
+export function decisionMeta(decision) {
   switch (decision) {
+    case "APPROVED":
+      return { cls: "dec-approved", icon: ICONS.check, label: "Approved" };
     case "DENIED":
       return { cls: "dec-denied", icon: ICONS.x, label: "Denied" };
     case "REVIEW":
@@ -40,7 +42,7 @@ function decisionMeta(decision) {
     case "PARTIAL":
       return { cls: "dec-review", icon: ICONS.alertTriangle, label: "Partial" };
     default:
-      return { cls: "dec-approved", icon: ICONS.check, label: "Approved" };
+      return { cls: "dec-review", icon: ICONS.alertTriangle, label: "Unknown" };
   }
 }
 
@@ -140,8 +142,10 @@ export async function saveToHistory(results) {
     await chrome.storage.local.set({
       [STORAGE_KEYS.complianceHistory]: history,
     });
+    return true;
   } catch (error) {
     console.error("Error saving to history:", error);
+    return false;
   }
 }
 
@@ -159,11 +163,22 @@ function historyDecision(results) {
 }
 
 export function archiveResultsForHistory(results) {
+  const checks = results.checks || {};
+  const stripped = {};
+  for (const [key, value] of Object.entries(checks)) {
+    if (!value || typeof value !== "object") {
+      stripped[key] = value;
+      continue;
+    }
+    // Keep status/text for reprints; drop bulky base64 evidence from long-term storage.
+    const { screenshotData: _omit, ...rest } = value;
+    stripped[key] = rest;
+  }
   return {
     ...results,
     runType: results.runType || "full",
     runLabel: results.runLabel || "Run All Checks",
-    checks: results.checks || {},
+    checks: stripped,
   };
 }
 
@@ -197,7 +212,7 @@ export async function populateHistoryModal(historyListEl) {
 
     if (history.length === 0) {
       historyListEl.innerHTML =
-        '<p class="history-empty">No compliance checks yet</p>';
+        '<div class="history-empty"><strong>No saved checks yet</strong><span>Run a compliance check to create the first history record.</span></div>';
       return;
     }
 
@@ -259,8 +274,8 @@ export async function populateHistoryModal(historyListEl) {
 
           const full = item.fullResults;
           const hasOfac = !!full?.checks?.ofac;
-          const hasRepeat = !!full?.checks?.repeatOffender?.screenshotData;
-          const hasTitle = !!full?.checks?.title?.screenshotData;
+          const hasRepeat = !!full?.checks?.repeatOffender;
+          const hasTitle = !!full?.checks?.title;
           const hasReports = hasOfac || hasRepeat || hasTitle;
 
           // One tidy row per report: label + print + PDF (icon buttons).
@@ -325,7 +340,8 @@ export async function populateHistoryModal(historyListEl) {
         .join("");
   } catch (error) {
     console.error("Error populating history:", error);
-    historyListEl.innerHTML = '<p class="history-empty">Error loading history</p>';
+    historyListEl.innerHTML =
+      '<div class="history-empty history-empty-error"><strong>History could not load</strong><span>Close History and try again. Your saved records have not been cleared.</span></div>';
   }
 }
 
@@ -335,9 +351,14 @@ export async function clearAllHistory(historyListEl, historyCountEl) {
   );
   if (!confirmed) return false;
 
-  await chrome.storage.local.remove(STORAGE_KEYS.complianceHistory);
+  // Remove the retired per-check feed too so older installations are fully
+  // cleaned up even though new versions no longer write it.
+  await chrome.storage.local.remove([
+    STORAGE_KEYS.complianceHistory,
+    STORAGE_KEYS.searchHistory,
+  ]);
   historyListEl.innerHTML =
-    '<p class="history-empty">No history entries</p>';
+    '<div class="history-empty"><strong>History cleared</strong><span>New compliance checks will appear here.</span></div>';
   await updateHistoryCount(historyCountEl);
   return true;
 }

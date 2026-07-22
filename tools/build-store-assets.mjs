@@ -11,7 +11,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const BUILD = join(ROOT, "store-assets", ".build");
 const IMAGES = join(ROOT, "store-assets", "chrome-web-store", "images");
+const UPLOAD = join(ROOT, "store-assets", "upload");
 const CHROME =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
@@ -26,6 +27,7 @@ mkdirSync(BUILD, { recursive: true });
 mkdirSync(join(IMAGES, "icons"), { recursive: true });
 mkdirSync(join(IMAGES, "screenshots"), { recursive: true });
 mkdirSync(join(IMAGES, "promotional"), { recursive: true });
+mkdirSync(UPLOAD, { recursive: true });
 
 // ---------- brand ----------
 const C = {
@@ -101,6 +103,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .btn.gold{background:${C.gold};color:#1a1a1a;border-color:${C.gold}}
 .ico{display:inline-flex}
 .ico svg{display:block}
+.scan-flow{display:flex;flex-direction:column;gap:10px}
+.flow-card{background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:12px}
+.flow-step-title{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:750;color:#edf5fd}
+.flow-step-dot{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;background:${C.gold};color:${C.navy};font-size:12px;font-weight:900;flex:0 0 auto}
+.secure-label{margin-left:auto;display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border-radius:999px;background:rgba(34,197,94,.13);color:${C.success};font-size:9px;font-weight:750;letter-spacing:.3px;text-transform:uppercase}
+.connect-row{display:flex;align-items:center;gap:14px;margin-top:10px}
+.qr-wrap{display:grid;place-items:center;width:88px;height:88px;border:6px solid #fff;border-radius:9px;background:#fff;box-shadow:0 8px 18px rgba(0,0,0,.28);flex:0 0 auto}
+.qr-mark{display:block;width:76px;height:76px}
+.connect-copy{display:flex;flex-direction:column;gap:5px;color:${C.text2};font-size:11px;line-height:1.42}
+.connect-copy strong{color:#fff;font-size:13px}
+.phone-preview{padding:11px;background:#071321;border:1px solid rgba(255,203,5,.32);border-radius:17px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.025)}
+.phone-top{display:flex;align-items:center;gap:7px;margin-bottom:9px;color:#edf5fd;font-size:11px;font-weight:750}
+.live-label{margin-left:auto;display:inline-flex;align-items:center;gap:5px;color:${C.success};font-size:9px;text-transform:uppercase;letter-spacing:.4px}
+.live-label::before{content:"";width:6px;height:6px;border-radius:50%;background:${C.success};box-shadow:0 0 0 3px rgba(34,197,94,.13)}
+.scan-window{height:220px;display:grid;place-items:center;position:relative;overflow:hidden;border-radius:12px;background:linear-gradient(145deg,#203a54,#0d2238)}
+.demo-id{width:305px;height:184px;padding:12px;border-radius:10px;background:linear-gradient(150deg,#e6f1f7,#b7d1df);color:#12314a;box-shadow:0 12px 26px rgba(0,0,0,.32);transform:rotate(-2deg)}
+.demo-id-head{display:flex;justify-content:space-between;font-size:8px;font-weight:900;letter-spacing:.8px;text-transform:uppercase}
+.demo-magstripe{height:25px;margin:9px -12px 8px;background:#25323d}
+.demo-id-body{display:grid;grid-template-columns:.72fr 1.28fr;gap:11px}
+.demo-lines{display:flex;flex-direction:column;gap:6px;padding-top:3px}
+.demo-lines span{height:4px;border-radius:99px;background:rgba(18,49,74,.32)}
+.demo-lines span:nth-child(2){width:74%}
+.demo-lines span:nth-child(4){width:62%}
+.demo-code-column{display:flex;flex-direction:column;gap:7px}
+.demo-code-thin{height:18px;border-radius:2px;background:repeating-linear-gradient(90deg,#10283e 0 2px,transparent 2px 4px,#10283e 4px 5px,transparent 5px 8px)}
+.demo-code-wide{height:72px;position:relative;border:3px solid ${C.gold};border-radius:5px;background:repeating-linear-gradient(90deg,#10283e 0 2px,transparent 2px 4px,#10283e 4px 7px,transparent 7px 9px),repeating-linear-gradient(0deg,rgba(16,40,62,.74) 0 2px,transparent 2px 5px);box-shadow:0 0 0 2px rgba(255,203,5,.18)}
+.barcode-label{position:absolute;right:4px;bottom:4px;padding:3px 5px;border-radius:3px;background:${C.gold};color:${C.navy};font-size:7px;font-weight:900;letter-spacing:.35px}
+.scan-corner{position:absolute;width:28px;height:28px;border-color:${C.gold};border-style:solid}
+.scan-corner.tl{top:13px;left:13px;border-width:3px 0 0 3px;border-radius:7px 0 0 0}
+.scan-corner.tr{top:13px;right:13px;border-width:3px 3px 0 0;border-radius:0 7px 0 0}
+.scan-corner.bl{bottom:13px;left:13px;border-width:0 0 3px 3px;border-radius:0 0 0 7px}
+.scan-corner.br{right:13px;bottom:13px;border-width:0 3px 3px 0;border-radius:0 0 7px 0}
+.scan-message{margin-top:8px;color:${C.text2};font-size:10px;text-align:center}
+.flow-ready{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid rgba(34,197,94,.34);border-radius:11px;background:rgba(34,197,94,.10)}
+.flow-ready .ready-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:${C.success};color:#061b10;flex:0 0 auto}
+.flow-ready strong,.flow-ready span{display:block}
+.flow-ready strong{color:#fff;font-size:12px}
+.flow-ready span{margin-top:2px;color:${C.text2};font-size:9.5px}
 `;
 
 const I = {
@@ -115,7 +155,17 @@ const I = {
   key: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3"/></svg>`,
   calendar: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>`,
   history: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>`,
+  lock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
 };
+
+const qrPairMark = `
+<svg class="qr-mark" viewBox="0 0 84 84" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <rect width="84" height="84" fill="#fff"/>
+  <g fill="${C.navy}">
+    <path d="M4 4h24v24H4zm5 5v14h14V9zM56 4h24v24H56zm5 5v14h14V9zM4 56h24v24H4zm5 5v14h14V61z"/>
+    <path d="M34 4h6v6h-6zM44 4h6v12h-6zM34 16h12v6H34zM38 26h8v8h-8zM50 22h6v12h-6zM60 34h6v6h-6zM70 34h10v6H70zM4 34h6v12H4zM14 34h14v6H14zM20 44h14v6H20zM4 48h10v6H4zM34 40h6v14h-6zM44 36h10v6H44zM46 46h8v8h-8zM58 44h12v6H58zM74 46h6v16h-6zM32 58h10v6H32zM46 58h6v14h-6zM56 54h14v6H56zM58 64h6v6h-6zM68 64h12v6H68zM34 72h8v8h-8zM50 74h16v6H50zM72 74h8v6h-8z"/>
+  </g>
+</svg>`;
 
 const pHead = () => `
 <div class="phead">
@@ -180,7 +230,6 @@ const screen02 = stage(
     <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>100% on-device — nothing transmitted</div>
     <div class="rdetail">Repeat Offender &amp; Title/Lien are included too — no account or setup needed.</div>
   </div>
-  ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible per MDOS response")}
   `
 );
 
@@ -208,21 +257,42 @@ const screen03 = stage(
 
 const screen04 = stage(
   copyBlock(
-    "Fast, accurate entry",
-    `Enter a date of birth<br><span class="a">in two taps.</span>`,
-    "A decade-based picker makes older customers quick to enter — no endless scrolling, no typos in the deal file.",
-    ["Jump by decade, then pick the year", "Type MM/DD/YYYY or use the calendar", "Validated age and format checks"]
+    "Scan instead of typing",
+    `Point your phone.<br><span class="a">Fields fill automatically.</span>`,
+    "Open the pairing code, then aim at the large, wide barcode on the back of the license or state ID. The scanner captures it automatically.",
+    ["No perfect alignment needed", "License image stays on the phone", "Encrypted, one-time field transfer"]
   ),
   `
-  <div class="row2"><div><div class="flabel">First Name</div><div class="field">John</div></div>
-    <div><div class="flabel">Last Name</div><div class="field">Anderson</div></div></div>
-  <div><div class="flabel">Date of Birth</div><div class="field" style="display:flex;align-items:center;justify-content:space-between">03/14/1962<span class="ico" style="color:${C.gold}">${I.calendar}</span></div></div>
-  <div class="rcard" style="padding:13px">
-    <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:${C.text2};margin-bottom:10px"><span>◀</span><span>1960 – 1969</span><span>▶</span></div>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
-      ${[1960,1961,1962,1963,1964,1965,1966,1967,1968,1969]
-        .map((y) => `<div style="text-align:center;font-size:12px;font-weight:600;padding:9px 0;border-radius:8px;${y===1962?`background:${C.gold};color:#1a1a1a`:`background:rgba(255,255,255,.05);color:${C.text2}`}">${y}</div>`)
-        .join("")}
+  <div class="scan-flow">
+    <div class="flow-card">
+      <div class="flow-step-title"><span class="flow-step-dot">1</span>Scan the pairing code<span class="secure-label">${I.lock} Secure</span></div>
+      <div class="connect-row">
+        <div class="qr-wrap">${qrPairMark}</div>
+        <div class="connect-copy"><strong>Open your phone camera</strong><span>Point it at the code. The license scanner opens in your browser—no app download.</span></div>
+      </div>
+    </div>
+    <div class="phone-preview">
+      <div class="phone-top"><span class="flow-step-dot">2</span>Aim at the wide barcode<span class="live-label">Automatic</span></div>
+      <div class="scan-window">
+        <div class="demo-id">
+          <div class="demo-id-head"><span>Michigan · Sample ID</span><span>Back</span></div>
+          <div class="demo-magstripe"></div>
+          <div class="demo-id-body">
+            <div class="demo-lines"><span></span><span></span><span></span><span></span><span></span></div>
+            <div class="demo-code-column">
+              <div class="demo-code-thin"></div>
+              <div class="demo-code-wide"><span class="barcode-label">WIDE BARCODE</span></div>
+            </div>
+          </div>
+        </div>
+        <span class="scan-corner tl"></span><span class="scan-corner tr"></span>
+        <span class="scan-corner bl"></span><span class="scan-corner br"></span>
+      </div>
+      <div class="scan-message">Second barcode from the top, on the right · tilted is okay</div>
+    </div>
+    <div class="flow-ready">
+      <span class="ready-icon">${I.check}</span>
+      <div><strong>Buyer fields ready</strong><span>Name, birth date, and license/ID number fill on the computer.</span></div>
     </div>
   </div>
   `
@@ -238,9 +308,9 @@ const histItem = (name, decision, cls, meta) => `
 const screen05 = stage(
   copyBlock(
     "Documented &amp; printable",
-    `Every check, kept<br><span class="a">for your records.</span>`,
-    "Recent screenings stay on your device so you can re-open, re-print, or export the evidence — including the official MDOS screenshot — anytime.",
-    ["Re-print or export past deals", "Official MDOS screenshots saved", "Stored locally, cleared on demand"]
+    `Recent checks, ready<br><span class="a">when you need them.</span>`,
+    "Text results stay on your device for up to 30 days or 50 records, so you can review, re-screen, print, or export recent deals. Portal screenshots remain current-run evidence only.",
+    ["Review or re-screen recent deals", "Portal screenshots stay session-only", "Clear local history anytime"]
   ),
   `
   <div class="sectitle">${I.history} Compliance History &nbsp;<span style="color:${C.muted};font-weight:500">· 3 today, 41 total</span></div>
@@ -391,18 +461,41 @@ const SCREENS = [
   ["01-run-all-approved-1280x800", screen01, 1280, 800, join(IMAGES, "screenshots")],
   ["02-ofac-only-local-1280x800", screen02, 1280, 800, join(IMAGES, "screenshots")],
   ["03-title-lien-1280x800", screen03, 1280, 800, join(IMAGES, "screenshots")],
-  ["04-dob-decade-picker-1280x800", screen04, 1280, 800, join(IMAGES, "screenshots")],
+  ["04-phone-license-scan-1280x800", screen04, 1280, 800, join(IMAGES, "screenshots")],
   ["05-compliance-history-1280x800", screen05, 1280, 800, join(IMAGES, "screenshots")],
 ];
 
-// Remove the three stale screenshots from the prior version.
+// Remove screenshots superseded by the current product flow.
 for (const old of [
   "01-run-all-results-and-pdf-actions-1280x800.png",
   "02-history-recordkeeping-actions-1280x800.png",
   "03-date-of-birth-year-selector-1280x800.png",
+  "04-dob-decade-picker-1280x800.png",
+  "04-dob-decade-picker-1280x800.jpg",
 ]) {
-  const p = join(IMAGES, "screenshots", old);
-  if (existsSync(p)) rmSync(p);
+  for (const dir of [join(IMAGES, "screenshots"), UPLOAD]) {
+    const p = join(dir, old);
+    if (existsSync(p)) rmSync(p);
+  }
+}
+
+async function writeUploadAssets() {
+  const { default: sharp } = await import("sharp");
+  for (const [name] of SCREENS) {
+    const png = join(IMAGES, "screenshots", `${name}.png`);
+    const jpg = join(IMAGES, "screenshots", `${name}.jpg`);
+    await sharp(png).jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toFile(jpg);
+    copyFileSync(jpg, join(UPLOAD, `${name}.jpg`));
+  }
+
+  copyFileSync(join(IMAGES, "icons", "icon128.png"), join(UPLOAD, "cc-store-icon-128.png"));
+
+  for (const name of ["small-promo-440x280", "marquee-promo-1400x560"]) {
+    const png = join(IMAGES, "promotional", `${name}.png`);
+    await sharp(png)
+      .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+      .toFile(join(UPLOAD, `${name}.jpg`));
+  }
 }
 
 await renderIcons();
@@ -415,6 +508,8 @@ renderHtml("small-promo-440x280", promoSmall, 440, 280, join(IMAGES, "promotiona
 console.log("promo: small 440x280");
 renderHtml("marquee-promo-1400x560", promoMarquee, 1400, 560, join(IMAGES, "promotional", "marquee-promo-1400x560.png"));
 console.log("promo: marquee 1400x560");
+await writeUploadAssets();
+console.log("upload: icon, five screenshots, and two promo tiles");
 
 rmSync(BUILD, { recursive: true, force: true });
 console.log("done.");

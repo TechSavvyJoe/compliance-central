@@ -3,29 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - Compliance Central</title>
+    <meta name="description" content="Compliance Central helps Michigan auto dealers scan customer IDs and run OFAC, Repeat Offender, and Title/Lien checks from one Chrome side panel." />
+    <title>Compliance Central — Michigan Dealer Compliance</title>
+    <link rel="icon" href="icons/icon32.png" />
     <style>
+        :root {
+            --navy: #00274c;
+            --navy-deep: #0a1628;
+            --navy-mid: #003d73;
+            --gold: #ffcb05;
+            --ink: #1c2b3a;
+            --muted: #5c6f82;
+            --line: #dbe4ed;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 800px;
+            color: var(--ink);
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 40px 20px;
-            background: #f9f9f9;
+            padding: 24px 20px 44px;
+            background: #f3f6fa;
         }
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 20px;
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 18px;
         }
-        h1 {
-            color: #00274C;
-            margin-bottom: 10px;
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--navy);
+            font-weight: 800;
+            text-decoration: none;
         }
-        h2 {
-            color: #00274C;
+        .brand img { width: 36px; height: 36px; }
+        .topbar nav {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .topbar nav a {
+            color: var(--navy-mid);
+            font-size: 0.93rem;
+            font-weight: 700;
+        }
+        .topbar nav .nav-install {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: var(--navy);
+            color: white;
+            text-decoration: none;
+        }
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+            gap: 34px;
+            align-items: center;
+            margin-bottom: 34px;
+            padding: 42px;
+            overflow: hidden;
+            border-radius: 22px;
+            background:
+                radial-gradient(520px 260px at 100% 0%, rgba(255, 203, 5, 0.14), transparent 68%),
+                linear-gradient(145deg, var(--navy-deep), var(--navy));
+            color: white;
+            box-shadow: 0 18px 48px rgba(0, 39, 76, 0.18);
+        }
+        .hero h1 {
+            max-width: 620px;
+            margin: 0;
+            font-size: clamp(2rem, 5vw, 3.15rem);
+            line-height: 1.04;
+            letter-spacing: -0.035em;
+        }
+        .hero-copy > p {
+            max-width: 590px;
+            margin: 18px 0 0;
+            color: #d5e3ef;
+            font-size: 1.08rem;
+        }
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 11px;
+            margin-top: 26px;
+        }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 11px 16px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-weight: 800;
+            line-height: 1.2;
+            text-decoration: none;
+        }
+        .button-primary { background: var(--gold); color: var(--navy); }
+        .button-secondary { border-color: rgba(255, 255, 255, 0.28); color: white; }
+        .hero-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .hero-flow li {
+            display: grid;
+            grid-template-columns: 32px 1fr;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.07);
+        }
+        .flow-number {
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gold);
+            color: var(--navy);
+            font-weight: 900;
+        }
+        .hero-flow strong, .hero-flow small { display: block; }
+        .hero-flow strong { font-size: 0.94rem; }
+        .hero-flow small { margin-top: 1px; color: #b9cfe0; line-height: 1.35; }
+        .policy-header {
+            margin-bottom: 20px;
+            padding: 22px 4px 14px;
+            border-bottom: 1px solid var(--line);
+        }
+        .policy-header h2 {
+            margin: 0 0 3px;
+            color: var(--navy);
+            font-size: 1.8rem;
+        }
+        .policy-header p { margin: 0; }
+        .section h3 {
+            color: var(--navy);
             margin-top: 30px;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
@@ -38,9 +164,22 @@
         .section {
             background: white;
             padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e3eaf1;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(25, 54, 82, 0.05);
             margin-bottom: 20px;
+        }
+        .data-summary {
+            border-top: 4px solid #ffcb05;
+        }
+        .data-summary h3 {
+            margin-top: 0;
+        }
+        .data-summary ul {
+            padding-left: 22px;
+        }
+        .data-summary li + li {
+            margin-top: 8px;
         }
         code {
             background: #eef2f7;
@@ -48,67 +187,123 @@
             border-radius: 4px;
             font-size: 0.9em;
         }
-        a { color: #003d73; }
+        a { color: var(--navy-mid); }
+        a:focus-visible {
+            outline: 3px solid var(--gold);
+            outline-offset: 3px;
+        }
         footer {
             text-align: center;
             margin-top: 50px;
             font-size: 0.8em;
             color: #777;
         }
+        @media (max-width: 720px) {
+            body { padding: 16px 14px 32px; }
+            .topbar { align-items: flex-start; }
+            .topbar nav { gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+            .topbar nav a { font-size: 0.84rem; }
+            .hero { grid-template-columns: 1fr; gap: 28px; padding: 30px 22px; }
+            .hero-actions { flex-direction: column; }
+            .button { width: 100%; }
+            .section { padding: 21px 18px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Compliance Central</h1>
-        <p>Privacy Policy</p>
-        <p class="last-updated">Last Updated: June 16, 2026</p>
+    <div class="topbar">
+        <a class="brand" href="#top" aria-label="Compliance Central home">
+            <img src="icons/icon128.png" alt="" width="36" height="36" />
+            <span>Compliance Central</span>
+        </a>
+        <nav aria-label="Primary navigation">
+            <a href="#privacy-policy">Privacy</a>
+            <a href="mailto:joejgallant@gmail.com">Support</a>
+            <a class="nav-install" href="https://chromewebstore.google.com/detail/compliance-central-michig/oijkbdclicekpggjblgknnphfdafdgod" target="_blank" rel="noopener noreferrer">Install</a>
+        </nav>
+    </div>
+
+    <main id="top">
+    <section class="hero" aria-labelledby="product-title">
+        <div class="hero-copy">
+            <h1 id="product-title">Michigan dealer compliance, all in one side panel.</h1>
+            <p>Scan a driver's license or state ID with a phone, then run OFAC, Repeat Offender, and Title/Lien checks without leaving the deal screen.</p>
+            <div class="hero-actions">
+                <a class="button button-primary" href="https://chromewebstore.google.com/detail/compliance-central-michig/oijkbdclicekpggjblgknnphfdafdgod" target="_blank" rel="noopener noreferrer">Install from Chrome Web Store</a>
+                <a class="button button-secondary" href="#scan-demo">How scanning works</a>
+            </div>
+        </div>
+        <ol class="hero-flow" id="scan-demo" aria-label="How license scanning works">
+            <li><span class="flow-number">1</span><span><strong>Open the phone scanner</strong><small>Scan the pairing code shown in the side panel.</small></span></li>
+            <li><span class="flow-number">2</span><span><strong>Aim at the wide barcode</strong><small>It is second from the top on the back of the ID.</small></span></li>
+            <li><span class="flow-number">3</span><span><strong>Review the filled fields</strong><small>The license image stays on the phone.</small></span></li>
+        </ol>
+    </section>
+
+    <header class="policy-header" id="privacy-policy">
+        <h2>Privacy Policy</h2>
+        <p>How Compliance Central handles customer and dealership data.</p>
+        <p class="last-updated">Effective: July 22, 2026</p>
     </header>
 
+    <div class="section data-summary">
+        <h3>Data Use at a Glance</h3>
+        <ul>
+            <li><strong>OFAC screening stays on your device.</strong> No customer information is transmitted for an OFAC-only check.</li>
+            <li><strong>Repeat Offender and Title/Lien checks use our secure service.</strong> The entered name, date of birth, license/ID number, and VIN when used are sent over HTTPS only to retrieve the requested official state result.</li>
+            <li><strong>Phone scan images stay on the phone.</strong> Only the text fields you approve are sent to your computer in an encrypted, single-use package.</li>
+            <li><strong>Text history is local and limited.</strong> Up to 50 records are kept on your device for no more than 30 days. Portal screenshots are available for the current run only and are excluded from long-term history.</li>
+        </ul>
+    </div>
+
     <div class="section">
-        <h2>1. Overview</h2>
+        <h3>1. Overview</h3>
         <p><strong>Compliance Central</strong> ("we", "our", or "the extension") is a Chrome extension that helps Michigan automotive dealers run compliance screenings &mdash; OFAC sanctions, Repeat Offender (MDOS), and Title/Lien checks &mdash; from a browser side panel. We are committed to protecting the personal information you enter. This policy explains exactly what data the extension handles, where it goes, and what is and is not retained.</p>
     </div>
 
     <div class="section">
-        <h2>2. What Data the Extension Handles</h2>
+        <h3>2. What Data the Extension Handles</h3>
         <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. This information is used only to perform the screenings you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the compliance checks.</p>
         <ul>
-            <li><strong>Stored only on your device:</strong> your compliance history and settings are saved locally using Chrome's <code>storage</code> API. We do not maintain a server-side database of your searches.</li>
+            <li><strong>Stored only on your device:</strong> bounded text history, including the customer fields and check results, and your settings are saved locally using Chrome's <code>storage</code> API. History is limited to 50 records and 30 days and can be cleared at any time. Portal screenshots are not kept in long-term history. We do not maintain a server-side database of your searches.</li>
             <li><strong>No tracking or analytics:</strong> the extension does not track your browsing, and does not use Google Analytics or any third-party advertising or analytics network.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>3. Data Transmitted for MDOS Checks</h2>
+        <h3>3. Data Transmitted for MDOS Checks</h3>
         <p>The <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks are performed by our secure backend service hosted on Fly.io, which queries the Michigan Department of State (MDOS) portal on your behalf using automated browsing.</p>
         <ul>
             <li>For these two checks only, the buyer/co-buyer <strong>name, date of birth, and DLN/PID</strong> (and the <strong>VIN</strong> for a title check) are transmitted to our backend over an encrypted HTTPS connection.</li>
-            <li>The backend processes this data <strong>in memory</strong> to obtain the official MDOS result and screenshot, then <strong>returns the result and immediately discards the data</strong>. It is not written to a database or log.</li>
+            <li>The backend processes this data <strong>in memory</strong> to obtain the official MDOS result and screenshot, then <strong>returns the result and immediately discards the data</strong>. It is not written to a database or log. The returned portal screenshot is current-run evidence and is not added to long-term history.</li>
             <li>The extension includes built-in access to the backend, so these checks work for everyone with no account or setup. (Advanced users may optionally supply their own backend key in Settings, stored only on their device.)</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>4. License Scan (Optional)</h2>
+        <h3>4. License Scan (Optional)</h3>
         <p>The optional <strong>"Scan license with phone"</strong> feature lets you capture a customer's Michigan driver's license or state ID with your phone instead of typing. It is designed to be private:</p>
         <ul>
             <li><strong>Scanning and parsing happen on your phone</strong> &mdash; the barcode on the back of the license is read and decoded in your phone's browser. The <strong>license image is never uploaded or transmitted</strong>.</li>
             <li>Only the parsed text fields (<strong>name, date of birth, and license/ID number</strong>) travel to your computer, and they are <strong>end-to-end encrypted</strong>: the desktop extension generates a one-time key that exists only inside the QR code, your phone encrypts the fields with it, and our backend merely relays an <strong>encrypted package it cannot read</strong>.</li>
             <li>That encrypted package is <strong>single-use, expires in about two minutes, and is deleted the moment your computer retrieves it</strong>. It is never written to a database or log.</li>
-            <li>Once the fields autofill, they are handled exactly like manually-typed data (used for the checks above and stored only on your device).</li>
+            <li>Once the fields autofill, they are handled exactly like manually typed data: used only for the checks you request and, if a result is saved, included in the bounded local text history described above.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>5. OFAC Screening (Local Only)</h2>
-        <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the public OFAC SDN list from OpenSanctions and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
+        <h3>5. OFAC Screening (Local Only)</h3>
+        <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the official SDN list directly from the U.S. Treasury OFAC Sanctions List Service and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
     </div>
 
     <div class="section">
-        <h2>6. Third-Party Services</h2>
+        <h3>6. Third-Party Services</h3>
         <ul>
-            <li><strong>OpenSanctions</strong> (<code>data.opensanctions.org</code>): provides the public OFAC SDN list the extension downloads for local screening. Only the list is downloaded &mdash; no customer data is sent.</li>
+            <li><strong>U.S. Treasury OFAC Sanctions List Service</strong> (<code>sanctionslistservice.ofac.treas.gov</code>): provides the official SDN list the extension downloads for local screening. Treasury redirects the file download to its dedicated AWS GovCloud storage host. Only the public list is downloaded &mdash; no customer data is sent.</li>
             <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
             <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and not persisted; for the optional license scan it relays only an encrypted, single-use package it cannot read.</li>
             <li><strong>GitHub Pages</strong> (<code>techsavvyjoe.github.io</code>): serves the static phone scan page (and this policy). The scan page performs the barcode decoding on your phone; the license image is not sent to it.</li>
@@ -116,19 +311,19 @@
     </div>
 
     <div class="section">
-        <h2>7. Permissions</h2>
+        <h3>7. Permissions</h3>
         <p>The extension requests only the permissions it needs:</p>
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
-            <li><code>storage</code> &mdash; to save your compliance history, settings, and API key locally.</li>
-            <li><code>unlimitedStorage</code> &mdash; to hold the OFAC sanctions dataset and your historical records.</li>
+            <li><code>storage</code> &mdash; to save bounded local text history, settings, and an optional custom backend key.</li>
+            <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded local text history. Portal screenshots remain session-only.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
-            <li>Host access to <code>data.opensanctions.org</code> (OFAC list download) and <code>compliance-central-api.fly.dev</code> (MDOS backend).</li>
+            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), plus <code>compliance-central-api.fly.dev</code> (MDOS backend).</li>
         </ul>
     </div>
 
     <div class="section">
-        <h2>8. Your Rights and Choices</h2>
+        <h3>8. Your Rights and Choices</h3>
         <ul>
             <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
             <li>Remove any optional backend key you've set, at any time from Settings.</li>
@@ -137,18 +332,19 @@
     </div>
 
     <div class="section" id="get-access">
-        <h2>9. No Account Needed</h2>
+        <h3>9. No Account Needed</h3>
         <p>All checks &mdash; OFAC, Repeat Offender, and Title/Lien &mdash; are included free, with no account, sign-up, or API key. Just install and use. (Advanced users may optionally configure their own backend key in Settings.)</p>
     </div>
 
     <div class="section">
-        <h2>10. Contact Us</h2>
+        <h3>10. Contact Us</h3>
         <p>Questions about this policy, the extension, or backend access? Email <a href="mailto:joejgallant@gmail.com">joejgallant@gmail.com</a> or use the Chrome Web Store support page for this listing.</p>
     </div>
 
     <footer>
         <p>&copy; 2026 Compliance Central. All rights reserved.</p>
     </footer>
+    </main>
 
 </body>
 </html>

@@ -16,16 +16,19 @@ sidePanel —
 The entire user interface is a Chrome side panel; this permission opens and renders it.
 
 storage —
-Saves the dealer's compliance history, preferences, and (optionally) a custom backend API key locally on the device.
+Saves bounded compliance text history (up to 30 days / 50 records), preferences, and (optionally) a custom backend API key locally on the device. History can include customer name, date of birth, DLN/PID, VIN, and check results. Portal screenshots are session-only current-run evidence and are not retained in long-term history.
 
 unlimitedStorage —
-The OFAC SDN sanctions dataset plus historical compliance records (with evidence screenshots) can exceed the default storage quota.
+Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded local text history. Portal screenshots are session-only current-run evidence, not retained in long-term compliance history.
 
 alarms —
 Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
 
-Host permission https://data.opensanctions.org/ —
-Downloads the public OFAC SDN sanctions list used for on-device screening.
+Host permission https://sanctionslistservice.ofac.treas.gov/ —
+Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
+
+Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/ —
+Allows the official Treasury Sanctions List Service download to follow its signed redirect to Treasury's dedicated AWS GovCloud file host. Only the public OFAC list is downloaded.
 
 Host permission https://compliance-central-api.fly.dev/ —
 The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal. It also relays the optional phone license-scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read (deleted on pickup; the license image is never transmitted).
@@ -41,7 +44,8 @@ DATA USAGE  (the checkbox form)
 
 Data types to mark as COLLECTED:
   • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
-  • Web history / authentication info: NO
+  • Authentication information  (optional custom backend API key only; stored locally and sent securely only to the selected compliance backend for requested checks)
+  • Web history: NO
   • Location, financial, health, personal communications, etc.: NO
   (The trade-in VIN is sent only for the optional title check — note under "other" if asked.)
 

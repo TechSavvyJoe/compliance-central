@@ -20,7 +20,3 @@ export async function setBadgeForStatus(status) {
   await chrome.action.setBadgeText({ text });
   await chrome.action.setBadgeBackgroundColor({ color });
 }
-
-export async function clearBadge() {
-  await chrome.action.setBadgeText({ text: "" });
-}

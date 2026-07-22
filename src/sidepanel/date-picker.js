@@ -243,7 +243,7 @@ function renderPicker(state) {
         ${
           isYearMode
             ? `<button type="button" class="date-year-range" data-action="toggle-years">${rangeLabel}</button>`
-            : `<select class="date-month-select" aria-label="Month">
+            : `<select id="${state.input.id}MonthSelect" name="${state.input.id}Month" class="date-month-select" aria-label="Month">
                 ${MONTHS.map(
                   (month, index) =>
                     `<option value="${index}"${index === viewMonth ? " selected" : ""}>${month}</option>`

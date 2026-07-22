@@ -6,7 +6,10 @@ import { CONFIG } from "../lib/config.js";
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
 import { normalizeDateValue } from "../src/sidepanel/date-picker.js";
 import { calculateFinalDecision } from "../src/sidepanel/checks.js";
-import { saveToHistory } from "../src/sidepanel/history.js";
+import {
+  decisionMeta,
+  saveToHistory,
+} from "../src/sidepanel/history.js";
 
 const manifest = JSON.parse(
   await readFile(new URL("../manifest.json", import.meta.url), "utf8")
@@ -128,6 +131,30 @@ test("an active-lien APPROVED never warns 'Trade lien: Unknown'", () => {
   assert.match(named.warnings[0], /Ally Financial/);
 });
 
+test("an unconfirmed or unknown title result requires review", () => {
+  const base = {
+    ofac: { passed: true },
+    repeatOffender: { passed: true, status: "eligible" },
+  };
+
+  for (const title of [
+    { passed: false, titleBrand: "CLEAN", hasLien: false },
+    { titleBrand: "CLEAN", hasLien: false },
+    { passed: false, titleBrand: "UNKNOWN", hasLien: false },
+  ]) {
+    const decision = calculateFinalDecision({ ...base, title });
+    assert.equal(decision.level, "REVIEW");
+    assert.equal(decision.approved, false);
+  }
+});
+
+test("legacy or corrupt history decisions never render as Approved", () => {
+  assert.equal(decisionMeta("APPROVED").label, "Approved");
+  assert.equal(decisionMeta("UNKNOWN").label, "Unknown");
+  assert.equal(decisionMeta(undefined).label, "Unknown");
+  assert.equal(decisionMeta("UNKNOWN").cls, "dec-review");
+});
+
 test("ships a built-in backend key so all checks work with no setup", () => {
   assert.ok(CONFIG.backend.defaultApiKey, "a built-in default key should be shipped");
   assert.equal(manifest.permissions.includes("unlimitedStorage"), true);
@@ -139,7 +166,7 @@ test("date picker normalizes typed DOB values for existing checks", () => {
   assert.equal(normalizeDateValue("1980-01-31"), "1980-01-31");
 });
 
-test("history archives keep printable compliance evidence", async () => {
+test("history archives keep printable text evidence without screenshot payloads", async () => {
   const stored = {
     [STORAGE_KEYS.complianceHistory]: [],
   };
@@ -156,7 +183,7 @@ test("history archives keep printable compliance evidence", async () => {
     },
   };
 
-  await saveToHistory({
+  const saved = await saveToHistory({
     customer: {
       firstName: "Jane",
       lastName: "Doe",
@@ -188,6 +215,7 @@ test("history archives keep printable compliance evidence", async () => {
       },
     },
   });
+  assert.equal(saved, true);
 
   const archived = stored[STORAGE_KEYS.complianceHistory][0];
   assert.equal(archived.decision, "PARTIAL");
@@ -195,6 +223,36 @@ test("history archives keep printable compliance evidence", async () => {
   assert.equal(archived.fullResults.customer.dlnPid, "S123456789012");
   assert.equal(archived.fullResults.customer.coBuyer.dob, "1981-02-03");
   assert.equal(archived.fullResults.checks.repeatOffender.rawText, "official portal pass information");
-  assert.equal(archived.fullResults.checks.repeatOffender.screenshotData, "data:image/png;base64,abc");
+  assert.equal(archived.fullResults.checks.repeatOffender.screenshotData, undefined);
   assert.equal(archived.fullResults.checks.ofac.entriesSearched, 12345);
+});
+
+test("history save reports storage failure to its caller", async () => {
+  globalThis.chrome = {
+    storage: {
+      local: {
+        async get(key) {
+          return { [key]: [] };
+        },
+        async set() {
+          throw new Error("quota unavailable");
+        },
+      },
+    },
+  };
+
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const saved = await saveToHistory({
+      customer: { firstName: "Jane", lastName: "Doe", tradeVin: "" },
+      timestamp: new Date().toISOString(),
+      runType: "individual",
+      runLabel: "OFAC Only",
+      checks: { ofac: { passed: true } },
+    });
+    assert.equal(saved, false);
+  } finally {
+    console.error = originalError;
+  }
 });

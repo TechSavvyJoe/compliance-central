@@ -1,23 +1,61 @@
 /**
- * OFAC SDN Data Fetcher and Parser
+ * Official U.S. Treasury / OFAC SDN data fetcher and parser.
  *
- * Downloads the publicly mirrored OFAC SDN list from OpenSanctions
- * (Treasury.gov blocks direct browser/extension requests).
+ * OFAC's legacy SDN.XML contains the complete SDN list, including primary
+ * names, aliases, programs, dates of birth, and country. The file is parsed
+ * locally in the extension service worker; no subject data is sent to Treasury.
+ * Only fields used by screening or result display are retained in IndexedDB.
  */
 
-const SDN_CSV_URL =
-  "https://data.opensanctions.org/datasets/latest/us_ofac_sdn/targets.simple.csv";
+import { CONFIG } from "../lib/config.js";
 
-// Cap the SDN download so a slow/hung CDN can't freeze screening indefinitely.
+const SDN_XML_URL = CONFIG.ofac.sdnDataUrl;
 const SDN_FETCH_TIMEOUT_MS = 60000;
+const MAX_SDN_XML_BYTES = 64 * 1024 * 1024;
 
-async function fetchSDNCSV() {
+function assertAllowedHost(finalUrl) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(finalUrl);
+  } catch {
+    throw new Error("SDN download redirected to an invalid URL.");
+  }
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error("SDN download blocked: HTTPS is required.");
+  }
+
+  const allowed = CONFIG.ofac.allowedHosts || [];
+  if (!allowed.includes(parsedUrl.hostname)) {
+    throw new Error(
+      `SDN download blocked: unexpected host "${parsedUrl.hostname}".`
+    );
+  }
+}
+
+async function readTextWithLimit(response) {
+  const contentLength = Number(response.headers?.get?.("Content-Length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_SDN_XML_BYTES) {
+    throw new Error("SDN download is unexpectedly large.");
+  }
+
+  // response.text() lets the browser decode into one backing string. Building
+  // an array of decoded stream chunks and joining it nearly doubles peak memory
+  // for this ~29 MB list, which is undesirable in a Manifest V3 worker.
+  const text = await response.text();
+  if (text.length > MAX_SDN_XML_BYTES) {
+    throw new Error("SDN download is unexpectedly large.");
+  }
+  return text;
+}
+
+async function fetchSDNXML() {
   let response;
   try {
-    response = await fetch(SDN_CSV_URL, {
+    response = await fetch(SDN_XML_URL, {
       method: "GET",
-      headers: { Accept: "text/csv, text/plain, */*" },
+      headers: { Accept: "application/xml, text/xml;q=0.9, */*;q=0.1" },
       signal: AbortSignal.timeout(SDN_FETCH_TIMEOUT_MS),
+      redirect: "follow",
     });
   } catch (err) {
     if (err?.name === "TimeoutError") {
@@ -27,148 +65,302 @@ async function fetchSDNCSV() {
       throw new Error("SDN download was cancelled.");
     }
     if (err instanceof TypeError) {
-      // fetch network failure (DNS, offline, CORS, connection refused)
-      throw new Error("Could not reach the OFAC data source. Check your internet connection.");
+      throw new Error(
+        "Could not reach the official OFAC data source. Check your internet connection."
+      );
     }
     throw err;
   }
+
+  assertAllowedHost(response.url || SDN_XML_URL);
 
   if (!response.ok) {
     throw new Error(`SDN download failed: HTTP ${response.status}`);
   }
 
-  return response.text();
+  const contentType = response.headers?.get?.("Content-Type") || "";
+  if (contentType && !/\b(?:application|text)\/xml\b/i.test(contentType)) {
+    throw new Error(`SDN download returned unexpected content type "${contentType}".`);
+  }
+
+  return response;
 }
 
-function parseCSVLine(line) {
-  const fields = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === "," && !inQuotes) {
-      fields.push(current.trim());
-      current = "";
-    } else {
-      current += char;
+function decodeXMLText(value) {
+  const text = String(value || "").trim();
+  return text.replace(
+    /&(?:#(\d+)|#x([\da-f]+)|(amp|lt|gt|quot|apos));/gi,
+    (entity, decimal, hex, named) => {
+      if (decimal) return String.fromCodePoint(Number(decimal));
+      if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+      return {
+        amp: "&",
+        lt: "<",
+        gt: ">",
+        quot: '"',
+        apos: "'",
+      }[named.toLowerCase()];
     }
-  }
-
-  fields.push(current.trim());
-  return fields;
+  );
 }
 
-function parseName(nameStr) {
-  if (!nameStr) return { firstName: "", middleName: "", lastName: "" };
+function tagPattern(tagName, flags = "") {
+  return new RegExp(
+    `<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}\\s*>`,
+    flags
+  );
+}
 
-  // OpenSanctions format: usually "LAST NAME, First Middle" or just "Name"
-  const parts = nameStr.split(",");
+function firstTagValue(xml, tagName) {
+  const match = tagPattern(tagName).exec(xml);
+  return match ? decodeXMLText(match[1]) : "";
+}
 
-  if (parts.length > 1) {
-    const lastName = parts[0].trim();
-    const firstMiddle = parts.slice(1).join(",").trim();
-    const nameParts = firstMiddle.split(/\s+/);
+function allTagValues(xml, tagName) {
+  const values = [];
+  const pattern = tagPattern(tagName, "g");
+  let match;
+  while ((match = pattern.exec(xml))) {
+    const value = decodeXMLText(match[1]);
+    if (value) values.push(value);
+  }
+  return values;
+}
 
-    if (nameParts.length === 1) {
-      return { firstName: nameParts[0], middleName: "", lastName };
-    }
-    return {
-      firstName: nameParts[0],
-      middleName: nameParts.slice(1).join(" "),
-      lastName,
-    };
+function allTagBlocks(xml, tagName) {
+  const blocks = [];
+  const pattern = tagPattern(tagName, "g");
+  let match;
+  while ((match = pattern.exec(xml))) blocks.push(match[1]);
+  return blocks;
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function parsePublicationDate(value) {
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value);
+  if (!match) {
+    throw new Error("Unexpected SDN XML publication date.");
+  }
+  const [, monthText, dayText, yearText] = match;
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const year = Number(yearText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new Error("Unexpected SDN XML publication date.");
+  }
+  return date.toISOString();
+}
+
+function parseMetadata(xml) {
+  if (/<!DOCTYPE|<!ENTITY/i.test(xml)) {
+    throw new Error("Unexpected SDN XML declaration.");
+  }
+  if (!/<sdnList(?:\s[^>]*)?>/.test(xml)) {
+    throw new Error("Unexpected SDN XML schema (missing sdnList root).");
   }
 
-  const nameParts = nameStr.split(/\s+/);
-  if (nameParts.length === 1) {
-    return { firstName: "", middleName: "", lastName: nameParts[0] };
-  }
-  if (nameParts.length === 2) {
-    return { firstName: nameParts[0], middleName: "", lastName: nameParts[1] };
+  const recordCountText = firstTagValue(xml, "Record_Count");
+  if (!/^\d+$/.test(recordCountText) || Number(recordCountText) <= 0) {
+    throw new Error("Unexpected SDN XML schema (invalid record count).");
   }
   return {
-    firstName: nameParts[0],
-    middleName: nameParts.slice(1, -1).join(" "),
-    lastName: nameParts[nameParts.length - 1],
+    expectedCount: Number(recordCountText),
+    publishDate: parsePublicationDate(firstTagValue(xml, "Publish_Date")),
   };
 }
 
-function parseSDNCSV(csvText) {
-  const lines = csvText.split("\n");
+function splitGivenNames(givenNames) {
+  const parts = givenNames.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts.shift() || "",
+    middleName: parts.join(" "),
+  };
+}
+
+function joinName(firstName, lastName) {
+  return [firstName, lastName].filter(Boolean).join(" ").trim();
+}
+
+function parseEntry(block, recordNumber) {
+  const uid = firstTagValue(block, "uid");
+  const givenNames = firstTagValue(block, "firstName");
+  const lastName = firstTagValue(block, "lastName");
+  const fullName = joinName(givenNames, lastName);
+
+  if (!uid || !fullName) {
+    throw new Error(`Unexpected SDN XML record ${recordNumber}: missing UID or name.`);
+  }
+
+  const aliases = [];
+  for (const aliasBlock of allTagBlocks(block, "aka")) {
+    const aliasFirstName = firstTagValue(aliasBlock, "firstName");
+    const aliasLastName = firstTagValue(aliasBlock, "lastName");
+    const name = joinName(aliasFirstName, aliasLastName);
+    if (!name) continue;
+    aliases.push(name);
+  }
+
+  const nationalityBlock = allTagBlocks(block, "nationalityList")[0] || "";
+  const countries = unique([
+    ...allTagValues(nationalityBlock, "country"),
+    ...allTagBlocks(block, "address").map((address) =>
+      firstTagValue(address, "country")
+    ),
+  ]);
+  const { firstName, middleName } = splitGivenNames(givenNames);
+
+  return {
+    uid,
+    firstName,
+    middleName,
+    lastName,
+    fullName,
+    type: firstTagValue(block, "sdnType") || "Entity",
+    program: unique(allTagValues(block, "program")).join("; "),
+    country: countries[0] || "",
+    birthDate: unique(allTagValues(block, "dateOfBirth")).join("; "),
+    aliases: unique(aliases),
+  };
+}
+
+/**
+ * Parse OFAC's documented legacy SDN XML format without DOMParser (which is
+ * unavailable in Manifest V3 service workers).
+ */
+export function parseSDNXML(xmlText) {
+  const xml = String(xmlText || "").replace(/^\uFEFF/, "");
+  if (!xml.trim()) throw new Error("SDN download was empty.");
+  if (!/<\/sdnList\s*>/.test(xml)) {
+    throw new Error("Unexpected SDN XML schema (missing sdnList root).");
+  }
+
+  const { expectedCount, publishDate } = parseMetadata(xml);
+
   const entries = [];
+  const uids = new Set();
+  const entryPattern = tagPattern("sdnEntry", "g");
+  let match;
+  while ((match = entryPattern.exec(xml))) {
+    const entry = parseEntry(match[1], entries.length + 1);
+    if (uids.has(entry.uid)) {
+      throw new Error(`Unexpected SDN XML: duplicate UID "${entry.uid}".`);
+    }
+    uids.add(entry.uid);
+    entries.push(entry);
+  }
 
-  // OpenSanctions simple CSV schema:
-  // id,schema,name,aliases,birth_date,countries,addresses,identifiers,sanctions,dataset
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  if (entries.length !== expectedCount) {
+    throw new Error(
+      `SDN XML record count mismatch: expected ${expectedCount}, parsed ${entries.length}.`
+    );
+  }
 
-    try {
-      const fields = parseCSVLine(line);
-      if (fields.length < 3) continue;
+  return { entries, count: entries.length, publishDate };
+}
 
-      const uid = fields[0] || "";
-      const schema = fields[1] || "";
-      const name = fields[2] || "";
-      const aliases = fields[3] || "";
-      const birthDate = fields[4] || "";
-      const countries = fields[5] || "";
-      const sanctions = fields[8] || "";
+async function parseSDNResponse(response) {
+  if (!response.body?.getReader) {
+    return parseSDNXML(await readTextWithLimit(response));
+  }
 
-      const { firstName, middleName, lastName } = parseName(name);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const entries = [];
+  const uids = new Set();
+  let buffer = "";
+  let bytesRead = 0;
+  let metadata = null;
 
-      let type = "Entity";
-      const schemaLower = schema.toLowerCase();
-      if (schemaLower.includes("person")) type = "Individual";
-      else if (schemaLower.includes("vessel")) type = "Vessel";
-      else if (schemaLower.includes("aircraft")) type = "Aircraft";
+  function consumeCompleteEntries() {
+    while (true) {
+      const open = /<sdnEntry(?:\s[^>]*)?>/.exec(buffer);
+      if (!open) return;
 
-      const programs = sanctions
-        ? sanctions.split(";").map((s) => s.trim()).filter(Boolean)
-        : [];
+      if (!metadata) {
+        metadata = parseMetadata(buffer.slice(0, open.index));
+      }
 
-      const countryList = countries ? countries.split(";")[0].trim() : "";
+      const contentStart = open.index + open[0].length;
+      const contentEnd = buffer.indexOf("</sdnEntry>", contentStart);
+      if (contentEnd < 0) {
+        // Discard only leading whitespace/metadata. Preserve the complete open
+        // tag and partial record until its closing tag arrives.
+        if (open.index > 0) buffer = buffer.slice(open.index);
+        return;
+      }
 
-      entries.push({
-        uid,
-        firstName,
-        middleName,
-        lastName,
-        fullName: name,
-        type,
-        program: programs.join("; "),
-        country: countryList,
-        birthDate,
-        aliases: aliases
-          ? aliases.split(";").map((a) => a.trim()).filter(Boolean)
-          : [],
-      });
-    } catch (err) {
-      console.warn("Error parsing SDN line", i, err);
+      const entry = parseEntry(
+        buffer.slice(contentStart, contentEnd),
+        entries.length + 1
+      );
+      if (uids.has(entry.uid)) {
+        throw new Error(`Unexpected SDN XML: duplicate UID "${entry.uid}".`);
+      }
+      uids.add(entry.uid);
+      entries.push(entry);
+      buffer = buffer.slice(contentEnd + "</sdnEntry>".length);
     }
   }
 
-  return entries;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_SDN_XML_BYTES) {
+        await reader.cancel();
+        throw new Error("SDN download is unexpectedly large.");
+      }
+      buffer += decoder.decode(value, { stream: true });
+      consumeCompleteEntries();
+
+      // The metadata header is only a few hundred bytes. A large prefix with
+      // no entry indicates an error page or a changed format; do not retain it.
+      if (!metadata && buffer.length > 1024 * 1024) {
+        throw new Error("Unexpected SDN XML schema (missing SDN entries).");
+      }
+    }
+    buffer += decoder.decode();
+    consumeCompleteEntries();
+  } catch (error) {
+    await reader.cancel(error).catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock?.();
+  }
+
+  if (!metadata) {
+    throw new Error("Unexpected SDN XML schema (missing SDN entries).");
+  }
+  if (!/<\/sdnList\s*>/.test(buffer)) {
+    throw new Error("Unexpected SDN XML schema (missing sdnList root).");
+  }
+  if (/<sdnEntry(?:\s[^>]*)?>/.test(buffer)) {
+    throw new Error("SDN XML record is truncated.");
+  }
+  if (entries.length !== metadata.expectedCount) {
+    throw new Error(
+      `SDN XML record count mismatch: expected ${metadata.expectedCount}, parsed ${entries.length}.`
+    );
+  }
+
+  return { entries, count: entries.length, publishDate: metadata.publishDate };
 }
 
 export async function downloadAndParseSDN() {
-  const csvText = await fetchSDNCSV();
-  const entries = parseSDNCSV(csvText);
-
+  const response = await fetchSDNXML();
+  const result = await parseSDNResponse(response);
   return {
-    entries,
-    count: entries.length,
+    ...result,
     downloadedAt: new Date().toISOString(),
-    publishDate: new Date().toISOString(),
   };
 }
 

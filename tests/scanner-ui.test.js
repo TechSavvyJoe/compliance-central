@@ -106,11 +106,11 @@ test("camera screen keeps only essential visible guidance", () => {
   assert.equal((html.match(/<li class="scan-step/g) || []).length, 3);
   assert.match(
     html,
-    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260722-20" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
+    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260722-21" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
   );
   assert.match(
     html,
-    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260722-20" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
+    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260722-21" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
   );
   assert.match(
     html,
@@ -131,7 +131,15 @@ test("camera screen keeps only essential visible guidance", () => {
   assert.doesNotMatch(html, /frame-label/);
   assert.match(
     html,
-    /id="privacyNote"[^>]*aria-label="Image stays on this phone\. Only the details you approve are encrypted and sent\."[^>]*>Image stays on this phone\.<\/p>/
+    /id="privacyNote"[^>]*>Image stays on this phone\. Approved details are encrypted and sent to your computer\.<\/p>/
+  );
+  assert.match(
+    html,
+    /id="reviewPrivacyNote"[^>]*>Your license image stays on this phone\. Selecting Looks good encrypts and sends only these details to your computer\.<\/p>/
+  );
+  assert.match(
+    html,
+    /id="confirmBtn"[^>]*aria-describedby="reviewPrivacyNote"[^>]*>Looks good<\/button>/
   );
   assert.match(
     html,
@@ -160,8 +168,8 @@ test("demo ID artwork is lightweight and clearly non-document training media", (
   assert.ok(frontDemoWebp.byteLength + backDemoWebp.byteLength < 50_000);
   assert.deepEqual(vp8Dimensions(frontDemoWebp), { width: 640, height: 404 });
   assert.deepEqual(vp8Dimensions(backDemoWebp), { width: 640, height: 404 });
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-20" width="640" height="404"/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-20" width="640" height="404"/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-21" width="640" height="404"/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-21" width="640" height="404"/);
 });
 
 test("normal scans do not populate implementation diagnostics", () => {
@@ -177,11 +185,11 @@ test("normal scans do not populate implementation diagnostics", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260722-20");
+  assert.equal(cssVersion, "20260722-21");
   assert.equal(scriptVersion, cssVersion);
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-20/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-20/);
-  assert.match(pairingJs, /&cb=20260722-20#k=/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-21/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-21/);
+  assert.match(pairingJs, /&cb=20260722-21#k=/);
   assert.doesNotMatch(pairingJs, /debug=1/);
 });
 

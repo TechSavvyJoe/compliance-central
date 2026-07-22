@@ -74,11 +74,65 @@ export function jaroWinkler(s1, s2, p = 0.1) {
 
 export function normalizeName(name) {
   if (!name) return "";
-  return name
+  return String(name)
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const NAME_SUFFIXES = new Set(["jr", "sr", "ii", "iii", "iv", "v"]);
+const FULL_NAME_RESCUE_THRESHOLD = 95;
+
+function comparableFullName(name) {
+  return normalizeName(name)
+    .split(" ")
+    .filter((part) => part && !NAME_SUFFIXES.has(part))
+    .join(" ");
+}
+
+function searchFullName(searchName) {
+  return comparableFullName(
+    [searchName.firstName, searchName.middleName, searchName.lastName]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
+/**
+ * Return the natural-order spelling plus a comma-reversed alternative.
+ * OFAC's official XML normally separates given and family names, but some
+ * aliases are published in a single field as forms such as "GARBAYA, AHMED".
+ * Screening both forms avoids a false negative without changing the
+ * human-review-only outcome.
+ */
+function fullNameVariants(name) {
+  if (!name || typeof name !== "string") return [];
+
+  const variants = [comparableFullName(name)];
+  const commaParts = name.split(",").map((part) => part.trim()).filter(Boolean);
+  if (commaParts.length === 2) {
+    variants.push(comparableFullName(`${commaParts[1]} ${commaParts[0]}`));
+  }
+  return [...new Set(variants.filter(Boolean))];
+}
+
+function fullNameSimilarity(searchName, candidateName) {
+  const search = searchFullName(searchName);
+  if (!search) return 0;
+
+  let bestScore = 0;
+  for (const candidate of fullNameVariants(candidateName)) {
+    bestScore = Math.max(bestScore, jaroWinkler(search, candidate));
+  }
+  return Math.round(bestScore * 100);
+}
+
+function qualifyingFullNameScore(searchName, candidateName, threshold) {
+  const score = fullNameSimilarity(searchName, candidateName);
+  return score >= Math.max(threshold, FULL_NAME_RESCUE_THRESHOLD) ? score : 0;
 }
 
 export function calculateNameSimilarity(searchName, sdnName) {
@@ -132,9 +186,9 @@ export function calculateNameSimilarity(searchName, sdnName) {
   return Math.round(finalScore);
 }
 
-// Pull plausible birth years (1900–2100) out of a free-form date string. The
-// OpenSanctions birth_date field may be a full date ("1965-04-12"), a bare year
-// ("1965"), a range, or several semicolon-separated values — so scan for all.
+// Pull plausible birth years (1900–2100) out of OFAC's free-form date strings.
+// The official XML may publish a full date, a bare year, an approximate range,
+// or several values, so scan for every plausible year.
 function extractYears(value) {
   const years = [];
   const re = /(\d{4})/g;
@@ -163,7 +217,7 @@ export function dobConfidence(searchDob, sdnBirthDate) {
 }
 
 function parseAlias(alias) {
-  const parts = alias.split(/\s+/);
+  const parts = comparableFullName(alias).split(/\s+/).filter(Boolean);
   if (parts.length === 1) {
     return { firstName: "", middleName: "", lastName: parts[0] };
   }
@@ -184,12 +238,23 @@ export function checkNameMatch(searchName, sdnEntry, threshold = 85) {
     lastName: sdnEntry.lastName,
   });
 
-  let bestScore = primaryScore;
-  let matchedName = sdnEntry.fullName;
+  const primaryName =
+    sdnEntry.fullName ||
+    [sdnEntry.firstName, sdnEntry.middleName, sdnEntry.lastName]
+      .filter(Boolean)
+      .join(" ");
+  let bestScore = Math.max(
+    primaryScore,
+    qualifyingFullNameScore(searchName, primaryName, threshold)
+  );
+  let matchedName = primaryName;
 
   if (sdnEntry.aliases?.length) {
     for (const alias of sdnEntry.aliases) {
-      const aliasScore = calculateNameSimilarity(searchName, parseAlias(alias));
+      const aliasScore = Math.max(
+        calculateNameSimilarity(searchName, parseAlias(alias)),
+        qualifyingFullNameScore(searchName, alias, threshold)
+      );
       if (aliasScore > bestScore) {
         bestScore = aliasScore;
         matchedName = alias;

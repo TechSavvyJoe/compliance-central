@@ -13,7 +13,7 @@
       <header class="hub-header">
         <div class="header-content">
           <div class="logo">
-            <img src="icons/icon128.png" alt="Compliance Central" />
+            <img src="icons/icon128.png" alt="" width="42" height="42" />
           </div>
           <div class="header-text">
             <h1>Compliance Central</h1>
@@ -45,16 +45,24 @@
 
         <div id="inputPanel">
         <section class="input-section">
-          <h3 class="section-title">
+          <h2 class="section-title">
             <span class="section-icon icon icon-user"></span>
             Customer Information
             <span id="buyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
-          </h3>
+          </h2>
 
-          <button id="scanLicenseBtn" type="button" class="btn-secondary btn-ghost scan-license-btn">
+          <button
+            id="scanLicenseBtn"
+            type="button"
+            class="btn-secondary btn-ghost scan-license-btn"
+            aria-describedby="scanLicenseHint"
+          >
             <span class="btn-icon icon icon-user"></span>
             Scan license with phone
           </button>
+          <p id="scanLicenseHint" class="scan-license-hint">
+            Use your phone camera; the customer fields fill here automatically.
+          </p>
 
           <div class="form-row">
             <div class="form-group">
@@ -94,7 +102,7 @@
                   id="dob"
                   placeholder="MM/DD/YYYY"
                   inputmode="numeric"
-                  autocomplete="bday"
+                  autocomplete="off"
                   aria-required="true"
                   aria-haspopup="dialog"
                   aria-expanded="false"
@@ -120,11 +128,11 @@
         </div>
 
         <section id="coBuyerSection" class="input-section cobuyer-section hidden">
-          <h3 class="section-title">
+          <h2 class="section-title">
             <span class="section-icon icon icon-users"></span>
             Co-Buyer Information
             <span id="coBuyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
-          </h3>
+          </h2>
 
           <div class="form-row">
             <div class="form-group">
@@ -176,27 +184,29 @@
             </div>
             <div class="form-group">
               <label for="cbDlnPid">DLN/PID <span class="required">*</span></label>
-              <input type="text" id="cbDlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" />
+              <input type="text" id="cbDlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" aria-describedby="cbDlnPidHelp" />
+              <small id="cbDlnPidHelp" class="helper-text">Front of the ID — letter + 12 digits, or a 9–12 digit PID</small>
             </div>
           </div>
         </section>
 
         <section class="input-section trade-section">
-          <h3
-            class="section-title trade-section-title"
-            id="tradeSectionHeader"
-            role="button"
-            tabindex="0"
-            aria-expanded="false"
-            aria-controls="tradeSectionContent"
-          >
-            <span class="trade-title-left">
-              <span class="section-icon icon icon-car"></span>
-              Trade-In Vehicle
-            </span>
-            <span class="optional-label">(Optional)</span>
-            <span class="section-toggle icon icon-chevron" aria-hidden="true"></span>
-          </h3>
+          <h2>
+            <button
+              class="section-title trade-section-title"
+              id="tradeSectionHeader"
+              type="button"
+              aria-expanded="false"
+              aria-controls="tradeSectionContent"
+            >
+              <span class="trade-title-left">
+                <span class="section-icon icon icon-car"></span>
+                Trade-In Vehicle
+              </span>
+              <span class="optional-label">(Optional)</span>
+              <span class="section-toggle icon icon-chevron" aria-hidden="true"></span>
+            </button>
+          </h2>
 
           <div id="tradeSectionContent" class="section-content collapsed">
             <div class="form-row">
@@ -216,8 +226,17 @@
         </div>
 
         <section class="action-section">
-          <div class="main-actions">
-            <button id="runAllChecksBtn" class="btn-primary btn-large">
+          <p id="dataUseNote" class="data-use-note">
+            Before you run: OFAC screening stays on this device. Any check saves the entered
+            customer fields and result text locally for up to 30 days / 50 records; clear them
+            anytime in History. By selecting Run All Checks, Repeat Offender, or Title/Lien,
+            you also agree to securely send the entered name, birth date, license/ID number,
+            and VIN when used to obtain the official Michigan result.
+            <a href="https://techsavvyjoe.github.io/compliance-central/" target="_blank" rel="noopener noreferrer">Privacy details</a>
+          </p>
+
+          <div class="main-actions" role="group" aria-label="Primary actions">
+            <button id="runAllChecksBtn" class="btn-primary btn-large" aria-describedby="dataUseNote">
               <span class="btn-icon icon icon-play"></span>
               Run All Checks
             </button>
@@ -227,24 +246,24 @@
             </button>
           </div>
 
-          <div class="individual-checks">
-            <button id="runOfacBtn" class="btn-secondary btn-ghost">
+          <div class="individual-checks" role="group" aria-label="Run one compliance check">
+            <button id="runOfacBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
               <span class="btn-icon icon icon-globe"></span>
               OFAC Only
             </button>
-            <button id="runRepeatOffenderBtn" class="btn-secondary btn-ghost">
+            <button id="runRepeatOffenderBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
               <span class="btn-icon icon icon-ban"></span>
               Repeat Offender
             </button>
-            <button id="runTitleBtn" class="btn-secondary btn-ghost" disabled>
+            <button id="runTitleBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote" disabled>
               <span class="btn-icon icon icon-file"></span>
               Title/Lien
             </button>
           </div>
         </section>
 
-        <section id="progressSection" class="progress-section hidden" aria-live="polite" aria-atomic="true">
-          <h3 class="section-title">Check Progress</h3>
+        <section id="progressSection" class="progress-section hidden" aria-live="polite">
+          <h2 id="progressSectionTitle" class="section-title">Check Progress</h2>
 
           <div class="check-items">
             <div class="check-item">
@@ -261,17 +280,26 @@
             </div>
           </div>
 
-          <div class="progress-bar">
+          <div
+            class="progress-bar"
+            role="progressbar"
+            aria-labelledby="progressSectionTitle"
+            aria-describedby="progressLabel"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            aria-valuetext="Starting"
+          >
             <div id="progressFill" class="progress-fill"></div>
           </div>
           <div class="progress-text">
             <span class="progress-spinner" id="progressSpinner"></span>
-            <span id="progressPercent">0%</span>
+            <span id="progressPercent" aria-hidden="true">0%</span>
             <span id="progressLabel">Starting...</span>
           </div>
         </section>
 
-        <section id="resultsSection" class="results-section hidden">
+        <section id="resultsSection" class="results-section hidden" aria-label="Compliance check results">
           <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
 
           <div class="results-grid">
@@ -285,7 +313,7 @@
                 <button class="btn-secondary btn-sm" id="printOfacBtn">
                   <span class="icon icon-printer"></span>Print
                 </button>
-                <button class="btn-secondary btn-sm" id="downloadOfacBtn">
+                <button class="btn-secondary btn-emphasis btn-sm" id="downloadOfacBtn">
                   <span class="icon icon-download"></span>Download PDF
                 </button>
               </div>
@@ -301,7 +329,7 @@
                 <button class="btn-secondary btn-sm hidden" id="printRepeatBtn">
                   <span class="icon icon-printer"></span>Print
                 </button>
-                <button class="btn-secondary btn-sm hidden" id="downloadRepeatBtn">
+                <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadRepeatBtn">
                   <span class="icon icon-download"></span>Download PDF
                 </button>
               </div>
@@ -317,7 +345,7 @@
                 <button class="btn-secondary btn-sm hidden" id="printTitleBtn">
                   <span class="icon icon-printer"></span>Print
                 </button>
-                <button class="btn-secondary btn-sm hidden" id="downloadTitleBtn">
+                <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadTitleBtn">
                   <span class="icon icon-download"></span>Download PDF
                 </button>
               </div>
@@ -325,7 +353,7 @@
           </div>
 
           <div id="coBuyerResultsSection" class="cobuyer-results hidden">
-            <h3 class="section-subtitle"><span class="icon icon-users"></span>Co-Buyer Results</h3>
+            <h2 class="section-subtitle"><span class="icon icon-users"></span>Co-Buyer Results</h2>
             <div class="results-grid">
               <div class="result-card" id="cbOfacResultCard">
                 <div class="result-header">
@@ -337,7 +365,7 @@
                   <button class="btn-secondary btn-sm" id="printCbOfacBtn">
                     <span class="icon icon-printer"></span>Print
                   </button>
-                  <button class="btn-secondary btn-sm" id="downloadCbOfacBtn">
+                  <button class="btn-secondary btn-emphasis btn-sm" id="downloadCbOfacBtn">
                     <span class="icon icon-download"></span>Download PDF
                   </button>
                 </div>
@@ -353,7 +381,7 @@
                   <button class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
                     <span class="icon icon-printer"></span>Print
                   </button>
-                  <button class="btn-secondary btn-sm hidden" id="downloadCbRepeatBtn">
+                  <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadCbRepeatBtn">
                     <span class="icon icon-download"></span>Download PDF
                   </button>
                 </div>
@@ -366,7 +394,7 @@
               <span class="btn-icon icon icon-printer"></span>
               Print All
             </button>
-            <button id="downloadPdfBtn" class="btn-secondary">
+            <button id="downloadPdfBtn" class="btn-secondary btn-emphasis">
               <span class="btn-icon icon icon-download"></span>
               Download PDF
             </button>
@@ -387,7 +415,7 @@
             <h3 id="historyModalTitle">Compliance History</h3>
             <button class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
           </div>
-          <div class="modal-body" id="historyList"></div>
+          <div class="modal-body" id="historyList" aria-live="polite"></div>
           <div class="modal-footer">
             <button id="exportAuditLogBtn" class="btn-hist" title="Export the full audit log as a CSV file">
               <span class="btn-icon icon icon-download"></span>
@@ -449,7 +477,7 @@
                     autocomplete="off"
                     spellcheck="false"
                   />
-                  <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show or hide key">
+                  <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show custom backend key" aria-pressed="false">
                     <span class="icon icon-eye"></span>
                   </button>
                 </div>
@@ -482,23 +510,23 @@
         </div>
       </div>
 
-      <div id="loadingOverlay" class="loading-overlay hidden" role="alert" aria-live="assertive">
+      <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-spinner" aria-hidden="true"></div>
         <p class="loading-text" id="loadingText">Processing...</p>
       </div>
     </div>
 
-    <div id="scanPairModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanPairTitle">
+    <div id="scanPairModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanPairTitle" aria-describedby="scanPairInstructions">
       <div class="modal-content">
         <div class="modal-header">
           <h3 id="scanPairTitle">Scan with your phone</h3>
           <button class="modal-close" id="scanPairCloseX" aria-label="Close pairing modal">&times;</button>
         </div>
         <div class="modal-body">
-          <p class="hint">On your phone, open the camera and point it at this code. You'll
+          <p id="scanPairInstructions" class="hint">On your phone, open the camera and point it at this code. You'll
             scan the license barcode on your phone — the fields fill here automatically.</p>
-          <div id="scanPairQr" class="scan-pair-qr"></div>
-          <p id="scanPairStatus" class="status" role="status" aria-live="polite">Starting…</p>
+          <div id="scanPairQr" class="scan-pair-qr" role="img" aria-label="QR code to connect your phone"></div>
+          <p id="scanPairStatus" class="scan-pair-status" role="status" aria-live="polite">Creating a secure connection…</p>
         </div>
         <div class="modal-footer">
           <button id="scanPairCancel" class="btn-secondary btn-ghost">Cancel</button>

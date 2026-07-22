@@ -9,11 +9,15 @@
  * Progress weighting: OFAC 0-20%, MDOS 20-95%, finalization 95-100%.
  * `inFlightCheck` is written before each await so the sidepanel can mark
  * the current row as "Running" with a pulse animation.
+ *
+ * Cancellation: Clear / stuck-timeout persist a run-ID tombstone. Every write
+ * verifies that its run is still active, so a late finish cannot publish.
  */
 
 import { handleOfacCheck } from "./ofac-check.js";
 import { handleRepeatOffenderCheck, handleTitleCheck } from "./mdos-check.js";
 import { atomicStateUpdate } from "./state.js";
+import { createRunId, isCurrentRunState } from "../../lib/run-fence.js";
 import {
   STORAGE_KEYS,
   SEARCH_STATUS,
@@ -24,20 +28,151 @@ import {
 // second concurrent run would collide with the first. The sidepanel also
 // disables its buttons while running; this is the worker-side backstop.
 let runInFlight = false;
+let currentRunId = null;
+let abortedRunId = null;
+let currentAbortController = null;
 
-export async function handleRunAllChecks(data) {
-  if (runInFlight) {
-    return { success: false, error: "A compliance run is already in progress." };
-  }
-  runInFlight = true;
+function hasActiveRunState(current, runId) {
+  return isCurrentRunState(
+    {
+      activeRunId: current[STORAGE_KEYS.activeRunId],
+      stateRunId: current[STORAGE_KEYS.stateRunId],
+      cancelledRunId: current[STORAGE_KEYS.cancelledRunId],
+    },
+    runId
+  );
+}
+
+export function isRunInFlight() {
+  return runInFlight;
+}
+
+/**
+ * Wait for all branches during normal operation, but release the run lock as
+ * soon as the shared signal is cancelled. Promise.allSettled keeps observing
+ * any detached work so a late rejection cannot become unhandled; each branch
+ * is independently fenced from publishing after cancellation.
+ */
+export async function waitForSettledOrAbort(promises, signal) {
+  const settled = Promise.allSettled(promises);
+  if (!signal) return settled;
+  if (signal.aborted) return null;
+
+  let onAbort;
+  const aborted = new Promise((resolve) => {
+    onAbort = () => resolve(null);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
   try {
-    return await runAllChecks(data);
+    return await Promise.race([settled, aborted]);
   } finally {
-    runInFlight = false;
+    signal.removeEventListener("abort", onAbort);
   }
 }
 
-async function runAllChecks(data) {
+/** Request abort and persist a tombstone that fences all delayed writes. */
+export async function cancelCurrentRun(requestedRunId) {
+  const runId = requestedRunId || currentRunId;
+  const wasRunning =
+    runInFlight && (!requestedRunId || requestedRunId === currentRunId);
+  if (wasRunning) {
+    abortedRunId = currentRunId;
+    currentAbortController?.abort();
+  }
+  let shouldCleanRunArtifacts = !runId;
+
+  if (runId) {
+    const stored = await chrome.storage.session.get(STORAGE_KEYS.activeRunId);
+    const storedRunId = stored[STORAGE_KEYS.activeRunId];
+    // Never let a delayed cancel for an older run invalidate a newer run.
+    const targetsCurrentMemoryRun = !currentRunId || currentRunId === runId;
+    if (storedRunId === runId || (!storedRunId && targetsCurrentMemoryRun)) {
+      shouldCleanRunArtifacts = true;
+      await chrome.storage.session.set({
+        [STORAGE_KEYS.cancelledRunId]: runId,
+        [STORAGE_KEYS.activeRunId]: null,
+        [STORAGE_KEYS.stateRunId]: runId,
+        [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
+        [STORAGE_KEYS.searchProgress]: 0,
+        [STORAGE_KEYS.inFlightCheck]: null,
+      });
+    }
+  }
+
+  if (shouldCleanRunArtifacts) {
+    await chrome.storage.session.remove([
+      STORAGE_KEYS.repeatOffenderScreenshot,
+      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
+      STORAGE_KEYS.titleScreenshot,
+      STORAGE_KEYS.lastResult,
+    ]);
+    await chrome.action.setBadgeText({ text: "" });
+  }
+  return { success: true, cancelled: wasRunning };
+}
+
+export async function handleRunAllChecks(data, onInitialized) {
+  if (runInFlight) {
+    return { success: false, error: "A compliance run is already in progress." };
+  }
+  const runId = data.runId || createRunId();
+  const abortController = new AbortController();
+  runInFlight = true;
+  currentRunId = runId;
+  abortedRunId = null;
+  currentAbortController = abortController;
+  try {
+    return await runAllChecks(
+      data,
+      runId,
+      abortController.signal,
+      onInitialized
+    );
+  } finally {
+    runInFlight = false;
+    if (currentRunId === runId) currentRunId = null;
+    if (abortedRunId === runId) abortedRunId = null;
+    if (currentAbortController === abortController) {
+      currentAbortController = null;
+    }
+  }
+}
+
+/**
+ * Start a run and acknowledge it only after the initial session state has been
+ * published. The remaining work continues in the background and reports via
+ * storage events, preserving the side panel's existing event-driven flow.
+ */
+export async function startRunAllChecks(data) {
+  if (runInFlight) {
+    return { success: false, error: "A compliance run is already in progress." };
+  }
+
+  let resolveStarted;
+  let acknowledged = false;
+  const started = new Promise((resolve) => {
+    resolveStarted = resolve;
+  });
+  const acknowledge = (result) => {
+    if (acknowledged) return;
+    acknowledged = true;
+    resolveStarted(result);
+  };
+
+  handleRunAllChecks(data, acknowledge).then(
+    (result) => acknowledge(result),
+    (err) => {
+      acknowledge({
+        success: false,
+        error: err instanceof Error ? err.message : "Could not start checks.",
+      });
+      console.error("[Orchestrator] RUN_ALL_CHECKS failed:", err);
+    }
+  );
+  return started;
+}
+
+async function runAllChecks(data, runId, signal, onInitialized) {
   const { customer, hasTrade } = data;
 
   const results = {
@@ -46,19 +181,43 @@ async function runAllChecks(data) {
     hasTrade,
     runType: "full",
     runLabel: "Run All Checks",
+    runId,
     checks: {},
   };
 
-  await chrome.storage.session.set({
-    [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
-    [STORAGE_KEYS.searchProgress]: 0,
-    [STORAGE_KEYS.currentResults]: results,
-    [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
-  });
+  try {
+    await chrome.storage.session.set({
+      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
+      [STORAGE_KEYS.searchProgress]: 0,
+      [STORAGE_KEYS.currentResults]: results,
+      [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
+      [STORAGE_KEYS.activeRunId]: runId,
+      [STORAGE_KEYS.stateRunId]: runId,
+    });
+    onInitialized?.({ success: true, status: "started", runId });
+  } catch (error) {
+    onInitialized?.({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not publish the initial check state.",
+    });
+    throw error;
+  }
 
+  const isAborted = () => abortedRunId === runId || signal.aborted;
+  if (isAborted()) {
+    return { success: false, cancelled: true, runId };
+  }
   const saveState = async (progress) => {
+    if (isAborted()) return;
     await atomicStateUpdate((current) => {
-      const update = { [STORAGE_KEYS.currentResults]: results };
+      if (isAborted() || !hasActiveRunState(current, runId)) return {};
+      const update = {
+        [STORAGE_KEYS.currentResults]: results,
+        [STORAGE_KEYS.stateRunId]: runId,
+      };
       if (progress !== undefined) {
         // Keep progress monotonic: the OFAC and MDOS branches write
         // concurrently, so never let a later write move the bar backwards.
@@ -70,7 +229,14 @@ async function runAllChecks(data) {
   };
 
   const setInFlight = async (key) => {
-    await chrome.storage.session.set({ [STORAGE_KEYS.inFlightCheck]: key });
+    if (isAborted()) return;
+    await atomicStateUpdate((current) => {
+      if (!hasActiveRunState(current, runId)) return {};
+      return {
+        [STORAGE_KEYS.inFlightCheck]: key,
+        [STORAGE_KEYS.stateRunId]: runId,
+      };
+    });
   };
 
   try {
@@ -78,6 +244,7 @@ async function runAllChecks(data) {
 
     // OFAC checks (parallel).
     const ofacPromise = handleOfacCheck(customer).then(async (result) => {
+      if (isAborted()) return;
       if (result.success) {
         results.checks.ofac = {
           ...result.result,
@@ -95,6 +262,7 @@ async function runAllChecks(data) {
 
     const coBuyerOfacPromise = hasCoBuyer
       ? handleOfacCheck(customer.coBuyer).then(async (result) => {
+          if (isAborted()) return;
           if (result.success) {
             results.checks.coBuyerOfac = {
               ...result.result,
@@ -122,13 +290,17 @@ async function runAllChecks(data) {
       const progressPerCheck = (mdosEnd - mdosStart) / totalMdosChecks;
 
       const updateMdosProgress = async (checkProgress = 0) => {
+        if (isAborted()) return;
         const overall = Math.round(
-          mdosStart + completedMdos * progressPerCheck + checkProgress * progressPerCheck
+          mdosStart +
+            completedMdos * progressPerCheck +
+            checkProgress * progressPerCheck
         );
         await saveState(overall);
       };
 
       // 1. Buyer Repeat Offender (Michigan license/ID only).
+      if (isAborted()) return;
       if (customer.buyerIsMichigan === false) {
         // Flash the in-flight indicator so the progress row still reflects the
         // check before it resolves to skipped (parity with the run path).
@@ -142,48 +314,46 @@ async function runAllChecks(data) {
         completedMdos++;
         await updateMdosProgress(0);
       } else {
-      await setInFlight(IN_FLIGHT.repeatOffender);
-      await updateMdosProgress(0);
-      try {
-        const customerWithKey = {
-          ...customer,
-          screenshotStorageKey: STORAGE_KEYS.repeatOffenderScreenshot,
-        };
-        await updateMdosProgress(0.2);
-        const roResult = await handleRepeatOffenderCheck(customerWithKey);
-        await updateMdosProgress(0.8);
+        await setInFlight(IN_FLIGHT.repeatOffender);
+        await updateMdosProgress(0);
+        if (isAborted()) return;
+        try {
+          const customerWithKey = {
+            ...customer,
+            suppressSideEffects: true,
+            signal,
+          };
+          await updateMdosProgress(0.2);
+          const roResult = await handleRepeatOffenderCheck(customerWithKey);
+          if (isAborted()) return;
+          await updateMdosProgress(0.8);
 
-        if (roResult.success) {
-          const checkRes = roResult.result;
-          checkRes.passed = checkRes.status === "eligible";
-          const roStorage = await chrome.storage.session.get(
-            STORAGE_KEYS.repeatOffenderScreenshot
-          );
-          if (roStorage[STORAGE_KEYS.repeatOffenderScreenshot]) {
-            checkRes.screenshotData =
-              roStorage[STORAGE_KEYS.repeatOffenderScreenshot];
+          if (roResult.success) {
+            const checkRes = roResult.result;
+            checkRes.passed = checkRes.status === "eligible";
+            results.checks.repeatOffender = checkRes;
+          } else {
+            results.checks.repeatOffender = {
+              passed: false,
+              error: roResult.error,
+              status: "error",
+            };
           }
-          results.checks.repeatOffender = checkRes;
-        } else {
+        } catch (e) {
+          if (isAborted()) return;
+          console.error("Repeat Offender error:", e);
           results.checks.repeatOffender = {
             passed: false,
-            error: roResult.error,
+            error: e.message,
             status: "error",
           };
         }
-      } catch (e) {
-        console.error("Repeat Offender error:", e);
-        results.checks.repeatOffender = {
-          passed: false,
-          error: e.message,
-          status: "error",
-        };
-      }
-      completedMdos++;
-      await updateMdosProgress(0);
+        completedMdos++;
+        await updateMdosProgress(0);
       }
 
       // 2. Co-Buyer Repeat Offender.
+      if (isAborted()) return;
       if (hasCoBuyer) {
         if (customer.coBuyerIsMichigan === false) {
           await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
@@ -196,66 +366,61 @@ async function runAllChecks(data) {
           completedMdos++;
           await updateMdosProgress(0);
         } else {
-        await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
-        try {
-          const coBuyerWithKey = {
-            ...customer.coBuyer,
-            screenshotStorageKey: STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-          };
-          await updateMdosProgress(0.2);
-          const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
-          await updateMdosProgress(0.8);
+          await setInFlight(IN_FLIGHT.coBuyerRepeatOffender);
+          if (isAborted()) return;
+          try {
+            const coBuyerWithKey = {
+              ...customer.coBuyer,
+              suppressSideEffects: true,
+              signal,
+            };
+            await updateMdosProgress(0.2);
+            const cbRoResult = await handleRepeatOffenderCheck(coBuyerWithKey);
+            if (isAborted()) return;
+            await updateMdosProgress(0.8);
 
-          if (cbRoResult.success) {
-            const checkRes = cbRoResult.result;
-            checkRes.passed = checkRes.status === "eligible";
-            const cbStorage = await chrome.storage.session.get(
-              STORAGE_KEYS.coBuyerRepeatOffenderScreenshot
-            );
-            if (cbStorage[STORAGE_KEYS.coBuyerRepeatOffenderScreenshot]) {
-              checkRes.screenshotData =
-                cbStorage[STORAGE_KEYS.coBuyerRepeatOffenderScreenshot];
+            if (cbRoResult.success) {
+              const checkRes = cbRoResult.result;
+              checkRes.passed = checkRes.status === "eligible";
+              results.checks.coBuyerRepeatOffender = checkRes;
+            } else {
+              results.checks.coBuyerRepeatOffender = {
+                passed: false,
+                error: cbRoResult.error,
+                status: "error",
+              };
             }
-            results.checks.coBuyerRepeatOffender = checkRes;
-          } else {
+          } catch (e) {
+            if (isAborted()) return;
+            console.error("Co-Buyer Repeat Offender error:", e);
             results.checks.coBuyerRepeatOffender = {
               passed: false,
-              error: cbRoResult.error,
+              error: e.message,
               status: "error",
             };
           }
-        } catch (e) {
-          console.error("Co-Buyer Repeat Offender error:", e);
-          results.checks.coBuyerRepeatOffender = {
-            passed: false,
-            error: e.message,
-            status: "error",
-          };
-        }
-        completedMdos++;
-        await updateMdosProgress(0);
+          completedMdos++;
+          await updateMdosProgress(0);
         }
       }
 
       // 3. Title check.
+      if (isAborted()) return;
       if (hasTrade) {
         await setInFlight(IN_FLIGHT.title);
+        if (isAborted()) return;
         try {
           await updateMdosProgress(0.2);
           const titleResult = await handleTitleCheck({
             vin: customer.tradeVin,
+            suppressSideEffects: true,
+            signal,
           });
+          if (isAborted()) return;
           await updateMdosProgress(0.8);
 
           if (titleResult.success) {
-            const checkRes = titleResult.result;
-            const titleStorage = await chrome.storage.session.get(
-              STORAGE_KEYS.titleScreenshot
-            );
-            if (titleStorage[STORAGE_KEYS.titleScreenshot]) {
-              checkRes.screenshotData = titleStorage[STORAGE_KEYS.titleScreenshot];
-            }
-            results.checks.title = checkRes;
+            results.checks.title = titleResult.result;
           } else {
             results.checks.title = {
               passed: false,
@@ -265,6 +430,7 @@ async function runAllChecks(data) {
             };
           }
         } catch (e) {
+          if (isAborted()) return;
           console.error("Title check error:", e);
           results.checks.title = {
             passed: false,
@@ -280,7 +446,14 @@ async function runAllChecks(data) {
 
     // allSettled (not all): one failing branch must not wipe the others, so
     // partial results (e.g. OFAC passed but MDOS errored) still render.
-    await Promise.allSettled([ofacPromise, coBuyerOfacPromise, mdosPromise]);
+    await waitForSettledOrAbort(
+      [ofacPromise, coBuyerOfacPromise, mdosPromise],
+      signal
+    );
+
+    if (isAborted()) {
+      return { success: false, cancelled: true };
+    }
 
     // Guard against any branch rejecting before it recorded a result, so a
     // finished run can never silently omit a check the user expected to run.
@@ -304,19 +477,37 @@ async function runAllChecks(data) {
       ensureResult("title", "Title check", { warning: true });
     }
 
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.complete,
-      [STORAGE_KEYS.searchProgress]: 100,
-      [STORAGE_KEYS.currentResults]: results,
-      [STORAGE_KEYS.inFlightCheck]: null,
+    if (isAborted()) {
+      return { success: false, cancelled: true };
+    }
+
+    const publication = await atomicStateUpdate((current) => {
+      if (!hasActiveRunState(current, runId)) return {};
+      return {
+        [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.complete,
+        [STORAGE_KEYS.searchProgress]: 100,
+        [STORAGE_KEYS.currentResults]: results,
+        [STORAGE_KEYS.inFlightCheck]: null,
+        [STORAGE_KEYS.stateRunId]: runId,
+      };
     });
-    return { success: true };
+    if (publication.error) throw publication.error;
+    return publication.applied
+      ? { success: true, runId }
+      : { success: false, cancelled: true, runId };
   } catch (err) {
+    if (isAborted()) {
+      return { success: false, cancelled: true };
+    }
     console.error("Run-all error:", err);
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
-      [STORAGE_KEYS.lastError]: err.message,
-      [STORAGE_KEYS.inFlightCheck]: null,
+    await atomicStateUpdate((current) => {
+      if (!hasActiveRunState(current, runId)) return {};
+      return {
+        [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
+        [STORAGE_KEYS.lastError]: err.message,
+        [STORAGE_KEYS.inFlightCheck]: null,
+        [STORAGE_KEYS.stateRunId]: runId,
+      };
     });
     return { success: false, error: err.message };
   }

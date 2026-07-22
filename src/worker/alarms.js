@@ -24,7 +24,7 @@ function nextRefreshTimestamp() {
 
 export async function setupUpdateAlarm() {
   await chrome.alarms.clear(UPDATE_ALARM_NAME);
-  chrome.alarms.create(UPDATE_ALARM_NAME, {
+  await chrome.alarms.create(UPDATE_ALARM_NAME, {
     when: nextRefreshTimestamp(),
     periodInMinutes: 24 * 60,
   });
@@ -35,6 +35,9 @@ export function registerAlarmListeners() {
   // an unhandled rejection, which Chrome surfaces on the extension Errors page.
   chrome.runtime.onInstalled.addListener(async (details) => {
     try {
+      // Persist the next refresh before doing a potentially long first download.
+      // If Chrome stops the worker mid-update, the alarm still recovers later.
+      await setupUpdateAlarm();
       if (details.reason === "install") {
         await initDB();
         await performSDNUpdate();
@@ -45,7 +48,6 @@ export function registerAlarmListeners() {
           await performSDNUpdate();
         }
       }
-      await setupUpdateAlarm();
     } catch (err) {
       console.error("[Alarms] onInstalled handler failed:", err);
     }
@@ -53,12 +55,12 @@ export function registerAlarmListeners() {
 
   chrome.runtime.onStartup.addListener(async () => {
     try {
+      await setupUpdateAlarm();
       await initDB();
       const status = await handleGetDataStatus();
       if (status.needsUpdate) {
         await performSDNUpdate();
       }
-      await setupUpdateAlarm();
     } catch (err) {
       console.error("[Alarms] onStartup handler failed:", err);
     }

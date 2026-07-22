@@ -4,6 +4,7 @@
 
 import { CONFIG } from "../../lib/config.js";
 import { STORAGE_KEYS, SEARCH_STATUS } from "../../lib/storage-keys.js";
+import { isCurrentRunState } from "../../lib/run-fence.js";
 
 let currentResults = null;
 let isRunning = false;
@@ -75,17 +76,51 @@ export async function loadPersistedResults() {
       STORAGE_KEYS.currentResults,
       STORAGE_KEYS.searchStatus,
       STORAGE_KEYS.searchProgress,
+      STORAGE_KEYS.activeRunId,
+      STORAGE_KEYS.stateRunId,
+      STORAGE_KEYS.cancelledRunId,
     ]);
 
     if (storage[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.running) {
+      const runState = {
+        activeRunId: storage[STORAGE_KEYS.activeRunId],
+        stateRunId: storage[STORAGE_KEYS.stateRunId],
+        cancelledRunId: storage[STORAGE_KEYS.cancelledRunId],
+      };
+      if (!isCurrentRunState(runState)) {
+        return { state: "idle" };
+      }
       const startTime = storage[STORAGE_KEYS.currentResults]?.timestamp;
       if (startTime) {
         const elapsed = Date.now() - new Date(startTime).getTime();
         if (elapsed > CONFIG.timeouts.stuckSearchTimeout) {
+          const runId = runState.activeRunId;
+          // Persist the tombstone before messaging the worker. Even if the
+          // worker is restarting, delayed state for this run is now rejected.
           await chrome.storage.session.set({
+            [STORAGE_KEYS.cancelledRunId]: runId,
+            [STORAGE_KEYS.activeRunId]: null,
+            [STORAGE_KEYS.stateRunId]: runId,
             [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
             [STORAGE_KEYS.searchProgress]: 0,
+            [STORAGE_KEYS.inFlightCheck]: null,
           });
+          try {
+            await chrome.runtime.sendMessage({
+              type: "CANCEL_CURRENT_RUN",
+              runId,
+            });
+          } catch {
+            // SW may be unavailable; still clear local session state.
+          }
+          await chrome.storage.session.remove([
+            STORAGE_KEYS.currentResults,
+            STORAGE_KEYS.repeatOffenderScreenshot,
+            STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
+            STORAGE_KEYS.titleScreenshot,
+            STORAGE_KEYS.lastResult,
+          ]);
+          await chrome.action.setBadgeText({ text: "" });
           return { state: "idle" };
         }
       }
@@ -96,10 +131,20 @@ export async function loadPersistedResults() {
         state: "running",
         results: currentResults,
         progress: storage[STORAGE_KEYS.searchProgress] || 0,
+        runId: runState.activeRunId,
       };
     }
 
-    if (storage[STORAGE_KEYS.currentResults]) {
+    const completedRunState = {
+      activeRunId: storage[STORAGE_KEYS.activeRunId],
+      stateRunId: storage[STORAGE_KEYS.stateRunId],
+      cancelledRunId: storage[STORAGE_KEYS.cancelledRunId],
+    };
+    if (
+      storage[STORAGE_KEYS.currentResults] &&
+      (storage[STORAGE_KEYS.currentResults].runType === "individual" ||
+        isCurrentRunState(completedRunState))
+    ) {
       const resultTime = new Date(storage[STORAGE_KEYS.currentResults].timestamp);
       const hoursDiff = (Date.now() - resultTime.getTime()) / 3600000;
       if (hoursDiff < 8) {
@@ -107,7 +152,11 @@ export async function loadPersistedResults() {
         if (currentResults.runType === "individual") {
           return { state: "individual", results: currentResults };
         }
-        return { state: "complete", results: currentResults };
+        return {
+          state: "complete",
+          results: currentResults,
+          runId: completedRunState.activeRunId,
+        };
       }
       currentResults = null;
       await chrome.storage.session.remove([

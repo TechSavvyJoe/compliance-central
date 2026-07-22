@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260722-16" />
+  <link rel="stylesheet" href="scan.css?v=20260722-18" />
 </head>
 <body>
   <header class="cc-header">
     <img class="cc-logo" src="icons/icon128.png" alt="" aria-hidden="true" />
-    <div class="cc-title">
-      <h1>Compliance Central</h1>
-      <span class="cc-subtitle">Michigan Dealer Compliance Hub</span>
-    </div>
+    <h1>Compliance Central</h1>
   </header>
 
   <main class="cc-main">
@@ -21,29 +18,51 @@
 
     <!-- Camera / scanning screen -->
     <section id="cameraScreen" class="screen" aria-labelledby="captureHeading">
-      <h2 id="captureHeading">Scan the buyer's license</h2>
-      <p id="captureInstructions" class="hint">Keep the <strong>wide PDF417 barcode</strong> on the back roughly inside
-        the large yellow area. It can be tilted or off-center — no need to line it up perfectly.
-        The scanner reads it automatically as soon as it is clear.
-        When asked, choose <strong>Allow</strong> for camera access.</p>
-      <div class="viewport" role="img"
-        aria-label="Live camera preview. Keep the wide barcode roughly within the large yellow scan area. Exact alignment is not required.">
-        <video id="video" playsinline muted autoplay aria-hidden="true"></video>
-        <div class="frame-guide" aria-hidden="true">
-          <span class="frame-label">Barcode can be anywhere here</span>
-        </div>
+      <h2 id="captureHeading">Scan the back of the buyer's ID</h2>
+      <p class="hint">Turn the Michigan license or state ID over.</p>
+      <div class="id-examples" role="group" aria-label="Which side of the ID to scan">
+        <figure class="id-example" aria-label="Front of ID: turn it over">
+          <img src="images/mi-id-front-demo.webp" width="640" height="402" alt=""
+            aria-hidden="true" decoding="async" />
+          <figcaption>
+            <span class="example-icon" aria-hidden="true">↻</span>
+            <span><strong>Front</strong><small>Turn it over</small></span>
+          </figcaption>
+        </figure>
+        <figure class="id-example is-target" aria-label="Back of ID: scan this side">
+          <img src="images/mi-id-back-demo.webp" width="640" height="404" alt=""
+            aria-hidden="true" decoding="async" />
+          <figcaption>
+            <span class="example-icon" aria-hidden="true">✓</span>
+            <span><strong>Back</strong><small>Scan this side</small></span>
+          </figcaption>
+        </figure>
       </div>
-      <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Starting camera…</p>
+      <p id="captureInstructions" class="scan-instruction">
+        <strong>Use the large, wide barcode at the bottom.</strong>
+        <span>Not the thin barcode.</span><span class="visually-hidden">
+          It can be tilted or off-center. Scanning is automatic.</span>
+      </p>
+      <div class="viewport-shell">
+        <div class="viewport" role="img"
+          aria-label="Live camera preview. Hold the back of the Michigan license or state ID in view and aim at the large, wide barcode at the bottom. It may be tilted or off-center. Scanning is automatic.">
+          <video id="video" playsinline muted autoplay aria-hidden="true"></video>
+          <div class="frame-guide" aria-hidden="true"></div>
+        </div>
+        <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Starting camera…</p>
+      </div>
       <p id="diag" class="diag hidden"></p>
       <div class="camera-actions">
-        <button id="torchBtn" class="btn btn-ghost hidden" type="button">Turn light on</button>
+        <button id="torchBtn" class="btn btn-ghost hidden" type="button"
+          aria-label="Turn camera light on" aria-pressed="false">Light</button>
         <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
-        <button id="photoBtn" class="btn btn-ghost" type="button" aria-controls="photoInput">Use a photo</button>
+        <button id="photoBtn" class="btn btn-ghost" type="button" aria-controls="photoInput"
+          aria-label="Choose a photo of the back of the license or state ID">Photo</button>
         <input id="photoInput" class="visually-hidden" type="file" accept="image/*"
-          aria-label="Choose a photo of the back of the license" tabindex="-1" />
+          aria-label="Choose a photo of the back of the license or state ID" tabindex="-1" />
       </div>
-      <p id="privacyNote" class="privacy-note">Scanning happens on this phone. The license image is not uploaded;
-        only the fields you review and confirm are encrypted and sent.</p>
+      <p id="privacyNote" class="privacy-note"
+        aria-label="Image stays on this phone. Only the details you approve are encrypted and sent.">Image stays on this phone.</p>
     </section>
 
     <!-- Review screen -->
@@ -82,6 +101,6 @@
   </main>
 
   <script src="lib/zxing.min.js?v=20260717-10"></script>
-  <script src="scan.js?v=20260722-16" type="module"></script>
+  <script src="scan.js?v=20260722-18" type="module"></script>
 </body>
 </html>

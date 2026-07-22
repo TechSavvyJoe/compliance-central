@@ -33,7 +33,7 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.16";
+const SCANNER_BUILD = "scanner-2026-07-22.18";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -219,17 +219,23 @@ function updateTorchButton(track) {
   if (!button) return;
   button.classList.toggle("hidden", !track);
   button.disabled = !track;
-  button.textContent = torchEnabled ? "Turn light off" : "Turn light on";
+  button.textContent = "Light";
+  button.setAttribute(
+    "aria-label",
+    torchEnabled ? "Turn camera light off" : "Turn camera light on"
+  );
+  button.setAttribute("aria-pressed", String(torchEnabled));
+  button.classList.toggle("is-active", torchEnabled);
 }
 
 function rejectHint(reason) {
   if (reason === "incomplete") {
-    return "Barcode found — hold steady while the scanner finishes reading it. Exact alignment is not required.";
+    return "Hold steady…";
   }
   if (reason === "not-aamva") {
-    return "Point at the wide PDF417 barcode on the back of the license (not a QR code or the thin 1D line).";
+    return "Show the large, wide barcode at the bottom.";
   }
-  return "Couldn't read that barcode. Hold steady and well-lit.";
+  return "Try again in better light.";
 }
 
 function cameraErrorMessage(error) {
@@ -273,7 +279,7 @@ function photoErrorMessage(reason) {
     return "That photo is too high-resolution to process safely on this phone. Crop it to the barcode or choose a standard-resolution copy.";
   }
   if (reason === "photo-not-image" || reason === "photo-empty") {
-    return "That file is not a usable photo. Choose an image of the back of the license.";
+    return "That file is not a usable photo. Choose an image of the back of the license or state ID.";
   }
   if (reason === "photo-decode-timeout") {
     return "Reading that photo took too long. Crop it to the wide barcode, choose a smaller photo, or try the camera.";
@@ -536,7 +542,7 @@ async function scanCommercialLicenseBarcode(provider, gen) {
     cancel: null,
   };
   activeRun = run;
-  el("status").textContent = "Starting production-grade scanner…";
+  el("status").textContent = "Starting scanner…";
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -565,7 +571,7 @@ async function scanCommercialLicenseBarcode(provider, gen) {
           return;
         }
         if (verdict.reason === "incomplete") {
-          el("status").textContent = "Barcode detected — decoding the full license…";
+          el("status").textContent = "Reading barcode…";
           if (DEBUG) {
             diag(`provider Dynamsoft · partial len ${raw.length}`);
           }
@@ -580,8 +586,7 @@ async function scanCommercialLicenseBarcode(provider, gen) {
         run.providerStopPromise = queueCommercialProviderStop(provider);
         return;
       }
-      el("status").textContent =
-        "Hold the wide barcode anywhere in the yellow area — capture is automatic.";
+      el("status").textContent = "";
       diag("provider Dynamsoft · camera ready");
     }).catch((error) => {
       if (!settled) {
@@ -604,7 +609,7 @@ async function scanLicenseBarcode(gen) {
       await stopCamera();
       if (gen !== captureGen) throw new Error("cancelled");
       diag(`Dynamsoft unavailable (${commercial.reason || error.message || "start failed"}) · fallback zxing`);
-      el("status").textContent = "Starting camera fallback…";
+      el("status").textContent = "Starting scanner…";
     }
   } else {
     diag(`provider zxing · ${commercial.reason || "commercial unavailable"}`);
@@ -654,7 +659,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
         lastNearMissAttempt = attempts;
       }
       if (nearMissFrames < PARTIAL_HINT_THRESHOLD) {
-        el("status").textContent = "Barcode detected — decoding…";
+        el("status").textContent = "Reading barcode…";
         diag(
           `partial len ${lastRawLen}` +
             (lastCodes ? ` · codes ${lastCodes}` : "") +
@@ -696,7 +701,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
   let nativeDetector = await createNativePdf417Detector();
   if (run.stopped || gen !== captureGen) throw new Error("cancelled");
 
-  el("status").textContent = "Requesting camera…";
+  el("status").textContent = "Starting camera…";
   const cameraRequest = createCameraRequest(
     (constraints) => navigator.mediaDevices.getUserMedia(constraints),
     { audio: false, video: HIRES },
@@ -720,8 +725,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
   }
   const track = await optimizeCamera(run.stream);
   const settings = readTrackSettings(track);
-  el("status").textContent =
-    "Hold the wide barcode anywhere in the yellow area — capture is automatic.";
+  el("status").textContent = "";
   diag(`camera ready · wasm warming`);
 
   // Do not stall camera startup on compilation. The throttled JS/native path
@@ -842,7 +846,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
           // Stop starting new WASM work for this run and continue with the
           // throttled pure-JS reader while the timed-out call settles.
           wasmReady = false;
-          el("status").textContent = "Still scanning — hold the barcode steady.";
+          el("status").textContent = "Hold steady…";
           diag("wasm frame timed out · continuing with js fallback");
           return;
         }
@@ -871,7 +875,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
             settled = true;
             reject(new Error("scanner-frame-failed"));
           } else {
-            el("status").textContent = "Still scanning — hold the barcode steady.";
+            el("status").textContent = "Hold steady…";
             diag(`camera frame retry ${consecutiveFrameErrors}/5`);
           }
         }
@@ -922,7 +926,9 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
   const pairingIssue = pairingConfigurationIssue();
   const contextIssue = waitForGesture ? browseContextIssue() : "";
   el("captureHeading").textContent =
-    which === "buyer" ? "Scan the buyer's license" : "Scan the co-buyer's license";
+    which === "buyer"
+      ? "Scan the back of the buyer's ID"
+      : "Scan the back of the co-buyer's ID";
   show("camera");
   el("status").textContent = "Starting camera…";
 
@@ -966,7 +972,7 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
     pending = person;
     renderReview(person);
     const rd = el("reviewDiag");
-    if (rd) {
+    if (DEBUG && rd) {
       const lf = (raw.match(/\n/g) || []).length;
       rd.textContent = `${SCANNER_BUILD} · codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
     }
@@ -979,7 +985,7 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
     const msg = e && e.message ? e.message : "unable to access camera.";
     if (msg === "cancelled") return;
     showError(cameraErrorMessage(e));
-    el("status").textContent = "Camera did not start.";
+    el("status").textContent = "";
     el("startBtn").textContent = "Try camera again";
     el("startBtn").classList.remove("hidden");
   }
@@ -1180,7 +1186,7 @@ async function decodePhoto(file) {
 
     const message = bestNearMiss
       ? "The barcode was found, but the photo did not contain the full license data. Try another sharp, well-lit photo."
-      : "No PDF417 license barcode was found. Try a sharp, well-lit photo of the back of the license.";
+      : "The large, wide barcode was not found. Try a sharp, well-lit photo of the back of the license or state ID.";
     el("status").textContent = "Photo scan unsuccessful.";
     showError(message);
     el("startBtn").textContent = "Try camera again";
@@ -1388,7 +1394,7 @@ el("photoBtn").addEventListener("click", () => {
   choosingPhoto = true;
   captureGen++;
   stopCamera();
-  el("status").textContent = "Choose a photo of the back of the license…";
+  el("status").textContent = "Choose a photo of the back of the license or state ID…";
   el("photoInput").click();
 });
 el("photoInput").addEventListener("change", (event) => {

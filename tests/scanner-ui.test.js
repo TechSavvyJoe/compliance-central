@@ -60,7 +60,7 @@ test("scanner exposes named regions and atomic live feedback", () => {
 test("photo fallback remains keyboard-accessible without an invisible tab stop", () => {
   assert.match(
     html,
-    /class="viewport" role="img"[^>]*aria-label="Live camera preview[^>]*Michigan license or state ID[^>]*large, wide barcode at the bottom[^>]*tilted or off-center[^>]*Scanning is automatic\./
+    /class="viewport" role="img"[^>]*aria-label="Live camera preview[^>]*Michigan license or state ID[^>]*second barcode from the top on the right[^>]*large, wide barcode directly under the thin one[^>]*tilted or off-center[^>]*Scanning is automatic\./
   );
   assert.match(html, /<video id="video"[^>]*aria-hidden="true"/);
   assert.match(
@@ -86,12 +86,14 @@ test("camera screen keeps only essential visible guidance", () => {
   );
   assert.match(
     html,
-    /class="id-example is-target" aria-label="Back of ID: scan this side"[\s\S]*?images\/mi-id-back-demo\.webp" width="640" height="404" alt=""[\s\S]*?<strong>Back<\/strong><small>Scan this side<\/small>/
+    /class="id-example is-target" aria-label="Back of ID: scan the second barcode on the right"[\s\S]*?images\/mi-id-back-demo\.webp" width="640" height="404" alt=""[\s\S]*?<strong>Back<\/strong><small>Scan 2nd barcode<\/small>/
   );
   assert.match(
     html,
-    /id="captureInstructions" class="scan-instruction">\s*<strong>Use the large, wide barcode at the bottom\.<\/strong>\s*<span>Not the thin barcode\.<\/span><span class="visually-hidden">\s*It can be tilted or off-center\. Scanning is automatic\.<\/span>/
+    /id="captureInstructions" class="scan-instruction">\s*<strong>Scan the second barcode from the top on the right\.<\/strong>\s*<span>It is the large, wide barcode under the thin one\.<\/span><span class="visually-hidden">\s*It can be tilted or off-center\. Scanning is automatic\.<\/span>/
   );
+  assert.doesNotMatch(html, /barcode at the bottom/i);
+  assert.doesNotMatch(scanJs, /barcode at the bottom/i);
   assert.doesNotMatch(html, /Michigan Dealer Compliance Hub/);
   assert.doesNotMatch(html, /PDF417/);
   assert.doesNotMatch(html, /When asked/);
@@ -137,9 +139,9 @@ test("normal scans do not populate implementation diagnostics", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260722-18");
+  assert.equal(cssVersion, "20260722-19");
   assert.equal(scriptVersion, cssVersion);
-  assert.match(pairingJs, /&cb=20260722-18#k=/);
+  assert.match(pairingJs, /&cb=20260722-19#k=/);
   assert.doesNotMatch(pairingJs, /debug=1/);
 });
 

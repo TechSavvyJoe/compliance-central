@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260722-18" />
+  <link rel="stylesheet" href="scan.css?v=20260722-19" />
 </head>
 <body>
   <header class="cc-header">
@@ -29,23 +29,23 @@
             <span><strong>Front</strong><small>Turn it over</small></span>
           </figcaption>
         </figure>
-        <figure class="id-example is-target" aria-label="Back of ID: scan this side">
+        <figure class="id-example is-target" aria-label="Back of ID: scan the second barcode on the right">
           <img src="images/mi-id-back-demo.webp" width="640" height="404" alt=""
             aria-hidden="true" decoding="async" />
           <figcaption>
             <span class="example-icon" aria-hidden="true">✓</span>
-            <span><strong>Back</strong><small>Scan this side</small></span>
+            <span><strong>Back</strong><small>Scan 2nd barcode</small></span>
           </figcaption>
         </figure>
       </div>
       <p id="captureInstructions" class="scan-instruction">
-        <strong>Use the large, wide barcode at the bottom.</strong>
-        <span>Not the thin barcode.</span><span class="visually-hidden">
+        <strong>Scan the second barcode from the top on the right.</strong>
+        <span>It is the large, wide barcode under the thin one.</span><span class="visually-hidden">
           It can be tilted or off-center. Scanning is automatic.</span>
       </p>
       <div class="viewport-shell">
         <div class="viewport" role="img"
-          aria-label="Live camera preview. Hold the back of the Michigan license or state ID in view and aim at the large, wide barcode at the bottom. It may be tilted or off-center. Scanning is automatic.">
+          aria-label="Live camera preview. Hold the back of the Michigan license or state ID in view and aim at the second barcode from the top on the right—the large, wide barcode directly under the thin one. It may be tilted or off-center. Scanning is automatic.">
           <video id="video" playsinline muted autoplay aria-hidden="true"></video>
           <div class="frame-guide" aria-hidden="true"></div>
         </div>
@@ -101,6 +101,6 @@
   </main>
 
   <script src="lib/zxing.min.js?v=20260717-10"></script>
-  <script src="scan.js?v=20260722-18" type="module"></script>
+  <script src="scan.js?v=20260722-19" type="module"></script>
 </body>
 </html>

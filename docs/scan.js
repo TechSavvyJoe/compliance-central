@@ -33,7 +33,7 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.18";
+const SCANNER_BUILD = "scanner-2026-07-22.19";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -233,7 +233,7 @@ function rejectHint(reason) {
     return "Hold steady…";
   }
   if (reason === "not-aamva") {
-    return "Show the large, wide barcode at the bottom.";
+    return "Show the second barcode from the top on the right — the large, wide one.";
   }
   return "Try again in better light.";
 }
@@ -1186,7 +1186,7 @@ async function decodePhoto(file) {
 
     const message = bestNearMiss
       ? "The barcode was found, but the photo did not contain the full license data. Try another sharp, well-lit photo."
-      : "The large, wide barcode was not found. Try a sharp, well-lit photo of the back of the license or state ID.";
+      : "The large, wide second barcode was not found. Try a sharp, well-lit photo of the back of the license or state ID.";
     el("status").textContent = "Photo scan unsuccessful.";
     showError(message);
     el("startBtn").textContent = "Try camera again";

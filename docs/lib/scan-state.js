@@ -1,4 +1,4 @@
-import { evaluateDetection } from "./aamva.js?v=20260717-10";
+import { evaluateDetection, parseAAMVA } from "./aamva.js?v=20260717-10";
 
 export const PHOTO_LIMITS = Object.freeze({
   maxBytes: 15 * 1024 * 1024,
@@ -6,6 +6,9 @@ export const PHOTO_LIMITS = Object.freeze({
   // unbounded decoder/canvas allocations on mobile devices.
   maxPixels: 50_000_000,
   maxEdge: 12_000,
+  // Above this size, decode a bounded canvas instead of asking WASM to expand
+  // a second full-resolution copy of the compressed phone photo.
+  maxDirectDecodePixels: 12_000_000,
 });
 
 /** Identify whether a scanner URL is standalone, fully paired, or incomplete. */
@@ -210,6 +213,71 @@ function fingerprint(text) {
   return hash >>> 0;
 }
 
+function normalizedPartialValue(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function validParsedDob(value) {
+  const match = String(value || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return false;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    year >= 1900 &&
+    year <= new Date().getUTCFullYear() &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function partialsBelongTogether(previous, current) {
+  if (!previous || !current) return false;
+  const previousIin = normalizedPartialValue(previous.iin);
+  const currentIin = normalizedPartialValue(current.iin);
+  if (!previousIin || previousIin !== currentIin) return false;
+
+  for (const field of ["dlnPid", "firstName", "lastName", "dob"]) {
+    const a = normalizedPartialValue(previous[field]);
+    const b = normalizedPartialValue(current[field]);
+    if (a && b && a !== b) return false;
+  }
+
+  const previousDln = normalizedPartialValue(previous.dlnPid);
+  const currentDln = normalizedPartialValue(current.dlnPid);
+  if (previousDln && previousDln === currentDln) return true;
+
+  // IIN alone identifies a state, not a person. Require two matching identity
+  // anchors before combining complementary fields from adjacent live frames.
+  let identityMatches = 0;
+  for (const field of ["firstName", "lastName", "dob"]) {
+    const a = normalizedPartialValue(previous[field]);
+    const b = normalizedPartialValue(current[field]);
+    if (a && a === b) identityMatches++;
+  }
+  return identityMatches >= 2;
+}
+
+function mergePartialPeople(previous, current) {
+  const merged = { ...previous };
+  for (const [key, value] of Object.entries(current || {})) {
+    if (value !== "" && value !== null && value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+function completePartialPerson(person) {
+  return Boolean(
+    person &&
+    normalizedPartialValue(person.dlnPid) &&
+    normalizedPartialValue(person.firstName) &&
+    normalizedPartialValue(person.lastName) &&
+    validParsedDob(person.dob)
+  );
+}
+
 /**
  * Stateful gate for detector results. Repeated rejected frames are suppressed,
  * while every complete AAMVA frame is evaluated and accepted immediately.
@@ -217,11 +285,32 @@ function fingerprint(text) {
 export function createDetectionGate(duplicateWindowMs = 1800) {
   let lastRejectedHash = null;
   let lastRejectedAt = 0;
+  let partialPerson = null;
+  let partialAt = 0;
+  const partialWindowMs = 3000;
 
   return {
     evaluate(raw, now = Date.now()) {
       const verdict = evaluateDetection(raw);
-      if (verdict.ok) return verdict;
+      if (verdict.ok) {
+        partialPerson = null;
+        return verdict;
+      }
+
+      if (verdict.reason === "incomplete") {
+        const current = parseAAMVA(raw);
+        const partialIsFresh =
+          partialPerson && now - partialAt >= 0 && now - partialAt <= partialWindowMs;
+        partialPerson = partialIsFresh && partialsBelongTogether(partialPerson, current)
+          ? mergePartialPeople(partialPerson, current)
+          : current;
+        partialAt = now;
+        if (completePartialPerson(partialPerson)) {
+          const person = partialPerson;
+          partialPerson = null;
+          return { ok: true, person, raw, combined: true };
+        }
+      }
 
       const normalized = typeof raw === "string" ? raw : String(raw || "");
       const hash = fingerprint(normalized);

@@ -17,6 +17,10 @@ const COMPLETE =
   "DLDAQS123456789012\nDCSSAMPLE\nDCTPAT ALEX\nDBB08081985\nDAJMI\n\r";
 const PARTIAL =
   "@\n\rANSI 636032100102DL00410279\nDLDCSAMPLE\nDCTPAT\nDBB08081985\nDAJMI\n\r";
+const PARTIAL_IDENTITY =
+  "@\n\rANSI 636032100102DL00410279\nDLDCSSAMPLE\nDACPAT\nDADALEX\nDBB08081985\nDAJMI\n\r";
+const PARTIAL_WITH_DLN =
+  "@\n\rANSI 636032100102DL00410279\nDLDAQS123456789012\nDCSSAMPLE\nDACPAT\nDAJMI\n\r";
 
 test("detection gate debounces duplicate partial frames", () => {
   const gate = createDetectionGate(1800);
@@ -34,6 +38,25 @@ test("later complete frame is accepted during duplicate cooldown", () => {
   assert.equal(accepted.ok, true);
   assert.equal(accepted.person.firstName, "PAT");
   assert.equal(accepted.person.isMichigan, true);
+});
+
+test("complementary partial frames from the same card complete immediately", () => {
+  const gate = createDetectionGate(1800);
+  assert.equal(gate.evaluate(PARTIAL_IDENTITY, 1000).reason, "incomplete");
+  const accepted = gate.evaluate(PARTIAL_WITH_DLN, 1200);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.combined, true);
+  assert.equal(accepted.person.firstName, "PAT");
+  assert.equal(accepted.person.lastName, "SAMPLE");
+  assert.equal(accepted.person.dob, "08/08/1985");
+  assert.equal(accepted.person.dlnPid, "S123456789012");
+});
+
+test("partial frames with conflicting identity data are never combined", () => {
+  const gate = createDetectionGate(1800);
+  assert.equal(gate.evaluate(PARTIAL_IDENTITY, 1000).reason, "incomplete");
+  const otherCard = PARTIAL_WITH_DLN.replace("DCSSAMPLE", "DCSOTHER");
+  assert.equal(gate.evaluate(otherCard, 1200).reason, "incomplete");
 });
 
 test("QR, malformed AAMVA, and empty detections stay rejected", () => {
@@ -73,6 +96,7 @@ test("photo dimension preflight allows 48 MP but bounds pathological canvases", 
     validatePhotoDimensions(0, 100).reason,
     "photo-invalid-dimensions"
   );
+  assert.equal(PHOTO_LIMITS.maxDirectDecodePixels, 12_000_000);
 });
 
 test("camera request timeout rejects and stops a stream that resolves late", async () => {

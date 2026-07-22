@@ -17,7 +17,7 @@ import {
   resolveBeforeTimeout,
   validatePhotoDimensions,
   validatePhotoFile,
-} from "./lib/scan-state.js?v=20260721-12";
+} from "./lib/scan-state.js?v=20260722-15";
 import {
   buildDecodeCrops,
   buildLiveDecodePlan,
@@ -27,13 +27,13 @@ import {
   decodePdf417File,
   decodePdf417Wasm,
   ensureWasmReader,
-} from "./lib/zxing-wasm-loader.js?v=20260721-11";
+} from "./lib/zxing-wasm-loader.js?v=20260722-15";
 import {
   createCommercialScannerProvider,
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.14";
+const SCANNER_BUILD = "scanner-2026-07-22.15";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
@@ -177,9 +177,11 @@ const LICENSE_FORMATS = ["pdf417"];
 
 // Best-effort continuous autofocus (advanced constraint; support varies).
 async function optimizeCamera(mediaStream) {
-  const track = mediaStream.getVideoTracks()[0];
-  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  let track = null;
+  try { track = mediaStream.getVideoTracks()[0] || null; } catch {}
   if (!track) return null;
+  let caps = {};
+  try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch {}
   if (caps.focusMode && caps.focusMode.includes("continuous")) {
     try {
       await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
@@ -187,6 +189,12 @@ async function optimizeCamera(mediaStream) {
   }
   updateTorchButton(caps.torch ? track : null);
   return track;
+}
+
+function readTrackSettings(track) {
+  try { return track && track.getSettings ? track.getSettings() : {}; } catch {
+    return {};
+  }
 }
 
 function waitForVideoFrame(video, timeoutMs = 2500) {
@@ -615,6 +623,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
   let lastRawLen = 0;
   let lastReject = "";
   let lastCodes = "";
+  let consecutiveFrameErrors = 0;
   const gate = createDetectionGate(DETECT_COOLDOWN_MS);
   const run = {
     gen,
@@ -710,7 +719,7 @@ async function scanOpenSourceLicenseBarcode(gen) {
     throw new Error("camera-not-ready");
   }
   const track = await optimizeCamera(run.stream);
-  const settings = track && track.getSettings ? track.getSettings() : {};
+  const settings = readTrackSettings(track);
   el("status").textContent =
     "Hold the wide barcode anywhere in the yellow area — capture is automatic.";
   diag(`camera ready · wasm warming`);
@@ -829,8 +838,15 @@ async function scanOpenSourceLicenseBarcode(gen) {
           LIVE_DECODE_TIMEOUT_RESULT
         );
         if (candidates === LIVE_DECODE_TIMEOUT_RESULT) {
-          throw new Error("scanner-frame-timeout");
+          // A slow WASM call must not end the whole scan on an older iPhone.
+          // Stop starting new WASM work for this run and continue with the
+          // throttled pure-JS reader while the timed-out call settles.
+          wasmReady = false;
+          el("status").textContent = "Still scanning — hold the barcode steady.";
+          diag("wasm frame timed out · continuing with js fallback");
+          return;
         }
+        consecutiveFrameErrors = 0;
         for (const text of candidates) {
           if (finishIfAccepted(text)) return;
         }
@@ -850,8 +866,14 @@ async function scanOpenSourceLicenseBarcode(gen) {
         }
       } catch {
         if (!settled && !run.stopped && gen === captureGen) {
-          settled = true;
-          reject(new Error("scanner-frame-failed"));
+          consecutiveFrameErrors++;
+          if (consecutiveFrameErrors >= 5) {
+            settled = true;
+            reject(new Error("scanner-frame-failed"));
+          } else {
+            el("status").textContent = "Still scanning — hold the barcode steady.";
+            diag(`camera frame retry ${consecutiveFrameErrors}/5`);
+          }
         }
       } finally {
         decoding = false;
@@ -1036,10 +1058,12 @@ async function decodePhoto(file) {
     );
     if (!dimensionCheck.ok) throw new Error(dimensionCheck.reason);
     checkDecodeBudget();
+    const directPhotoDecode =
+      dimensionCheck.pixels <= PHOTO_LIMITS.maxDirectDecodePixels;
 
     const commercial = await getCommercialProvider();
     if (gen !== captureGen) return;
-    if (commercial.provider) {
+    if (commercial.provider && directPhotoDecode) {
       try {
         const candidates = rankDecodedPayloads(
           await resolveBeforeTimeout(
@@ -1072,7 +1096,7 @@ async function decodePhoto(file) {
     wasmReady = await awaitWithinDecodeBudget(ensureWasmReader());
     if (gen !== captureGen) return;
     checkDecodeBudget();
-    if (wasmReady) {
+    if (wasmReady && directPhotoDecode) {
       const fileCandidates = rankDecodedPayloads(
         await awaitWithinDecodeBudget(decodePdf417File(file))
       );
@@ -1091,6 +1115,8 @@ async function decodePhoto(file) {
         if (raw.length > commercialNearMiss.length) commercialNearMiss = raw;
       }
       diag("wasm original photo miss · trying canvas variants");
+    } else if (!directPhotoDecode) {
+      diag("large photo · skipping full-resolution decoder copy");
     }
 
     const nativeDetector = await awaitWithinDecodeBudget(

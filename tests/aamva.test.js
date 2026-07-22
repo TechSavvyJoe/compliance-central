@@ -36,6 +36,12 @@ const MI_DCT =
 const MI_DAA =
   "@\n\rANSI 636032100002DL00410234\nDLDAQD3\nDAAPUBLIC,JOHN,QUINCY\nDBB07041970\nDAJMI\n\r";
 
+// Real cards may begin the DL subfile on the same physical line as the ANSI
+// header/directory instead of inserting a newline before DLDAQ.
+const MI_INLINE_SUBFILE =
+  "@\n\rANSI 636032100002DL00410234DLDAQS123456789012\n" +
+  "DCSSAMPLE\nDACPAT\nDADALEX\nDBB08081985\nDAJMI\n\r";
+
 test("Michigan DL: full name + MM/DD/YYYY DOB, isMichigan true", () => {
   const r = parseAAMVA(MI_DL);
   assert.equal(r.firstName, "JOSEPH");
@@ -57,6 +63,15 @@ test("Michigan State ID parses, isMichigan true", () => {
   assert.equal(r.dob, "03/22/1990");
   assert.equal(r.dlnPid, "I987654321000");
   assert.equal(r.isMichigan, true);
+});
+
+test("first DL element can follow the ANSI directory without a newline", () => {
+  const result = acceptLicenseScan(MI_INLINE_SUBFILE);
+  assert.ok(result);
+  assert.equal(result.dlnPid, "S123456789012");
+  assert.equal(result.firstName, "PAT");
+  assert.equal(result.lastName, "SAMPLE");
+  assert.ok(aamvaElementCodes(MI_INLINE_SUBFILE).includes("DAQ"));
 });
 
 test("out-of-state license: parses, isMichigan false", () => {

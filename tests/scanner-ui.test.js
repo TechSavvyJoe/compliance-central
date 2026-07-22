@@ -76,7 +76,7 @@ test("camera guidance describes a forgiving automatic scan area", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260722-15");
+  assert.equal(cssVersion, "20260722-16");
   assert.equal(scriptVersion, cssVersion);
 });
 

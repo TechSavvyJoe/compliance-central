@@ -3,7 +3,7 @@ import {
   evaluateDetection,
   looksLikeAamva,
   rankDecodedPayloads,
-} from "./lib/aamva.js?v=20260717-10";
+} from "./lib/aamva.js?v=20260722-16";
 import { encryptPayload } from "./lib/crypto-pair.js";
 import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-10";
 import {
@@ -17,7 +17,7 @@ import {
   resolveBeforeTimeout,
   validatePhotoDimensions,
   validatePhotoFile,
-} from "./lib/scan-state.js?v=20260722-15";
+} from "./lib/scan-state.js?v=20260722-16";
 import {
   buildDecodeCrops,
   buildLiveDecodePlan,
@@ -33,7 +33,7 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.15";
+const SCANNER_BUILD = "scanner-2026-07-22.16";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.

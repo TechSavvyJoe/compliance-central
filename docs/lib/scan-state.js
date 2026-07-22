@@ -1,4 +1,4 @@
-import { evaluateDetection, parseAAMVA } from "./aamva.js?v=20260717-10";
+import { evaluateDetection, parseAAMVA } from "./aamva.js?v=20260722-16";
 
 export const PHOTO_LIMITS = Object.freeze({
   maxBytes: 15 * 1024 * 1024,

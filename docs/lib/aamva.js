@@ -41,8 +41,19 @@ export function normalizeAamvaText(text) {
 function parseElements(text) {
   const map = {};
   for (const segRaw of normalizeAamvaText(text).split(/\n+/)) {
-    const seg = segRaw.trim();
+    let seg = segRaw.trim();
     if (!seg) continue;
+
+    // Some real AAMVA cards place the first DL/ID element immediately after
+    // the subfile directory with no newline, for example
+    // `ANSI ... DL00410279DLDAQ...`. The directory entry is followed by
+    // digits, while the actual subfile prefix is followed by a 3-letter field
+    // code, so this extracts the field boundary without scanning field values.
+    if (/^ANSI\b/.test(seg)) {
+      const subfile = seg.match(/(?:DL|ID)(?=[A-Z]{3})/);
+      if (!subfile || subfile.index == null) continue;
+      seg = seg.slice(subfile.index);
+    }
     let m = seg.match(/^(?:DL|ID)([A-Z]{3})(.*)$/); // first element w/ subfile prefix
     if (!m) m = seg.match(/^([A-Z]{3})(.*)$/);
     if (!m) continue;

@@ -3,40 +3,65 @@ import {
   evaluateDetection,
   looksLikeAamva,
   rankDecodedPayloads,
-} from "./lib/aamva.js?v=20260717-9";
+} from "./lib/aamva.js?v=20260717-10";
 import { encryptPayload } from "./lib/crypto-pair.js";
-import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-9";
-import { createDetectionGate } from "./lib/scan-state.js?v=20260717-9";
-import { buildDecodeCrops, mapGuideToVideoPixels } from "./lib/scan-roi.js?v=20260717-9";
+import { classifyBrowseContext } from "./lib/scan-context.js?v=20260717-10";
 import {
+  classifyPairingState,
+  commitPendingScan,
+  createCameraRequest,
+  createDetectionGate,
+  decodeIntervalElapsed,
+  hasSameLicenseNumber,
+  PHOTO_LIMITS,
+  resolveBeforeTimeout,
+  validatePhotoDimensions,
+  validatePhotoFile,
+} from "./lib/scan-state.js?v=20260721-12";
+import {
+  buildDecodeCrops,
+  buildLiveDecodePlan,
+  mapGuideToVideoPixels,
+} from "./lib/scan-roi.js?v=20260722-14";
+import {
+  decodePdf417File,
   decodePdf417Wasm,
   ensureWasmReader,
-} from "./lib/zxing-wasm-loader.js?v=20260717-9";
+} from "./lib/zxing-wasm-loader.js?v=20260721-11";
 import {
   createCommercialScannerProvider,
-} from "./lib/scanner-provider.js?v=20260717-9";
+} from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-17.9-js";
+const SCANNER_BUILD = "scanner-2026-07-22.14";
 
 // Pairing data is split between query and fragment so the relay never receives
 // the AES key in the URL request.
 const params = new URLSearchParams(location.search);
 const sessionId = params.get("s") || "";
 const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
-// Always-on decode diagnostics for this build so phone retests can report
-// accept/reject without remembering ?debug=1. Still honors ?debug=1 explicitly.
-const DEBUG = true;
+// Diagnostics are privacy-safe (field codes/lengths only), but production users
+// should not see implementation details. Enable deliberately with ?debug=1.
+const DEBUG = params.get("debug") === "1";
 
 const DETECT_COOLDOWN_MS = 1800;
-/** Match the pre-wasm live loop (~12 Hz). Faster frames beat fancy preprocess. */
-const FRAME_INTERVAL_MS = 80;
-const MAX_DECODE_WIDTH = 1800;
+/** Keep the main thread responsive while the previous decode is still running. */
+const FRAME_INTERVAL_MS = 120;
+const MAX_DECODE_WIDTH = 1600;
+const MAX_DESKEW_WIDTH = 1280;
 const PARTIAL_HINT_THRESHOLD = 3;
-/** Occasional deskew only — rotating every frame hurt pure-JS hit rate. */
-const LIVE_DESKEW = [0, 0, 0, -6, 0, 6];
-/** WASM is secondary: run at most every Nth live attempt after JS misses. */
-const WASM_EVERY_N = 4;
+/** Legacy JS is a fallback; running it every frame can freeze older iPhones. */
+const JS_FALLBACK_EVERY_N = 6;
+const COMMERCIAL_READY_TIMEOUT_MS = 1500;
+const COMMERCIAL_START_TIMEOUT_MS = 8000;
+const COMMERCIAL_STOP_TIMEOUT_MS = 3000;
+const COMMERCIAL_PHOTO_TIMEOUT_MS = 5000;
+const CAMERA_START_TIMEOUT_MS = 12_000;
+const LIVE_DECODE_TIMEOUT_MS = 2500;
+const LIVE_DECODE_TIMEOUT_RESULT = Object.freeze({ timedOut: true });
+const WASM_READY_TIMEOUT_MS = 8000;
+const PHOTO_LOAD_TIMEOUT_MS = 8000;
+const PHOTO_DECODE_BUDGET_MS = 15_000;
 
 const el = (id) => document.getElementById(id);
 const screens = {
@@ -45,6 +70,11 @@ const screens = {
   cobuyer: el("cobuyerPrompt"),
   done: el("doneScreen"),
 };
+let visibleScreenName = "camera";
+if (DEBUG) {
+  el("diag").classList.remove("hidden");
+  el("reviewDiag").classList.remove("hidden");
+}
 const commercialProviderReady = createCommercialScannerProvider({
   mount: el("video").parentElement,
 });
@@ -58,10 +88,25 @@ let resumeAfterVisibility = false;
 let torchEnabled = false;
 let wasmReady = false;
 let choosingPhoto = false;
+let lastPayload = null;
+let deliveryGeneration = 0;
+let activeDeliveryController = null;
+let commercialProviderTeardown = Promise.resolve();
 
 function show(name) {
+  const changed = visibleScreenName !== name;
   for (const [key, node] of Object.entries(screens)) {
     node.classList.toggle("hidden", key !== name);
+  }
+  visibleScreenName = name;
+  if (changed) {
+    const heading = screens[name] && screens[name].querySelector("h2");
+    if (heading) {
+      heading.tabIndex = -1;
+      requestAnimationFrame(() => {
+        if (visibleScreenName === name) heading.focus({ preventScroll: true });
+      });
+    }
   }
 }
 
@@ -71,16 +116,31 @@ function showError(msg) {
   b.classList.remove("hidden");
 }
 function clearError() {
-  el("errorBanner").classList.add("hidden");
+  const banner = el("errorBanner");
+  banner.textContent = "";
+  banner.classList.add("hidden");
+}
+
+function queueCommercialProviderStop(provider) {
+  const previous = commercialProviderTeardown;
+  commercialProviderTeardown = previous
+    .catch(() => {})
+    .then(() => resolveBeforeTimeout(
+      Promise.resolve().then(() => provider.stop()),
+      COMMERCIAL_STOP_TIMEOUT_MS,
+      null
+    ))
+    .catch(() => {});
+  return commercialProviderTeardown;
 }
 
 function stopCamera(run = activeRun) {
-  if (!run) return;
+  if (!run) return commercialProviderTeardown;
   run.stopped = true;
   if (run.rafId) cancelAnimationFrame(run.rafId);
   if (run.cancel) run.cancel();
-  if (run.provider) {
-    Promise.resolve(run.provider.stop()).catch(() => {});
+  if (run.provider && !run.providerStopPromise) {
+    run.providerStopPromise = queueCommercialProviderStop(run.provider);
   }
   if (run.reader) {
     try { run.reader.reset(); } catch {}
@@ -93,6 +153,7 @@ function stopCamera(run = activeRun) {
   if (activeRun === run) activeRun = null;
   torchEnabled = false;
   updateTorchButton(null);
+  return run.providerStopPromise || commercialProviderTeardown;
 }
 
 // On-screen diagnostics (we can't see the phone's console). Off unless ?debug=1.
@@ -102,12 +163,13 @@ function diag(msg) {
   if (d) d.textContent = `${SCANNER_BUILD} · ${msg}`;
 }
 
-// A dense license PDF417 needs a high-resolution, focused frame to decode.
+// A dense license PDF417 needs a detailed frame, but forcing 4K/zoom makes some
+// phones choose a poor lens and increases decode latency. These are preferences.
 const HIRES = {
   facingMode: { ideal: "environment" },
-  width: { ideal: 3840 },
-  height: { ideal: 2160 },
-  aspectRatio: { ideal: 16 / 9 },
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
+  frameRate: { ideal: 30, max: 30 },
 };
 
 // License scan: PDF417 only. Never QR — that would re-read the pairing QR.
@@ -123,15 +185,25 @@ async function optimizeCamera(mediaStream) {
       await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
     } catch {}
   }
-  if (caps.zoom && Number.isFinite(caps.zoom.max) && caps.zoom.max > 1) {
-    const minimum = Number.isFinite(caps.zoom.min) ? caps.zoom.min : 1;
-    const target = Math.max(minimum, Math.min(caps.zoom.max, 1.45));
-    try {
-      await track.applyConstraints({ advanced: [{ zoom: target }] });
-    } catch {}
-  }
   updateTorchButton(caps.torch ? track : null);
   return track;
+}
+
+function waitForVideoFrame(video, timeoutMs = 2500) {
+  if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener("loadeddata", finish);
+      resolve(Boolean(video.videoWidth && video.videoHeight));
+    };
+    video.addEventListener("loadeddata", finish, { once: true });
+    setTimeout(finish, timeoutMs);
+  });
 }
 
 function updateTorchButton(track) {
@@ -144,7 +216,7 @@ function updateTorchButton(track) {
 
 function rejectHint(reason) {
   if (reason === "incomplete") {
-    return "Partial PDF417 read — hold steady, fill the yellow frame with the wide barcode, and wait for a full decode.";
+    return "Barcode found — hold steady while the scanner finishes reading it. Exact alignment is not required.";
   }
   if (reason === "not-aamva") {
     return "Point at the wide PDF417 barcode on the back of the license (not a QR code or the thin 1D line).";
@@ -161,6 +233,15 @@ function cameraErrorMessage(error) {
   if (message === "scanner-library-unavailable") {
     return "The barcode scanner did not load. Check your connection, reload the page, and try again.";
   }
+  if (message === "camera-not-ready") {
+    return "The camera opened but did not provide a usable picture. Close other camera apps, then tap Try camera again.";
+  }
+  if (message === "camera-start-timeout") {
+    return "The camera permission request timed out. Tap Try camera again and choose Allow, or use a photo instead.";
+  }
+  if (message === "scanner-frame-failed") {
+    return "The scanner lost the camera picture. Tap Try camera again, or use a photo instead.";
+  }
   if (name === "NotAllowedError" || name === "SecurityError") {
     return "Camera access is blocked. Allow camera access for this site in your browser settings, then tap Try camera again.";
   }
@@ -176,11 +257,41 @@ function cameraErrorMessage(error) {
   return "The camera could not start. Check permission and reload or tap Try camera again.";
 }
 
+function photoErrorMessage(reason) {
+  if (reason === "photo-too-large") {
+    return `That photo is too large. Choose a photo under ${Math.round(PHOTO_LIMITS.maxBytes / 1024 / 1024)} MB or crop it to the barcode.`;
+  }
+  if (reason === "photo-too-many-pixels") {
+    return "That photo is too high-resolution to process safely on this phone. Crop it to the barcode or choose a standard-resolution copy.";
+  }
+  if (reason === "photo-not-image" || reason === "photo-empty") {
+    return "That file is not a usable photo. Choose an image of the back of the license.";
+  }
+  if (reason === "photo-decode-timeout") {
+    return "Reading that photo took too long. Crop it to the wide barcode, choose a smaller photo, or try the camera.";
+  }
+  return "That photo could not be read. Choose another photo or try the camera again.";
+}
+
+async function getCommercialProvider() {
+  const fallback = { provider: null, reason: "commercial-initialization-timeout" };
+  try {
+    return await resolveBeforeTimeout(
+      commercialProviderReady,
+      COMMERCIAL_READY_TIMEOUT_MS,
+      fallback
+    );
+  } catch {
+    return { provider: null, reason: "commercial-initialization-failed" };
+  }
+}
+
 function pairingConfigurationIssue() {
-  if (sessionId && !keyB64) {
+  const pairingState = classifyPairingState(sessionId, keyB64);
+  if (pairingState === "partial" && sessionId) {
     return "This pairing link is missing its encryption key. Scan a new QR code from Compliance Central.";
   }
-  if (!sessionId && keyB64) {
+  if (pairingState === "partial" && keyB64) {
     return "This pairing link is missing its session. Scan a new QR code from Compliance Central.";
   }
   return "";
@@ -231,6 +342,23 @@ function guideCrop(video, padding = 0.04) {
   });
 }
 
+function visibleVideoCrop(video) {
+  const viewport = video.parentElement;
+  if (!viewport || !video.videoWidth || !video.videoHeight) return null;
+  const viewportRect = viewport.getBoundingClientRect();
+  return mapGuideToVideoPixels({
+    videoWidth: video.videoWidth,
+    videoHeight: video.videoHeight,
+    viewportWidth: viewportRect.width,
+    viewportHeight: viewportRect.height,
+    guideLeft: 0,
+    guideTop: 0,
+    guideWidth: viewportRect.width,
+    guideHeight: viewportRect.height,
+    padding: 0,
+  });
+}
+
 function drawCropFrame(video, canvas, crop, scale = 1) {
   const targetWidth = Math.max(
     1,
@@ -240,8 +368,8 @@ function drawCropFrame(video, canvas, crop, scale = 1) {
   if (canvas.width !== targetWidth) canvas.width = targetWidth;
   if (canvas.height !== targetHeight) canvas.height = targetHeight;
   const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
+  // Preserve narrow PDF417 modules when a large camera frame is downscaled.
+  context.imageSmoothingEnabled = false;
   context.drawImage(
     video,
     crop.x,
@@ -258,15 +386,21 @@ function drawCropFrame(video, canvas, crop, scale = 1) {
 
 function rotateCanvas(source, target, degrees) {
   if (!degrees) return source.getContext("2d", { alpha: false, willReadFrequently: true });
-  if (target.width !== source.width) target.width = source.width;
-  if (target.height !== source.height) target.height = source.height;
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+  const targetWidth = Math.max(1, Math.ceil(source.width * cos + source.height * sin));
+  const targetHeight = Math.max(1, Math.ceil(source.width * sin + source.height * cos));
+  if (target.width !== targetWidth) target.width = targetWidth;
+  if (target.height !== targetHeight) target.height = targetHeight;
   const context = target.getContext("2d", { alpha: false, willReadFrequently: true });
   context.save();
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.fillStyle = "#fff";
   context.fillRect(0, 0, target.width, target.height);
   context.translate(target.width / 2, target.height / 2);
-  context.rotate((degrees * Math.PI) / 180);
+  context.rotate(radians);
+  context.imageSmoothingEnabled = false;
   context.drawImage(source, -source.width / 2, -source.height / 2);
   context.restore();
   return context;
@@ -302,6 +436,24 @@ async function createNativePdf417Detector() {
   }
 }
 
+async function detectNativeCandidates(nativeDetector, source) {
+  if (!nativeDetector || !source) return [];
+  try {
+    const codes = await nativeDetector.detect(source);
+    return rankDecodedPayloads(
+      (codes || [])
+        .filter((code) =>
+          code &&
+          code.rawValue &&
+          (!code.format || String(code.format).toLowerCase() === "pdf417")
+        )
+        .map((code) => code.rawValue)
+    );
+  } catch {
+    return [];
+  }
+}
+
 function createJsPdf417Reader() {
   if (typeof ZXing === "undefined") return { reader: null, hints: null };
   const hints = new Map();
@@ -312,18 +464,41 @@ function createJsPdf417Reader() {
 }
 
 /**
- * Free decoder path: pure-JS ZXing first (historically worked on MI cards),
- * then optional native BarcodeDetector, then zxing-wasm only when asked.
+ * Free decoder path: native acceleration when the browser explicitly supports
+ * PDF417, then ZXing-C++ WASM. The older pure-JS reader is throttled as a final
+ * fallback because repeated synchronous misses can freeze a phone UI.
  */
 async function decodeCanvasCandidates(
   canvas,
   context,
-  { nativeDetector, zxingReader, hints, jsMode = 0, useWasm = false }
+  {
+    nativeDetector,
+    zxingReader,
+    hints,
+    jsMode = 0,
+    useWasm = true,
+    useJsFallback = false,
+  }
 ) {
   const candidates = [];
 
-  // Primary: pure JS PDF417Reader (pre-wasm path).
-  if (zxingReader) {
+  if (nativeDetector) {
+    candidates.push(...await detectNativeCandidates(nativeDetector, canvas));
+    if (candidates.length) return rankDecodedPayloads(candidates);
+  }
+
+  if (useWasm && wasmReady) {
+    const imageData = canvasImageData(canvas, context);
+    if (imageData) {
+      try {
+        const wasmCandidates = await decodePdf417Wasm(imageData);
+        candidates.push(...wasmCandidates);
+        if (wasmCandidates.length) return rankDecodedPayloads(candidates);
+      } catch {}
+    }
+  }
+
+  if (useJsFallback && zxingReader) {
     try {
       const result = decodePdf417CanvasJs(zxingReader, canvas, hints, jsMode);
       if (result && result.getText()) candidates.push(result.getText());
@@ -331,31 +506,6 @@ async function decodeCanvasCandidates(
       // A miss is expected on most live frames.
     } finally {
       try { zxingReader.reset(); } catch {}
-    }
-  }
-
-  if (nativeDetector) {
-    try {
-      const codes = await nativeDetector.detect(canvas);
-      for (const code of codes || []) {
-        if (
-          code &&
-          code.rawValue &&
-          (!code.format || String(code.format).toLowerCase() === "pdf417")
-        ) {
-          candidates.push(code.rawValue);
-        }
-      }
-    } catch {}
-  }
-
-  // Secondary: WASM only on selected frames so it cannot starve JS FPS.
-  if (useWasm && wasmReady) {
-    const imageData = canvasImageData(canvas, context);
-    if (imageData) {
-      try {
-        candidates.push(...await decodePdf417Wasm(imageData));
-      } catch {}
     }
   }
 
@@ -367,10 +517,13 @@ async function decodeCanvasCandidates(
  * Keeps the same camera stream across rejected frames (no flash/restart loop).
  */
 async function scanCommercialLicenseBarcode(provider, gen) {
+  await commercialProviderTeardown;
+  if (gen !== captureGen) throw new Error("cancelled");
   const gate = createDetectionGate(DETECT_COOLDOWN_MS);
   const run = {
     gen,
     provider,
+    providerStopPromise: null,
     stopped: false,
     cancel: null,
   };
@@ -379,8 +532,18 @@ async function scanCommercialLicenseBarcode(provider, gen) {
 
   return new Promise((resolve, reject) => {
     let settled = false;
+    let started = false;
+    const startupTimer = setTimeout(() => {
+      if (settled || started) return;
+      settled = true;
+      reject(new Error("commercial-start-timeout"));
+    }, COMMERCIAL_START_TIMEOUT_MS);
     run.cancel = () => {
-      if (!settled) reject(new Error("cancelled"));
+      if (!settled) {
+        settled = true;
+        clearTimeout(startupTimer);
+        reject(new Error("cancelled"));
+      }
     };
 
     const onCandidates = (candidates) => {
@@ -389,6 +552,7 @@ async function scanCommercialLicenseBarcode(provider, gen) {
         const verdict = gate.evaluate(raw);
         if (verdict.ok) {
           settled = true;
+          clearTimeout(startupTimer);
           resolve(verdict);
           return;
         }
@@ -402,12 +566,19 @@ async function scanCommercialLicenseBarcode(provider, gen) {
     };
 
     provider.start(onCandidates).then(() => {
-      if (settled || run.stopped || gen !== captureGen) return;
-      el("status").textContent = "Point at the wide PDF417 on the back…";
+      started = true;
+      clearTimeout(startupTimer);
+      if (settled || run.stopped || gen !== captureGen) {
+        run.providerStopPromise = queueCommercialProviderStop(provider);
+        return;
+      }
+      el("status").textContent =
+        "Hold the wide barcode anywhere in the yellow area — capture is automatic.";
       diag("provider Dynamsoft · camera ready");
     }).catch((error) => {
       if (!settled) {
         settled = true;
+        clearTimeout(startupTimer);
         reject(error);
       }
     });
@@ -415,13 +586,15 @@ async function scanCommercialLicenseBarcode(provider, gen) {
 }
 
 async function scanLicenseBarcode(gen) {
-  const commercial = await commercialProviderReady;
+  const commercial = await getCommercialProvider();
+  if (gen !== captureGen) throw new Error("cancelled");
   if (commercial.provider) {
     try {
       return await scanCommercialLicenseBarcode(commercial.provider, gen);
     } catch (error) {
       if (error && error.message === "cancelled") throw error;
-      stopCamera();
+      await stopCamera();
+      if (gen !== captureGen) throw new Error("cancelled");
       diag(`Dynamsoft unavailable (${commercial.reason || error.message || "start failed"}) · fallback zxing`);
       el("status").textContent = "Starting camera fallback…";
     }
@@ -432,6 +605,7 @@ async function scanLicenseBarcode(gen) {
 }
 
 async function scanOpenSourceLicenseBarcode(gen) {
+  if (gen !== captureGen) throw new Error("cancelled");
   const video = el("video");
   let attempts = 0;
   let lastHintAt = 0;
@@ -485,7 +659,6 @@ async function scanOpenSourceLicenseBarcode(gen) {
     if (reason !== lastHintReason || now - lastHintAt >= DETECT_COOLDOWN_MS) {
       const hint = rejectHint(reason);
       el("status").textContent = hint;
-      showError(hint);
       lastHintAt = now;
       lastHintReason = reason;
     }
@@ -502,31 +675,51 @@ async function scanOpenSourceLicenseBarcode(gen) {
   }
 
   // Start camera immediately. WASM warms in the background only.
-  const wasmWarm = ensureWasmReader().then((ok) => {
+  const wasmWarm = resolveBeforeTimeout(
+    ensureWasmReader(),
+    WASM_READY_TIMEOUT_MS,
+    false
+  ).catch(() => false).then((ok) => {
     wasmReady = ok;
     return ok;
   });
 
-  const nativeDetector = await createNativePdf417Detector();
+  let nativeDetector = await createNativePdf417Detector();
   if (run.stopped || gen !== captureGen) throw new Error("cancelled");
 
   el("status").textContent = "Requesting camera…";
-  run.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: HIRES });
+  const cameraRequest = createCameraRequest(
+    (constraints) => navigator.mediaDevices.getUserMedia(constraints),
+    { audio: false, video: HIRES },
+    {
+      timeoutMs: CAMERA_START_TIMEOUT_MS,
+      isCancelled: () => run.stopped || gen !== captureGen,
+    }
+  );
+  run.cancel = cameraRequest.cancel;
+  run.stream = await cameraRequest.promise;
+  if (run.cancel === cameraRequest.cancel) run.cancel = null;
   if (run.stopped || gen !== captureGen) {
     stopCamera(run);
     throw new Error("cancelled");
   }
   video.srcObject = run.stream;
   await video.play();
+  if (!await waitForVideoFrame(video)) {
+    stopCamera(run);
+    throw new Error("camera-not-ready");
+  }
   const track = await optimizeCamera(run.stream);
   const settings = track && track.getSettings ? track.getSettings() : {};
-  el("status").textContent = "Point at the wide PDF417 on the back…";
-  diag(`js-primary · cam starting · wasm warm…`);
+  el("status").textContent =
+    "Hold the wide barcode anywhere in the yellow area — capture is automatic.";
+  diag(`camera ready · wasm warming`);
 
-  // Do not stall live decode on WASM — pure JS is the primary path.
+  // Do not stall camera startup on compilation. The throttled JS/native path
+  // can begin while the version-matched local WASM reader finishes warming.
   wasmWarm.then((ok) => {
     wasmReady = ok;
-    if (ok) diag(`js-primary · wasm ready · cam ${settings.width || "?"}×${settings.height || "?"}`);
+    if (ok) diag(`wasm ready · cam ${settings.width || "?"}×${settings.height || "?"}`);
   });
   if (!nativeDetector && typeof ZXing === "undefined") {
     wasmReady = await wasmWarm;
@@ -547,73 +740,107 @@ async function scanOpenSourceLicenseBarcode(gen) {
   const rotatedCanvas = document.createElement("canvas");
   return new Promise((resolve, reject) => {
     let settled = false;
-    let lastFrameAt = 0;
+    let lastFrameFinishedAt = Number.NEGATIVE_INFINITY;
     let decoding = false;
     run.cancel = () => {
-      if (!settled) reject(new Error("cancelled"));
+      if (!settled) {
+        settled = true;
+        reject(new Error("cancelled"));
+      }
     };
 
     const finishIfAccepted = (raw) => {
       const outcome = tryAccept(raw);
       if (!outcome.ok) return false;
       settled = true;
-      diag(`ACCEPT len ${String(raw || "").length} · ${aamvaElementCodes(raw).join(" ")}`);
       resolve(outcome);
+      diag(`ACCEPT len ${String(raw || "").length} · ${aamvaElementCodes(raw).join(" ")}`);
       return true;
     };
 
     const tick = async (now) => {
       if (settled || run.stopped || gen !== captureGen) return;
-      if (decoding || now - lastFrameAt < FRAME_INTERVAL_MS) {
+      if (
+        decoding ||
+        !decodeIntervalElapsed(now, lastFrameFinishedAt, FRAME_INTERVAL_MS)
+      ) {
         run.rafId = requestAnimationFrame(tick);
         return;
       }
-      lastFrameAt = now;
       attempts++;
       decoding = true;
 
       try {
-        // Alternate tight/loose padding like the known-good 7f50f5a loop.
-        const guide = guideCrop(video, attempts % 4 === 0 ? 0.14 : 0.06);
-        if (!guide) {
-          decoding = false;
-          run.rafId = requestAnimationFrame(tick);
-          return;
+        // Native BarcodeDetector can inspect the video directly, avoiding a
+        // canvas copy and finding PDF417 anywhere in the camera frame.
+        if (nativeDetector) {
+          const nativeCandidates = await resolveBeforeTimeout(
+            detectNativeCandidates(nativeDetector, video),
+            LIVE_DECODE_TIMEOUT_MS,
+            LIVE_DECODE_TIMEOUT_RESULT
+          );
+          if (nativeCandidates === LIVE_DECODE_TIMEOUT_RESULT) {
+            // Native detection is only an accelerator. If a browser's
+            // implementation stalls, disable it for this run and keep the
+            // bounded WASM/JS fallback alive instead of restarting the camera.
+            nativeDetector = null;
+            diag("native detector timed out · continuing with wasm");
+          } else {
+            for (const text of nativeCandidates) {
+              if (finishIfAccepted(text)) return;
+            }
+          }
         }
 
-        const crops = buildDecodeCrops(guide, attempts, video.videoWidth);
-        const crop = crops[attempts % Math.max(1, crops.length)];
-        if (!crop) {
-          decoding = false;
-          run.rafId = requestAnimationFrame(tick);
+        const guide = guideCrop(video, 0.04);
+        const visible = visibleVideoCrop(video);
+        const plan = buildLiveDecodePlan(
+          guide,
+          visible,
+          attempts,
+          video.videoWidth,
+          video.videoHeight
+        );
+        if (!plan) {
           return;
         }
-        // Occasional downscale (old loop used 0.75) plus rare deskew.
-        const scale = attempts % 5 === 0 ? 0.75 : 1;
-        const angle = LIVE_DESKEW[attempts % LIVE_DESKEW.length];
-        drawCropFrame(video, canvas, crop, scale);
-        const decodeTarget = angle ? rotatedCanvas : canvas;
-        const context = angle
-          ? rotateCanvas(canvas, rotatedCanvas, angle)
+        const crop = plan.crop;
+        const cropScale = plan.angle
+          ? Math.min(1, MAX_DESKEW_WIDTH / crop.width)
+          : 1;
+        drawCropFrame(video, canvas, crop, cropScale);
+        const decodeTarget = plan.angle ? rotatedCanvas : canvas;
+        const context = plan.angle
+          ? rotateCanvas(canvas, rotatedCanvas, plan.angle)
           : canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-        const useWasm = wasmReady && attempts % WASM_EVERY_N === 0;
-        const candidates = await decodeCanvasCandidates(decodeTarget, context, {
-          nativeDetector,
-          zxingReader,
-          hints,
-          jsMode: attempts % 3,
-          useWasm,
-        });
+        const candidates = await resolveBeforeTimeout(
+          decodeCanvasCandidates(decodeTarget, context, {
+            // The native path already searched the full video above.
+            nativeDetector: null,
+            zxingReader,
+            hints,
+            jsMode: attempts % 3,
+            useWasm: wasmReady,
+            useJsFallback:
+              attempts % JS_FALLBACK_EVERY_N === 0 ||
+              (!wasmReady && attempts % 2 === 0),
+          }),
+          LIVE_DECODE_TIMEOUT_MS,
+          LIVE_DECODE_TIMEOUT_RESULT
+        );
+        if (candidates === LIVE_DECODE_TIMEOUT_RESULT) {
+          throw new Error("scanner-frame-timeout");
+        }
         for (const text of candidates) {
           if (finishIfAccepted(text)) return;
         }
 
         if (attempts % 8 === 0) {
           diag(
-            `js${wasmReady ? "+wasm" : ""}${nativeDetector ? "+native" : ""}` +
+            `${nativeDetector ? "native+" : ""}${wasmReady ? "wasm" : "js fallback"}` +
               ` · ROI ${canvas.width}×${canvas.height}` +
               ` · crop ${crop.width}×${crop.height}` +
-              ` · skew ${angle}°` +
+              ` · ${plan.label}${plan.angle ? ` ${plan.angle}°` : ""}` +
               ` · lastLen ${lastRawLen || 0}` +
               (lastReject ? ` · ${lastReject}` : "") +
               (lastCodes ? ` · ${lastCodes}` : "") +
@@ -621,8 +848,14 @@ async function scanOpenSourceLicenseBarcode(gen) {
               ` · tries ${attempts}`
           );
         }
+      } catch {
+        if (!settled && !run.stopped && gen === captureGen) {
+          settled = true;
+          reject(new Error("scanner-frame-failed"));
+        }
       } finally {
         decoding = false;
+        lastFrameFinishedAt = performance.now();
         if (!settled && !run.stopped && gen === captureGen) {
           run.rafId = requestAnimationFrame(tick);
         }
@@ -662,16 +895,25 @@ function renderReview(person) {
 async function beginCapture(which, { waitForGesture = false } = {}) {
   capturing = which;
   const gen = ++captureGen;
-  stopCamera();
+  const stopPromise = stopCamera();
   clearError();
   const pairingIssue = pairingConfigurationIssue();
   const contextIssue = waitForGesture ? browseContextIssue() : "";
-  if (pairingIssue) showError(pairingIssue);
-  else if (contextIssue) showError(contextIssue);
   el("captureHeading").textContent =
     which === "buyer" ? "Scan the buyer's license" : "Scan the co-buyer's license";
   show("camera");
   el("status").textContent = "Starting camera…";
+
+  if (pairingIssue) {
+    showError(pairingIssue);
+    el("status").textContent = "This scanner link is incomplete. Open a new QR code on your computer.";
+    el("startBtn").classList.add("hidden");
+    el("photoBtn").disabled = true;
+    await stopPromise;
+    return;
+  }
+  el("photoBtn").disabled = false;
+  if (contextIssue) showError(contextIssue);
 
   // Iframes / tiny popups: show UI + instructions; wait for an explicit tap.
   if (waitForGesture) {
@@ -684,6 +926,8 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
   }
 
   el("startBtn").classList.add("hidden");
+  await stopPromise;
+  if (gen !== captureGen) return;
 
   // Warm WASM in parallel — never block or abort camera on loader failure.
   ensureWasmReader().then((ok) => {
@@ -695,7 +939,8 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
   try {
     const { person, raw } = await scanLicenseBarcode(gen);
     if (gen !== captureGen) return;
-    stopCamera();
+    await stopCamera();
+    if (gen !== captureGen) return;
     pending = person;
     renderReview(person);
     const rd = el("reviewDiag");
@@ -704,11 +949,11 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
       rd.textContent = `${SCANNER_BUILD} · codes: ${aamvaElementCodes(raw).join(" ")} · len ${raw.length} · lf ${lf}`;
     }
     clearError();
-    if (pairingIssue) showError(pairingIssue);
     show("review");
   } catch (e) {
     if (gen !== captureGen) return;
-    stopCamera();
+    await stopCamera();
+    if (gen !== captureGen) return;
     const msg = e && e.message ? e.message : "unable to access camera.";
     if (msg === "cancelled") return;
     showError(cameraErrorMessage(e));
@@ -722,33 +967,89 @@ function loadPhoto(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => resolve({ image, url });
-    image.onerror = () => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      image.onload = null;
+      image.onerror = null;
+      if (!error) {
+        resolve({ image, url });
+        return;
+      }
       URL.revokeObjectURL(url);
-      reject(new Error("photo-load-failed"));
+      reject(error);
     };
+    const timer = setTimeout(
+      () => finish(new Error("photo-load-timeout")),
+      PHOTO_LOAD_TIMEOUT_MS
+    );
+    image.onload = () => finish(null);
+    image.onerror = () => finish(new Error("photo-load-failed"));
     image.src = url;
   });
 }
 
 async function decodePhoto(file) {
   const gen = ++captureGen;
-  stopCamera();
+  const stopPromise = stopCamera();
   clearError();
   show("camera");
+  el("startBtn").classList.add("hidden");
+  el("photoBtn").disabled = true;
   el("status").textContent = "Reading photo…";
 
   let loaded = null;
   let zxingReader = null;
   let commercialNearMiss = "";
+  const decodeStartedAt = performance.now();
+  const remainingDecodeBudget = () =>
+    Math.max(0, PHOTO_DECODE_BUDGET_MS - (performance.now() - decodeStartedAt));
+  const checkDecodeBudget = () => {
+    if (remainingDecodeBudget() <= 0) {
+      throw new Error("photo-decode-timeout");
+    }
+  };
+  const awaitWithinDecodeBudget = async (promise) => {
+    checkDecodeBudget();
+    const timedOut = Object.freeze({ timedOut: true });
+    const result = await resolveBeforeTimeout(
+      promise,
+      remainingDecodeBudget(),
+      timedOut
+    );
+    if (result === timedOut) throw new Error("photo-decode-timeout");
+    return result;
+  };
   try {
+    await stopPromise;
+    if (gen !== captureGen) return;
+    const fileCheck = validatePhotoFile(file);
+    if (!fileCheck.ok) throw new Error(fileCheck.reason);
+
     loaded = await loadPhoto(file);
-    const commercial = await commercialProviderReady;
+    if (gen !== captureGen) return;
+    const dimensionCheck = validatePhotoDimensions(
+      loaded.image.naturalWidth,
+      loaded.image.naturalHeight
+    );
+    if (!dimensionCheck.ok) throw new Error(dimensionCheck.reason);
+    checkDecodeBudget();
+
+    const commercial = await getCommercialProvider();
+    if (gen !== captureGen) return;
     if (commercial.provider) {
       try {
         const candidates = rankDecodedPayloads(
-          await commercial.provider.decodeImage(file)
+          await resolveBeforeTimeout(
+            commercial.provider.decodeImage(file),
+            Math.min(COMMERCIAL_PHOTO_TIMEOUT_MS, remainingDecodeBudget()),
+            []
+          )
         );
+        if (gen !== captureGen) return;
+        checkDecodeBudget();
         for (const raw of candidates) {
           const verdict = evaluateDetection(raw);
           if (verdict.ok) {
@@ -767,8 +1068,35 @@ async function decodePhoto(file) {
       }
     }
 
-    wasmReady = await ensureWasmReader();
-    const nativeDetector = await createNativePdf417Detector();
+    if (gen !== captureGen) return;
+    wasmReady = await awaitWithinDecodeBudget(ensureWasmReader());
+    if (gen !== captureGen) return;
+    checkDecodeBudget();
+    if (wasmReady) {
+      const fileCandidates = rankDecodedPayloads(
+        await awaitWithinDecodeBudget(decodePdf417File(file))
+      );
+      if (gen !== captureGen) return;
+      checkDecodeBudget();
+      for (const raw of fileCandidates) {
+        const verdict = evaluateDetection(raw);
+        if (verdict.ok) {
+          pending = verdict.person;
+          renderReview(verdict.person);
+          clearError();
+          diag(`wasm original photo · len ${raw.length}`);
+          show("review");
+          return;
+        }
+        if (raw.length > commercialNearMiss.length) commercialNearMiss = raw;
+      }
+      diag("wasm original photo miss · trying canvas variants");
+    }
+
+    const nativeDetector = await awaitWithinDecodeBudget(
+      createNativePdf417Detector()
+    );
+    if (gen !== captureGen) return;
     const js = createJsPdf417Reader();
     zxingReader = js.reader;
     if (!nativeDetector && !wasmReady && !zxingReader) {
@@ -783,28 +1111,33 @@ async function decodePhoto(file) {
       height: source.naturalHeight,
     };
     const crops = buildDecodeCrops(full, 1, source.naturalWidth);
-    // A loosely framed photo may place the symbol outside the lower windows.
-    // Keep one PDF417-only full-photo search as the still-image fallback.
-    crops.push(full);
+    // buildDecodeCrops always leads with the full image, so a loosely framed
+    // barcode is still searched before the focused lower-band variants.
     const canvas = document.createElement("canvas");
     const rotatedCanvas = document.createElement("canvas");
     let bestNearMiss = commercialNearMiss;
 
     for (const crop of crops) {
       if (gen !== captureGen) return;
+      checkDecodeBudget();
       drawCropFrame(source, canvas, crop);
       for (const angle of [0, -6, 6, -10, 10]) {
+        checkDecodeBudget();
         const decodeTarget = angle ? rotatedCanvas : canvas;
         const context = angle
           ? rotateCanvas(canvas, rotatedCanvas, angle)
           : canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-        const candidates = await decodeCanvasCandidates(decodeTarget, context, {
-          nativeDetector,
-          zxingReader,
-          hints: js.hints,
-          jsMode: 0,
-          useWasm: true,
-        });
+        const candidates = await awaitWithinDecodeBudget(
+          decodeCanvasCandidates(decodeTarget, context, {
+            nativeDetector,
+            zxingReader,
+            hints: js.hints,
+            jsMode: 0,
+            useWasm: true,
+            useJsFallback: true,
+          })
+        );
+        if (gen !== captureGen) return;
         for (const raw of candidates) {
           const verdict = evaluateDetection(raw);
           if (verdict.ok) {
@@ -822,16 +1155,16 @@ async function decodePhoto(file) {
     const message = bestNearMiss
       ? "The barcode was found, but the photo did not contain the full license data. Try another sharp, well-lit photo."
       : "No PDF417 license barcode was found. Try a sharp, well-lit photo of the back of the license.";
-    el("status").textContent = message;
+    el("status").textContent = "Photo scan unsuccessful.";
     showError(message);
     el("startBtn").textContent = "Try camera again";
     el("startBtn").classList.remove("hidden");
   } catch (error) {
-    const message =
-      error && error.message === "scanner-library-unavailable"
-        ? cameraErrorMessage(error)
-        : "That photo could not be read. Choose another photo or try the camera again.";
-    el("status").textContent = message;
+    if (gen !== captureGen) return;
+    const message = error && error.message === "scanner-library-unavailable"
+      ? cameraErrorMessage(error)
+      : photoErrorMessage(error && error.message);
+    el("status").textContent = "Photo could not be read.";
     showError(message);
     el("startBtn").textContent = "Try camera again";
     el("startBtn").classList.remove("hidden");
@@ -840,11 +1173,18 @@ async function decodePhoto(file) {
       try { zxingReader.reset(); } catch {}
     }
     if (loaded) URL.revokeObjectURL(loaded.url);
+    el("photoBtn").disabled = false;
   }
 }
 
 function onConfirm() {
-  deal[capturing] = pending;
+  const result = commitPendingScan(deal, capturing, pending);
+  if (!result.ok) {
+    if (result.reason === "duplicate-license") {
+      showError("Buyer and co-buyer have the same license number. Rescan the co-buyer's license before continuing.");
+    }
+    return;
+  }
   pending = null;
   if (capturing === "buyer") {
     show("cobuyer");
@@ -853,13 +1193,111 @@ function onConfirm() {
   }
 }
 
+function deliveryError(message, retryable) {
+  const error = new Error(message);
+  error.retryable = retryable;
+  return error;
+}
+
+function relayFailure(status) {
+  if (status === 400) {
+    return deliveryError(
+      "The pairing was already received or expired. Check the computer; if the fields did not fill, open a new scanner QR code.",
+      false
+    );
+  }
+  if (status === 404 || status === 410) {
+    return deliveryError(
+      "The pairing session expired or is no longer available. Open a new scanner QR code on your computer.",
+      false
+    );
+  }
+  if (status === 409) {
+    return deliveryError(
+      "This pairing session was already used. Check the computer before starting a new pairing.",
+      false
+    );
+  }
+  if (status === 429) {
+    return deliveryError(
+      "The relay is receiving too many requests. Wait a moment, then retry.",
+      true
+    );
+  }
+  if (status >= 500) {
+    return deliveryError(
+      "The relay service is temporarily unavailable. Retry in a moment.",
+      true
+    );
+  }
+  return deliveryError("The relay could not accept the scan.", false);
+}
+
+async function deliverPayload(payload, generation) {
+  const delivery = el("deliveryStatus");
+  const retry = el("retrySendBtn");
+  clearError();
+  if (retry) {
+    retry.disabled = true;
+    retry.classList.add("hidden");
+  }
+  if (delivery) delivery.textContent = "Encrypting and sending to your computer…";
+
+  if (activeDeliveryController) activeDeliveryController.abort();
+  const controller = new AbortController();
+  activeDeliveryController = controller;
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    let blob;
+    try {
+      blob = await encryptPayload(keyB64, payload);
+    } catch {
+      throw deliveryError(
+        "The pairing encryption key is invalid. Open a new scanner QR code on your computer.",
+        false
+      );
+    }
+
+    const res = await fetch(
+      `${RELAY_BASE}/pair/${encodeURIComponent(sessionId)}/submit`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(blob),
+        signal: controller.signal,
+      }
+    );
+    if (!res.ok) throw relayFailure(res.status);
+    if (generation !== deliveryGeneration) return;
+    if (delivery) delivery.textContent = "Sent securely — return to your computer.";
+  } catch (error) {
+    if (generation !== deliveryGeneration) return;
+    const message = controller.signal.aborted
+      ? "Sending timed out. Check the connection and retry — you do not need to scan the license again."
+      : error && error.message
+        ? error.message
+        : "The network request failed. Check the connection and retry.";
+    if (delivery) delivery.textContent = "Not sent yet.";
+    showError(message);
+    const canRetry = controller.signal.aborted || error?.retryable !== false;
+    if (retry && canRetry) {
+      retry.disabled = false;
+      retry.classList.remove("hidden");
+    }
+  } finally {
+    clearTimeout(timeout);
+    if (activeDeliveryController === controller) activeDeliveryController = null;
+  }
+}
+
 async function finish() {
   // Guard: same license scanned twice.
-  if (deal.coBuyer && deal.buyer && deal.coBuyer.dlnPid === deal.buyer.dlnPid) {
+  if (deal.coBuyer && deal.buyer && hasSameLicenseNumber(deal.buyer, deal.coBuyer)) {
     showError("Buyer and co-buyer have the same license number — did you scan the same card twice?");
     return;
   }
-  const payload = {
+  lastPayload = {
     buyer: deal.buyer,
     coBuyer: deal.coBuyer || null,
     scannedAt: new Date().toISOString(),
@@ -876,57 +1314,31 @@ async function finish() {
   const delivery = el("deliveryStatus");
   if (delivery) {
     delivery.textContent =
-      sessionId && keyB64 ? "Encrypting and sending to your computer…" : "Saved only for this screen.";
+      sessionId && keyB64
+        ? "Preparing secure delivery…"
+        : "Scan complete. This page was opened without a computer pairing.";
   }
+  el("startOverBtn").classList.toggle("hidden", Boolean(sessionId && keyB64));
+  el("retrySendBtn").classList.add("hidden");
   show("done");
 
-  // If we arrived via a paired QR (session + key in the URL), encrypt the
-  // payload with the QR-supplied key and relay it; otherwise the page just
-  // works standalone (the summary above is the result).
   if (sessionId && keyB64) {
-    try {
-      let blob;
-      try {
-        blob = await encryptPayload(keyB64, payload);
-      } catch {
-        throw new Error("The pairing encryption key is invalid. Scan a new QR code from Compliance Central.");
-      }
-      const res = await fetch(
-        `${RELAY_BASE}/pair/${encodeURIComponent(sessionId)}/submit`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(blob),
-        }
-      );
-      if (!res.ok) {
-        let detail = "The relay could not accept the scan.";
-        if (res.status === 404 || res.status === 410) {
-          detail = "The pairing session expired. Scan a new QR code from Compliance Central.";
-        } else if (res.status === 409) {
-          detail = "This pairing session was already used. Scan a new QR code from Compliance Central.";
-        } else if (res.status >= 500) {
-          detail = "The relay service is temporarily unavailable. Try again with a new pairing session.";
-        }
-        throw new Error(detail);
-      }
-      if (delivery) delivery.textContent = "Sent securely to your computer.";
-    } catch (e) {
-      if (delivery) delivery.textContent = "Not sent.";
-      showError(
-        "Couldn't send to your computer: " +
-          (e && e.message ? e.message : "network error") +
-          ". The data stayed on this phone — tap Start over after fixing the connection, or enter details on the computer."
-      );
-    }
+    const generation = ++deliveryGeneration;
+    await deliverPayload(lastPayload, generation);
   }
 }
 
 function resetAll() {
+  deliveryGeneration++;
+  if (activeDeliveryController) activeDeliveryController.abort();
+  activeDeliveryController = null;
   deal.buyer = null;
   deal.coBuyer = null;
   pending = null;
+  lastPayload = null;
   capturing = "buyer";
+  el("startOverBtn").classList.remove("hidden");
+  el("retrySendBtn").classList.add("hidden");
   clearError();
   beginCapture("buyer");
 }
@@ -936,6 +1348,11 @@ el("rescanBtn").addEventListener("click", () => beginCapture(capturing));
 el("yesCoBuyerBtn").addEventListener("click", () => beginCapture("coBuyer"));
 el("noCoBuyerBtn").addEventListener("click", finish);
 el("startOverBtn").addEventListener("click", resetAll);
+el("retrySendBtn").addEventListener("click", () => {
+  if (!lastPayload || !sessionId || !keyB64) return;
+  const generation = ++deliveryGeneration;
+  deliverPayload(lastPayload, generation);
+});
 el("startBtn").addEventListener("click", () => {
   el("startBtn").classList.add("hidden");
   // Explicit user gesture — always attempt getUserMedia from here.
@@ -943,6 +1360,9 @@ el("startBtn").addEventListener("click", () => {
 });
 el("photoBtn").addEventListener("click", () => {
   choosingPhoto = true;
+  captureGen++;
+  stopCamera();
+  el("status").textContent = "Choose a photo of the back of the license…";
   el("photoInput").click();
 });
 el("photoInput").addEventListener("change", (event) => {
@@ -951,6 +1371,13 @@ el("photoInput").addEventListener("change", (event) => {
   const file = input.files && input.files[0];
   input.value = "";
   if (file) decodePhoto(file);
+});
+el("photoInput").addEventListener("cancel", () => {
+  choosingPhoto = false;
+  if (screens.camera.classList.contains("hidden") || activeRun) return;
+  el("status").textContent = "No photo selected. Tap Try camera again or choose a photo.";
+  el("startBtn").textContent = "Try camera again";
+  el("startBtn").classList.remove("hidden");
 });
 el("torchBtn").addEventListener("click", async () => {
   const run = activeRun;
@@ -988,6 +1415,9 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   captureGen++;
   stopCamera();
+  deliveryGeneration++;
+  if (activeDeliveryController) activeDeliveryController.abort();
+  activeDeliveryController = null;
 });
 
 // Prefer a full top-level page so the phone camera permission prompt can appear.

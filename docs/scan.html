@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260717-9" />
+  <link rel="stylesheet" href="scan.css?v=20260722-14" />
 </head>
 <body>
   <header class="cc-header">
-    <img class="cc-logo" src="icons/icon128.png" alt="Compliance Central" />
+    <img class="cc-logo" src="icons/icon128.png" alt="" aria-hidden="true" />
     <div class="cc-title">
       <h1>Compliance Central</h1>
       <span class="cc-subtitle">Michigan Dealer Compliance Hub</span>
@@ -17,62 +17,71 @@
   </header>
 
   <main class="cc-main">
+    <section id="errorBanner" class="error-banner hidden" role="alert" aria-atomic="true"></section>
+
     <!-- Camera / scanning screen -->
-    <section id="cameraScreen" class="screen">
+    <section id="cameraScreen" class="screen" aria-labelledby="captureHeading">
       <h2 id="captureHeading">Scan the buyer's license</h2>
-      <p class="hint">Fill the yellow frame with the <strong>wide PDF417</strong> on the back
-        (bottom barcode). A bit of the thin 1D line above it is OK — hold steady.</p>
-      <div class="viewport">
-        <video id="video" playsinline muted autoplay></video>
-        <div class="frame-guide" aria-hidden="true"></div>
+      <p id="captureInstructions" class="hint">Keep the <strong>wide PDF417 barcode</strong> on the back roughly inside
+        the large yellow area. It can be tilted or off-center — no need to line it up perfectly.
+        The scanner reads it automatically as soon as it is clear.
+        When asked, choose <strong>Allow</strong> for camera access.</p>
+      <div class="viewport" role="img"
+        aria-label="Live camera preview. Keep the wide barcode roughly within the large yellow scan area. Exact alignment is not required.">
+        <video id="video" playsinline muted autoplay aria-hidden="true"></video>
+        <div class="frame-guide" aria-hidden="true">
+          <span class="frame-label">Barcode can be anywhere here</span>
+        </div>
       </div>
-      <p id="status" class="status" role="status" aria-live="polite">Starting camera…</p>
-      <p id="diag" class="diag"></p>
+      <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Starting camera…</p>
+      <p id="diag" class="diag hidden"></p>
       <div class="camera-actions">
         <button id="torchBtn" class="btn btn-ghost hidden" type="button">Turn light on</button>
         <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
-        <button id="photoBtn" class="btn btn-ghost" type="button">Use a photo</button>
-        <input id="photoInput" class="visually-hidden" type="file" accept="image/*" />
+        <button id="photoBtn" class="btn btn-ghost" type="button" aria-controls="photoInput">Use a photo</button>
+        <input id="photoInput" class="visually-hidden" type="file" accept="image/*"
+          aria-label="Choose a photo of the back of the license" tabindex="-1" />
       </div>
+      <p id="privacyNote" class="privacy-note">Scanning happens on this phone. The license image is not uploaded;
+        only the fields you review and confirm are encrypted and sent.</p>
     </section>
 
     <!-- Review screen -->
-    <section id="reviewScreen" class="screen hidden">
+    <section id="reviewScreen" class="screen hidden" aria-labelledby="reviewHeading">
       <h2 id="reviewHeading">Confirm the details</h2>
-      <dl id="fields" class="fields"></dl>
+      <dl id="fields" class="fields" aria-label="Scanned license details"></dl>
       <p id="jurisdictionNote" class="note hidden"></p>
-      <p id="reviewDiag" class="diag"></p>
+      <p id="reviewDiag" class="diag hidden"></p>
       <div class="actions">
-        <button id="rescanBtn" class="btn btn-ghost">Re-scan</button>
-        <button id="confirmBtn" class="btn btn-primary">Looks good</button>
+        <button id="rescanBtn" class="btn btn-ghost" type="button">Re-scan</button>
+        <button id="confirmBtn" class="btn btn-primary" type="button">Looks good</button>
       </div>
     </section>
 
     <!-- Co-buyer prompt -->
-    <section id="cobuyerPrompt" class="screen hidden">
-      <h2>Is there a co-buyer?</h2>
+    <section id="cobuyerPrompt" class="screen hidden" aria-labelledby="cobuyerHeading">
+      <h2 id="cobuyerHeading">Is there a co-buyer?</h2>
       <p class="hint">A co-buyer is a second person on the deal. Scan their license too,
         or finish with just the buyer.</p>
       <div class="actions">
-        <button id="noCoBuyerBtn" class="btn btn-ghost">No co-buyer</button>
-        <button id="yesCoBuyerBtn" class="btn btn-primary">Scan co-buyer</button>
+        <button id="noCoBuyerBtn" class="btn btn-ghost" type="button">No co-buyer</button>
+        <button id="yesCoBuyerBtn" class="btn btn-primary" type="button">Scan co-buyer</button>
       </div>
     </section>
 
     <!-- Done screen -->
-    <section id="doneScreen" class="screen hidden">
+    <section id="doneScreen" class="screen hidden" aria-labelledby="doneHeading">
       <div class="done-check" aria-hidden="true">✓</div>
-      <h2>Scan complete</h2>
+      <h2 id="doneHeading">Scan complete</h2>
       <p class="hint">Return to your computer — the form will fill automatically.</p>
-      <p id="deliveryStatus" class="status" role="status" aria-live="polite"></p>
-      <div id="captureSummary" class="capture-summary"></div>
-      <button id="startOverBtn" class="btn btn-ghost">Start over</button>
+      <p id="deliveryStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
+      <div id="captureSummary" class="capture-summary" role="group" aria-label="Captured people"></div>
+      <button id="retrySendBtn" class="btn btn-primary hidden" type="button">Retry sending</button>
+      <button id="startOverBtn" class="btn btn-ghost" type="button">Start over</button>
     </section>
-
-    <section id="errorBanner" class="error-banner hidden" role="alert"></section>
   </main>
 
-  <script src="lib/zxing.min.js?v=20260717-9"></script>
-  <script src="scan.js?v=20260717-9" type="module"></script>
+  <script src="lib/zxing.min.js?v=20260717-10"></script>
+  <script src="scan.js?v=20260722-14" type="module"></script>
 </body>
 </html>

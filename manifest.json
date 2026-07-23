@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Compliance Central - Michigan Dealer Compliance Hub",
   "short_name": "Compliance",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "minimum_chrome_version": "114",
   "description": "Unified compliance screening for Michigan auto dealers. OFAC sanctions, Repeat Offender, and Title/Lien checks in one sidebar tool.",
   "homepage_url": "https://techsavvyjoe.github.io/compliance-central/",

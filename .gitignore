@@ -23,3 +23,9 @@ __pycache__/
 
 # Sensitive
 .env
+
+# Generated compliance exports may contain customer identity data.
+Compliance*.pdf
+OFAC_*.pdf
+RepeatOffender_*.pdf
+Title_*.pdf

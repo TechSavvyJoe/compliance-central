@@ -36,6 +36,15 @@ function contrast(foreground, background) {
   return (light + 0.05) / (dark + 0.05);
 }
 
+function loadScanSuccessFeedbackGate() {
+  const start = scanJs.indexOf("function createScanSuccessFeedbackGate()");
+  const endMarker = "\n}\n\nconst scanSuccessFeedbackGate";
+  const end = scanJs.indexOf(endMarker, start);
+  assert.ok(start >= 0 && end > start, "feedback gate must remain testable");
+  const source = scanJs.slice(start, end + 2);
+  return Function(`"use strict"; ${source}; return createScanSuccessFeedbackGate;`)();
+}
+
 function vp8Dimensions(webp) {
   assert.equal(webp.subarray(0, 4).toString("ascii"), "RIFF");
   assert.equal(webp.subarray(8, 12).toString("ascii"), "WEBP");
@@ -81,6 +90,29 @@ test("scanner exposes named regions and atomic live feedback", () => {
   assert.ok(html.indexOf('id="errorBanner"') < html.indexOf('id="cameraScreen"'));
 });
 
+test("valid scans produce one-shot supplemental sound and haptic feedback", () => {
+  const createGate = loadScanSuccessFeedbackGate();
+  const gate = createGate();
+
+  assert.equal(gate.claim(Number.NaN, Number.NaN), false, "invalid runs stay silent");
+  assert.equal(gate.claim(7, 7), true, "first accepted frame signals");
+  assert.equal(gate.claim(7, 7), false, "duplicate frames stay silent");
+  assert.equal(gate.claim(7, 8), false, "stale capture stays silent");
+  assert.equal(gate.claim(8, 8), true, "a new capture rearms feedback");
+  assert.equal(gate.claim(8, 8), false, "new capture still signals once");
+
+  assert.match(scanJs, /window\.AudioContext \|\| window\.webkitAudioContext/);
+  assert.match(scanJs, /createOscillator\(\)/);
+  assert.match(scanJs, /navigator\.vibrate\(45\)/);
+  assert.match(scanJs, /prefers-reduced-motion: reduce/);
+  assert.equal(
+    (scanJs.match(/playScanSuccessFeedback\(gen\);/g) || []).length,
+    4,
+    "camera and all three valid photo paths signal through the one-shot gate"
+  );
+  assert.doesNotMatch(scanJs, /new Audio\(|\.(?:mp3|wav|ogg)["']/i);
+});
+
 test("photo fallback remains keyboard-accessible without an invisible tab stop", () => {
   assert.match(
     html,
@@ -89,7 +121,7 @@ test("photo fallback remains keyboard-accessible without an invisible tab stop",
   assert.match(html, /<video id="video"[^>]*aria-hidden="true"/);
   assert.match(
     html,
-    /id="photoBtn"[^>]*aria-controls="photoInput"[^>]*aria-label="Choose a photo of the back of the license or state ID"[^>]*>Use a photo<\/button>/
+    /id="photoBtn"[^>]*aria-controls="photoInput"[^>]*aria-label="Use a photo of the back of the license or state ID"[^>]*>Use a photo<\/button>/
   );
   assert.match(
     html,
@@ -106,11 +138,11 @@ test("camera screen keeps only essential visible guidance", () => {
   assert.equal((html.match(/<li class="scan-step/g) || []).length, 3);
   assert.match(
     html,
-    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260722-21" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
+    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260722-23" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
   );
   assert.match(
     html,
-    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260722-21" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
+    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260722-23" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
   );
   assert.match(
     html,
@@ -135,7 +167,7 @@ test("camera screen keeps only essential visible guidance", () => {
   );
   assert.match(
     html,
-    /id="reviewPrivacyNote"[^>]*>Your license image stays on this phone\. Selecting Looks good encrypts and sends only these details to your computer\.<\/p>/
+    /id="reviewPrivacyNote"[^>]*>Your license image stays on this phone\. After you finish, only the details shown here are encrypted and sent to your computer\.<\/p>/
   );
   assert.match(
     html,
@@ -168,8 +200,8 @@ test("demo ID artwork is lightweight and clearly non-document training media", (
   assert.ok(frontDemoWebp.byteLength + backDemoWebp.byteLength < 50_000);
   assert.deepEqual(vp8Dimensions(frontDemoWebp), { width: 640, height: 404 });
   assert.deepEqual(vp8Dimensions(backDemoWebp), { width: 640, height: 404 });
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-21" width="640" height="404"/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-21" width="640" height="404"/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-23" width="640" height="404"/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-23" width="640" height="404"/);
 });
 
 test("normal scans do not populate implementation diagnostics", () => {
@@ -185,11 +217,12 @@ test("normal scans do not populate implementation diagnostics", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260722-21");
+  assert.equal(cssVersion, "20260722-23");
   assert.equal(scriptVersion, cssVersion);
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-21/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-21/);
-  assert.match(pairingJs, /&cb=20260722-21#k=/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-23/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-23/);
+  assert.match(pairingJs, /new URLSearchParams\(\{ s: sessionId, k: key \}\)/);
+  assert.match(pairingJs, /cb=20260722-23#\$\{fragment\.toString\(\)\}/);
   assert.doesNotMatch(pairingJs, /debug=1/);
 });
 

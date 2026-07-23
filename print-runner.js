@@ -7,7 +7,9 @@
  */
 
 import {
+  consumePrintPayload,
   PRINT_TIMEOUT_MS,
+  removeExpiredPrintPayloads,
   schedulePrint,
 } from "./lib/print-html.js";
 
@@ -20,18 +22,20 @@ function fail(message) {
 
 async function loadPayload() {
   if (!id || !chrome?.storage?.session) return null;
-  const bag = await chrome.storage.session.get(id);
-  const payload = bag?.[id] || null;
   try {
-    await chrome.storage.session.remove(id);
+    return await consumePrintPayload(chrome.storage.session, id);
   } catch {
-    // ignore cleanup failures
+    return null;
   }
-  return payload;
 }
 
 async function main() {
   const payload = await loadPayload();
+  try {
+    await removeExpiredPrintPayloads(chrome.storage.session);
+  } catch {
+    // Current payload has already been consumed; stale-job cleanup is best effort.
+  }
   if (!payload || typeof payload.html !== "string" || !payload.html) {
     fail("Nothing to print. Close this tab and try Print again from Compliance Central.");
     return;

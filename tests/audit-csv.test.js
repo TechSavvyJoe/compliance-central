@@ -6,58 +6,73 @@ import { buildAuditCsv } from "../src/sidepanel/audit-csv.js";
 const SAMPLE = [
   {
     timestamp: "2026-06-16T14:30:00.000Z",
-    customer: "Jane Doe",
-    vin: "1HGBH41JXMN109186",
+    reference: "CC-20260616-123456",
     decision: "APPROVED",
     runType: "full",
     runLabel: "Run All Checks",
-    checks: { ofac: true, repeatOffender: true, title: true },
-    fullResults: { customer: { dob: "1980-01-01" } },
+    hasCoBuyer: true,
+    checks: {
+      ofac: "clear",
+      repeatOffender: "eligible",
+      coBuyerOfac: "clear",
+      coBuyerRepeatOffender: "eligible",
+      title: "lien",
+    },
   },
   {
     timestamp: "2026-06-15T09:00:00.000Z",
-    customer: "John Smith",
-    vin: null,
-    decision: "DENIED",
+    reference: "CC-20260615-654321",
+    decision: "REVIEW",
     runType: "full",
-    checks: { ofac: false, repeatOffender: "na", title: undefined },
-    fullResults: { customer: { dob: "1975-12-31" } },
+    hasCoBuyer: false,
+    checks: {
+      ofac: "error",
+      repeatOffender: "na",
+      title: "review",
+    },
   },
 ];
 
-test("buildAuditCsv emits a header row plus one row per entry", () => {
+test("buildAuditCsv emits anonymous, per-subject audit columns", () => {
   const csv = buildAuditCsv(SAMPLE);
   const lines = csv.split("\r\n");
-  assert.equal(lines.length, 3); // header + 2
-  assert.match(lines[0], /^Timestamp,Customer,Date of Birth,/);
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /^Timestamp,Audit Reference,Run,Buyer OFAC,/);
+  assert.doesNotMatch(csv, /Customer|Date of Birth|Trade VIN/);
 });
 
-test("buildAuditCsv maps each check result and the final decision", () => {
+test("buildAuditCsv preserves typed outcomes without false clear or match labels", () => {
   const lines = buildAuditCsv(SAMPLE).split("\r\n");
-  // Row 1: all clear, approved.
-  assert.match(lines[1], /Jane Doe/);
-  assert.match(lines[1], /1980-01-01/);
-  assert.match(lines[1], /Clear,Eligible,Clear,APPROVED$/);
-  // Row 2: OFAC match, RO not-applicable, title not run, denied.
-  assert.match(lines[2], /Match,N\/A,—,DENIED$/);
+  assert.match(
+    lines[1],
+    /CC-20260616-123456,Run All Checks,Clear,Eligible,Clear,Eligible,Active lien,APPROVED$/
+  );
+  assert.match(
+    lines[2],
+    /Unavailable,N\/A,N\/A,N\/A,Review,REVIEW$/
+  );
+  assert.doesNotMatch(lines[2], /Potential match|Flagged/);
 });
 
-test("buildAuditCsv quotes cells containing commas/quotes (no column shift)", () => {
+test("buildAuditCsv neutralizes spreadsheet formulas and preserves columns", () => {
   const csv = buildAuditCsv([
     {
       timestamp: "2026-06-16T00:00:00.000Z",
-      customer: 'Doe, "JJ" Jr',
-      vin: "V",
+      reference: "=HYPERLINK(\"https://bad.invalid\")",
+      runLabel: "+SUM(1,2)",
       decision: "REVIEW",
       runType: "full",
-      checks: { ofac: true, repeatOffender: true, title: true },
-      fullResults: { customer: { dob: "1990-02-02" } },
+      hasCoBuyer: false,
+      checks: {
+        ofac: "clear",
+        repeatOffender: "eligible",
+        title: "clear",
+      },
     },
   ]);
   const row = csv.split("\r\n")[1];
-  // The comma-and-quote name must be wrapped and its quotes doubled.
-  assert.ok(row.includes('"Doe, ""JJ"" Jr"'));
-  // Still exactly 9 columns once the quoted field is accounted for.
+  assert.ok(row.includes("'=HYPERLINK"));
+  assert.ok(row.includes("'+SUM"));
   assert.equal(csv.split("\r\n")[0].split(",").length, 9);
 });
 

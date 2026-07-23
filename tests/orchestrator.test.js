@@ -69,14 +69,19 @@ test("cancellation releases orchestration without waiting for a slow shared bran
 
 test("a second concurrent Run All Checks is rejected while one is in flight", async () => {
   let releaseStart;
+  let markStartEntered;
   const startBlocked = new Promise((resolve) => {
     releaseStart = resolve;
   });
+  const startEntered = new Promise((resolve) => {
+    markStartEntered = resolve;
+  });
   let blockFirstSet = true;
   mockChromeSession({
-    set() {
-      if (blockFirstSet) {
+    set(obj) {
+      if (blockFirstSet && obj.searchStatus === "running") {
         blockFirstSet = false;
+        markStartEntered();
         return startBlocked;
       }
       return Promise.resolve();
@@ -95,6 +100,7 @@ test("a second concurrent Run All Checks is rejected while one is in flight", as
   const second = await handleRunAllChecks({ customer, hasTrade: false });
   assert.equal(second.success, false);
   assert.match(second.error, /already in progress/i);
+  await startEntered;
   await cancelCurrentRun("run-busy");
   releaseStart();
   assert.equal((await first).cancelled, true);
@@ -102,14 +108,19 @@ test("a second concurrent Run All Checks is rejected while one is in flight", as
 
 test("message router returns busy before starting a second RUN_ALL_CHECKS", async () => {
   let releaseStart;
+  let markStartEntered;
   const startBlocked = new Promise((resolve) => {
     releaseStart = resolve;
   });
+  const startEntered = new Promise((resolve) => {
+    markStartEntered = resolve;
+  });
   let blockFirstSet = true;
   mockChromeSession({
-    set() {
-      if (blockFirstSet) {
+    set(obj) {
+      if (blockFirstSet && obj.searchStatus === "running") {
         blockFirstSet = false;
+        markStartEntered();
         return startBlocked;
       }
       return Promise.resolve();
@@ -134,6 +145,7 @@ test("message router returns busy before starting a second RUN_ALL_CHECKS", asyn
   );
   assert.equal(response.success, false);
   assert.match(response.error, /already in progress/i);
+  await startEntered;
   await cancelCurrentRun("run-router-busy");
   releaseStart();
   await first;
@@ -169,16 +181,43 @@ test("message router reports an initial storage failure instead of false started
   }
 });
 
+test("a persisted Clear tombstone blocks delayed initial RUNNING publication", async () => {
+  const { writes, state } = mockChromeSession();
+  state.cancelledRunId = "run-cleared-before-worker-start";
+  state.activeRunId = null;
+  state.stateRunId = "run-cleared-before-worker-start";
+  state.searchStatus = "idle";
+
+  const result = await handleRunAllChecks({
+    customer: { firstName: "Late", lastName: "Message", hasCoBuyer: false },
+    hasTrade: false,
+    runId: "run-cleared-before-worker-start",
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.cancelled, true);
+  assert.equal(state.searchStatus, "idle");
+  assert.equal(
+    writes.some((write) => write.searchStatus === "running"),
+    false
+  );
+});
+
 test("a delayed cancel for an older run cannot fence a newer starting run", async () => {
   let releaseStart;
+  let markStartEntered;
   const startBlocked = new Promise((resolve) => {
     releaseStart = resolve;
   });
+  const startEntered = new Promise((resolve) => {
+    markStartEntered = resolve;
+  });
   let blockFirstSet = true;
   const { state } = mockChromeSession({
-    set() {
-      if (blockFirstSet) {
+    set(obj) {
+      if (blockFirstSet && obj.searchStatus === "running") {
         blockFirstSet = false;
+        markStartEntered();
         return startBlocked;
       }
       return Promise.resolve();
@@ -195,6 +234,7 @@ test("a delayed cancel for an older run cannot fence a newer starting run", asyn
     runId: "run-new",
   });
 
+  await startEntered;
   const staleCancel = await cancelCurrentRun("run-old");
   assert.equal(staleCancel.cancelled, false);
   assert.equal(state.activeRunId, "run-new");
@@ -207,14 +247,19 @@ test("a delayed cancel for an older run cannot fence a newer starting run", asyn
 
 test("cancelled run cannot publish completion or leave transient residue", async () => {
   let releaseStart;
+  let markStartEntered;
   const startBlocked = new Promise((resolve) => {
     releaseStart = resolve;
   });
+  const startEntered = new Promise((resolve) => {
+    markStartEntered = resolve;
+  });
   let blockFirstSet = true;
   const { writes, state } = mockChromeSession({
-    set() {
-      if (blockFirstSet) {
+    set(obj) {
+      if (blockFirstSet && obj.searchStatus === "running") {
         blockFirstSet = false;
+        markStartEntered();
         return startBlocked;
       }
       return Promise.resolve();
@@ -230,6 +275,7 @@ test("cancelled run cannot publish completion or leave transient residue", async
   });
   assert.equal(isRunInFlight(), true);
 
+  await startEntered;
   const response = await handleMessage(
     { type: "CANCEL_CURRENT_RUN", runId: "run-cancelled" },
     { id: "test-ext-id" }

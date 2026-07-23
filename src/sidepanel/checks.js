@@ -50,7 +50,7 @@ export async function runOfacCheck(customerData) {
   };
 }
 
-export async function runRepeatOffenderCheck(customerData) {
+export async function runRepeatOffenderCheck(customerData, operationId) {
   const response = await chrome.runtime.sendMessage({
     type: "RUN_REPEAT_OFFENDER",
     data: {
@@ -60,6 +60,7 @@ export async function runRepeatOffenderCheck(customerData) {
       suffix: customerData.suffix,
       dob: customerData.dob,
       dlnPid: customerData.dlnPid,
+      operationId,
     },
   });
 
@@ -91,10 +92,10 @@ export async function runRepeatOffenderCheck(customerData) {
   };
 }
 
-export async function runTitleCheck(customerData) {
+export async function runTitleCheck(customerData, operationId) {
   const response = await chrome.runtime.sendMessage({
     type: "RUN_TITLE_CHECK",
-    data: { vin: customerData.tradeVin },
+    data: { vin: customerData.tradeVin, operationId },
   });
 
   if (!response?.success) {
@@ -148,8 +149,86 @@ export async function runTitleCheck(customerData) {
   };
 }
 
+/**
+ * Normalize an OFAC result before it is used for a final decision or report.
+ * A service failure commonly carries `passed: false`; it must never be treated
+ * as a confirmed match unless the result is otherwise a valid completed check.
+ */
+export function classifyOfacResult(result) {
+  if (!result) {
+    return { state: "missing", blocker: false, complete: false };
+  }
+  if (result.error || result.status === "error") {
+    return { state: "unavailable", blocker: false, complete: false };
+  }
+  if (result.passed === true) {
+    return {
+      state: result.stale ? "stale" : "clear",
+      blocker: false,
+      complete: true,
+    };
+  }
+  if (result.passed === false) {
+    return { state: "match", blocker: true, complete: true };
+  }
+  return { state: "review", blocker: false, complete: false };
+}
+
+/**
+ * Normalize the Michigan Repeat Offender response. Both the status enum and
+ * boolean must agree; unknown or contradictory combinations require review.
+ */
+export function classifyRepeatOffenderResult(result) {
+  if (!result) {
+    return { state: "missing", blocker: false, complete: false };
+  }
+  if (result.error || result.status === "error") {
+    return { state: "unavailable", blocker: false, complete: false };
+  }
+  if (result.status === "eligible" && result.passed === true) {
+    return { state: "eligible", blocker: false, complete: true };
+  }
+  if (result.status === "ineligible" && result.passed === false) {
+    return { state: "ineligible", blocker: true, complete: true };
+  }
+  if (
+    result.status === "not_applicable" &&
+    (result.passed === null || result.passed === undefined)
+  ) {
+    return { state: "not_applicable", blocker: false, complete: true };
+  }
+  return { state: "review", blocker: false, complete: false };
+}
+
 export function calculateFinalDecision(checks) {
-  if (!checks.ofac) {
+  const buyerOfac = classifyOfacResult(checks.ofac);
+  const coBuyerOfac = checks.coBuyerOfac
+    ? classifyOfacResult(checks.coBuyerOfac)
+    : null;
+  const buyerRepeat = classifyRepeatOffenderResult(checks.repeatOffender);
+  const coBuyerRepeat = checks.coBuyerRepeatOffender
+    ? classifyRepeatOffenderResult(checks.coBuyerRepeatOffender)
+    : null;
+
+  // Known legal/compliance blockers take precedence over unrelated incomplete
+  // checks. An outage must not soften a confirmed denial into a generic review.
+  if (buyerOfac.blocker || coBuyerOfac?.blocker) {
+    return {
+      approved: false,
+      level: "DENIED",
+      reason: "OFAC match found - cannot proceed with transaction",
+    };
+  }
+
+  if (buyerRepeat.blocker || coBuyerRepeat?.blocker) {
+    return {
+      approved: false,
+      level: "DENIED",
+      reason: "Repeat offender status - registration will be denied",
+    };
+  }
+
+  if (buyerOfac.state === "missing") {
     return {
       approved: false,
       level: "REVIEW",
@@ -157,7 +236,10 @@ export function calculateFinalDecision(checks) {
     };
   }
 
-  if (checks.ofac.error || checks.coBuyerOfac?.error) {
+  if (
+    buyerOfac.state === "unavailable" ||
+    coBuyerOfac?.state === "unavailable"
+  ) {
     return {
       approved: false,
       level: "REVIEW",
@@ -165,7 +247,15 @@ export function calculateFinalDecision(checks) {
     };
   }
 
-  if (!checks.repeatOffender) {
+  if (buyerOfac.state === "review" || coBuyerOfac?.state === "review") {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason: "OFAC screening returned an unrecognized result - review before proceeding",
+    };
+  }
+
+  if (buyerRepeat.state === "missing") {
     return {
       approved: false,
       level: "REVIEW",
@@ -174,10 +264,8 @@ export function calculateFinalDecision(checks) {
   }
 
   if (
-    checks.repeatOffender.error ||
-    checks.repeatOffender.status === "error" ||
-    checks.coBuyerRepeatOffender?.error ||
-    checks.coBuyerRepeatOffender?.status === "error"
+    buyerRepeat.state === "unavailable" ||
+    coBuyerRepeat?.state === "unavailable"
   ) {
     return {
       approved: false,
@@ -186,39 +274,18 @@ export function calculateFinalDecision(checks) {
     };
   }
 
-  const ofacPass = checks.ofac.passed;
-  // An out-of-state subject's Michigan Repeat Offender check is "not_applicable"
-  // (passed: null) — that is NOT a failure, so treat it as non-blocking.
-  const repeatPass =
-    checks.repeatOffender.status === "not_applicable"
-      ? true
-      : checks.repeatOffender.passed;
-  const cbOfacPass = checks.coBuyerOfac ? checks.coBuyerOfac.passed : true;
-  const cbRepeatPass = !checks.coBuyerRepeatOffender
-    ? true
-    : checks.coBuyerRepeatOffender.status === "not_applicable"
-      ? true
-      : checks.coBuyerRepeatOffender.passed;
-
-  if (!ofacPass || !cbOfacPass) {
+  if (buyerRepeat.state === "review" || coBuyerRepeat?.state === "review") {
     return {
       approved: false,
-      level: "DENIED",
-      reason: "OFAC match found - cannot proceed with transaction",
-    };
-  }
-
-  if (!repeatPass || !cbRepeatPass) {
-    return {
-      approved: false,
-      level: "DENIED",
-      reason: "Repeat offender status - registration will be denied",
+      level: "REVIEW",
+      reason:
+        "Repeat Offender check returned an unrecognized or contradictory response - review before proceeding",
     };
   }
 
   // A clean OFAC result against a list that could not be refreshed is not a
   // confident clear — require review rather than silently approving.
-  if (checks.ofac.stale || checks.coBuyerOfac?.stale) {
+  if (buyerOfac.state === "stale" || coBuyerOfac?.state === "stale") {
     return {
       approved: false,
       level: "REVIEW",

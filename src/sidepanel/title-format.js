@@ -56,3 +56,75 @@ export function lienSummary(title) {
     ? `Lienholder: ${holder} — payoff required before sale.`
     : "Active lien on the trade — obtain payoff / lien release before sale.";
 }
+
+/**
+ * Derive one fail-closed Title/Lien presentation for every UI/export surface.
+ * A backend `passed:true` means no disqualifying brand; it does NOT mean there
+ * is no lien, so brand/lien warnings must take precedence over a green state.
+ */
+export function titlePresentation(title) {
+  const value = title || {};
+  const brand = String(value.titleBrand || "").trim().toUpperCase();
+  const titleStatus = String(value.titleStatus || "").trim();
+  const noRecord = /no\s+(?:title\s+)?record/i.test(titleStatus);
+
+  if (
+    value.error ||
+    value.status === "error" ||
+    noRecord ||
+    brand === "UNKNOWN" ||
+    value.passed !== true
+  ) {
+    return {
+      state: "review",
+      statusKey: "warning",
+      label: noRecord ? "No Record" : "Review",
+      title: noRecord ? "NO TITLE RECORD FOUND" : "TITLE RESULT NEEDS REVIEW",
+      subtitle: noRecord
+        ? "Michigan records did not return a title for this VIN. Verify the VIN and review before proceeding."
+        : value.error ||
+          "The Title/Lien response was not confirmed clear. Review the result before proceeding.",
+    };
+  }
+
+  if (brand && !["CLEAN", "NONE"].includes(brand)) {
+    return {
+      state: "branded",
+      statusKey: "warning",
+      label: brand,
+      title: `${brand} TITLE${value.hasLien ? " + ACTIVE LIEN" : ""}`,
+      subtitle: value.hasLien
+        ? `Branded title; ${lienSummary(value)}`
+        : "Branded title — disclosure and review are required before sale.",
+    };
+  }
+
+  if (value.hasLien) {
+    return {
+      state: "lien",
+      statusKey: "warning",
+      label: "Lien",
+      title: "ACTIVE LIEN",
+      subtitle: lienSummary(value),
+    };
+  }
+
+  if (brand === "CLEAN" || /^clear$/i.test(titleStatus)) {
+    return {
+      state: "clear",
+      statusKey: "pass",
+      label: "Clear",
+      title: "CLEAR TITLE",
+      subtitle: "No title brands or active liens were reported.",
+    };
+  }
+
+  return {
+    state: "review",
+    statusKey: "warning",
+    label: "Review",
+    title: "TITLE RESULT NEEDS REVIEW",
+    subtitle:
+      "The Title/Lien response did not include a confirmed clean status. Review before proceeding.",
+  };
+}

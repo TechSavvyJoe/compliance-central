@@ -6,7 +6,7 @@
   <meta name="description" content="Use your phone to scan the wide barcode on the back of a Michigan driver's license or state ID and securely fill Compliance Central customer fields." />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />
-  <link rel="stylesheet" href="scan.css?v=20260722-21" />
+  <link rel="stylesheet" href="scan.css?v=20260722-23" />
 </head>
 <body>
   <header class="cc-header">
@@ -23,7 +23,7 @@
       <ol class="scan-steps" role="list" aria-label="How to scan the ID">
         <li class="scan-step">
           <figure class="id-example" aria-label="Step 1. Turn it over. Show the back of the ID.">
-            <img src="images/mi-id-front-demo.webp?v=20260722-21" width="640" height="404" alt=""
+            <img src="images/mi-id-front-demo.webp?v=20260722-23" width="640" height="404" alt=""
               aria-hidden="true" decoding="async" />
             <figcaption id="step1Title">
               <span class="step-number" aria-hidden="true">1</span>
@@ -33,7 +33,7 @@
         </li>
         <li class="scan-step">
           <figure class="id-example is-target" aria-label="Step 2. Find the wide barcode. It is the second barcode from the top on the right, directly below the thin barcode.">
-            <img src="images/mi-id-back-demo.webp?v=20260722-21" width="640" height="404" alt=""
+            <img src="images/mi-id-back-demo.webp?v=20260722-23" width="640" height="404" alt=""
               aria-hidden="true" decoding="async" />
             <figcaption id="step2Title">
               <span class="step-number" aria-hidden="true">2</span>
@@ -62,7 +62,7 @@
           aria-label="Turn camera light on" aria-pressed="false">Light</button>
         <button id="startBtn" class="btn btn-primary hidden" type="button">Start camera</button>
         <button id="photoBtn" class="btn btn-ghost" type="button" aria-controls="photoInput"
-          aria-label="Choose a photo of the back of the license or state ID">Use a photo</button>
+          aria-label="Use a photo of the back of the license or state ID">Use a photo</button>
         <input id="photoInput" class="visually-hidden" type="file" accept="image/*"
           aria-label="Choose a photo of the back of the license or state ID" tabindex="-1" />
       </div>
@@ -75,7 +75,7 @@
       <dl id="fields" class="fields" aria-label="Scanned license details"></dl>
       <p id="jurisdictionNote" class="note hidden"></p>
       <p id="reviewDiag" class="diag hidden"></p>
-      <p id="reviewPrivacyNote" class="privacy-note">Your license image stays on this phone. Selecting Looks good encrypts and sends only these details to your computer.</p>
+      <p id="reviewPrivacyNote" class="privacy-note">Your license image stays on this phone. After you finish, only the details shown here are encrypted and sent to your computer.</p>
       <div class="actions">
         <button id="rescanBtn" class="btn btn-ghost" type="button">Re-scan</button>
         <button id="confirmBtn" class="btn btn-primary" type="button" aria-describedby="reviewPrivacyNote">Looks good</button>
@@ -106,6 +106,6 @@
   </main>
 
   <script src="lib/zxing.min.js?v=20260717-10"></script>
-  <script src="scan.js?v=20260722-21" type="module"></script>
+  <script src="scan.js?v=20260722-23" type="module"></script>
 </body>
 </html>

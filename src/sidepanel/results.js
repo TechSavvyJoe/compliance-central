@@ -10,6 +10,7 @@ import {
   formatTitleType,
   cleanLienHolder,
   formatLienStatus,
+  titlePresentation,
 } from "./title-format.js";
 
 const MISSING_KEY_DETAIL =
@@ -26,7 +27,7 @@ function friendlyCheckError(message, fallback) {
     return "The check could not connect. Confirm the internet connection, then try again.";
   }
   if (/unauthori[sz]ed|forbidden|\b40[13]\b/i.test(text)) {
-    return "The check could not authenticate. Open Settings to verify backend access, then try again.";
+    return "The service could not authenticate this check. Try again shortly or contact support.";
   }
   return text || fallback;
 }
@@ -119,8 +120,9 @@ const CONFIDENCE_META = {
   low: { label: "DOB differs", cls: "conf-low" },
 };
 
-function renderOfacMatchList(matches) {
+function renderOfacMatchList(matches, totalCount = matches?.length || 0) {
   if (!matches?.length) return "";
+  const omitted = Math.max(0, totalCount - matches.length);
   const items = matches
     .map((m) => {
       const conf = CONFIDENCE_META[m.confidence] || CONFIDENCE_META.medium;
@@ -144,8 +146,9 @@ function renderOfacMatchList(matches) {
     .join("");
   return `
     <details class="ofac-match-list" open>
-      <summary>Review ${matches.length} potential match${matches.length === 1 ? "" : "es"}</summary>
+      <summary>Review ${totalCount} potential match${totalCount === 1 ? "" : "es"}</summary>
       <ul>${items}</ul>
+      ${omitted ? `<p class="ofac-match-omitted">${omitted} additional match${omitted === 1 ? "" : "es"} not shown here.</p>` : ""}
     </details>`;
 }
 
@@ -181,12 +184,13 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
   );
   if (detailEl) {
     if (!ofac.passed) {
-      const count = ofac.matches?.length || 0;
+      const shown = ofac.matches?.length || 0;
+      const count = Math.max(Number(ofac.matchCount) || 0, shown);
       detailEl.innerHTML =
         `<span class="ofac-match-summary">${count} potential match${
           count === 1 ? "" : "es"
         } found — review each before proceeding.</span>` +
-        renderOfacMatchList(ofac.matches);
+        renderOfacMatchList(ofac.matches, count);
     } else {
       let txt = "No matches in SDN list";
       if (ofac.stale) {
@@ -471,24 +475,12 @@ export function displayResults(elements, results) {
       elements.printTitleBtn?.classList.add("hidden");
       elements.downloadTitleBtn?.classList.add("hidden");
     } else {
-      let statusKey, statusLabel;
-      // Check brand + lien BEFORE passed: the backend leaves passed:true for a
-      // lien (only salvage flips it), so a lien/brand must take precedence or it
-      // would be masked as "Clear".
-      if (title.titleBrand && title.titleBrand !== "CLEAN") {
-        statusKey = "warning";
-        statusLabel = title.titleBrand;
-      } else if (title.hasLien) {
-        statusKey = "warning";
-        statusLabel = "Lien";
-      } else if (title.passed) {
-        statusKey = "pass";
-        statusLabel = "Clear";
-      } else {
-        statusKey = "warning";
-        statusLabel = "Review";
-      }
-      setResultStatus(elements.titleResultStatus, statusKey, statusLabel);
+      const presentation = titlePresentation(title);
+      setResultStatus(
+        elements.titleResultStatus,
+        presentation.statusKey,
+        presentation.label
+      );
 
       const lines = [];
       if (title.year && title.make && title.model) {
@@ -505,8 +497,10 @@ export function displayResults(elements, results) {
         lines.push(`Branded title: ${title.titleBrand}`);
       } else if (title.titleStatus === "No Record Found") {
         lines.push("No title record found for this VIN");
-      } else {
+      } else if (presentation.state === "clear") {
         lines.push("Clean title — no brands");
+      } else {
+        lines.push(presentation.subtitle);
       }
 
       // Title type (paper vs electronic) + issue date — important for transfer.
@@ -645,10 +639,11 @@ export function displayIndividualResult(elements, type, result) {
         "Unable to complete Title check"
       );
     } else {
+      const presentation = titlePresentation(result);
       setResultStatus(
         elements.titleResultStatus,
-        result.passed ? "pass" : "warning",
-        result.passed ? "Clear" : "Review"
+        presentation.statusKey,
+        presentation.label
       );
       const dlines = [];
       // Title status / brand headline (parity with the full-run card).
@@ -659,8 +654,10 @@ export function displayIndividualResult(elements, type, result) {
         dlines.push(`Branded title: ${result.titleBrand}`);
       } else if (result.titleStatus === "No Record Found") {
         dlines.push("No title record found for this VIN");
-      } else {
+      } else if (presentation.state === "clear") {
         dlines.push("Clean title — no brands");
+      } else {
+        dlines.push(presentation.subtitle);
       }
       const itype = formatTitleType(result.titleType);
       if (itype) {

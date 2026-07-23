@@ -14,14 +14,17 @@ import {
   IN_FLIGHT,
 } from "./lib/storage-keys.js";
 import { MISSING_API_KEY } from "./lib/api-client.js";
-import { ensureDataUrl } from "./lib/data-url.js";
-import { createRunId, isCurrentRunState } from "./lib/run-fence.js";
+import { ensureDataUrl, imageDataUrlExtension } from "./lib/data-url.js";
+import {
+  createRunId,
+  isCurrentRunState,
+  createOperationFence,
+} from "./lib/run-fence.js";
 import {
   getFormData,
   validateCustomerFields,
   cacheFormData,
   loadCachedFormData,
-  applyCustomerData,
   extractScanJurisdiction,
 } from "./src/sidepanel/form.js";
 import {
@@ -207,11 +210,10 @@ const elements = {
   settingsBtn: $("settingsBtn"),
   settingsModal: $("settingsModal"),
   closeSettingsModal: $("closeSettingsModal"),
-  apiKeyInput: $("apiKeyInput"),
-  apiKeyStatus: $("apiKeyStatus"),
-  saveApiKeyBtn: $("saveApiKeyBtn"),
-  clearApiKeyBtn: $("clearApiKeyBtn"),
-  toggleApiKeyVisibility: $("toggleApiKeyVisibility"),
+  serviceStatus: $("serviceStatus"),
+  settingsClearHistoryBtn: $("settingsClearHistoryBtn"),
+  settingsPrivacyLink: $("settingsPrivacyLink"),
+  settingsVersion: $("settingsVersion"),
   supportEmailLink: $("supportEmailLink"),
 };
 
@@ -242,8 +244,8 @@ function applyIcons() {
     ["icon-download", ICONS.download],
     ["icon-chevron", ICONS.chevron],
     ["icon-settings", ICONS.settings],
-    ["icon-key", ICONS.key],
-    ["icon-eye", ICONS.eye],
+    ["icon-check", ICONS.check],
+    ["icon-info", ICONS.info],
   ];
   for (const [cls, svg] of iconMap) {
     document.querySelectorAll("." + cls).forEach((el) => {
@@ -272,7 +274,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initDatePickers([elements.dob, elements.cbDob]);
   initEventListeners();
 
-  initSettings(elements);
+  initSettings(elements, {
+    onClearHistory: () =>
+      clearAllHistory(elements.historyList, elements.historyCount),
+  });
 
   // Independent async tasks — run in parallel, don't block paint.
   restoreCachedForm();
@@ -486,28 +491,11 @@ function initEventListeners() {
     const { [STORAGE_KEYS.complianceHistory]: history = [] } =
       await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
     if (index < 0 || index >= history.length) return;
-    const item = history[index];
-
-    if (btn.classList.contains("history-view-btn")) {
-      loadHistoryItem(item);
-    } else if (btn.classList.contains("history-rescreen-btn")) {
-      reScreenHistoryItem(item);
-    } else if (btn.classList.contains("history-print-ofac")) {
-      withTempResults(item.fullResults, () => printOfacReport(item.fullResults));
-    } else if (btn.classList.contains("history-download-ofac")) {
-      withTempResults(item.fullResults, () => downloadOfacReportPDF(item.fullResults));
-    } else if (btn.classList.contains("history-print-repeat")) {
-      withTempResults(item.fullResults, () => printRepeatScreenshot(item.fullResults));
-    } else if (btn.classList.contains("history-download-repeat")) {
-      withTempResults(item.fullResults, () => downloadRepeatOffenderPDF(item.fullResults));
-    } else if (btn.classList.contains("history-print-title")) {
-      withTempResults(item.fullResults, () => printTitleScreenshot(item.fullResults));
-    } else if (btn.classList.contains("history-download-title")) {
-      withTempResults(item.fullResults, () => downloadTitleReportPDF(item.fullResults));
-    } else if (btn.classList.contains("history-print-all")) {
-      withTempResults(item.fullResults, () => printAllReports(item.fullResults));
-    } else if (btn.classList.contains("history-download-all")) {
-      withTempResults(item.fullResults, () => downloadAllReportsPDF(item.fullResults));
+    if (btn.classList.contains("history-new-btn")) {
+      hideModal(elements.historyModal);
+      await handleClear();
+      elements.scanLicenseBtn?.focus();
+      showToast("Ready for a new screening — scan an ID or enter the details.", "info");
     }
   });
 
@@ -679,20 +667,6 @@ function initEventListeners() {
   );
 }
 
-function withTempResults(temp, fn) {
-  if (!temp) {
-    showToast("No saved results for this entry.", "info");
-    return;
-  }
-  const original = getCurrentResults();
-  setCurrentResults(temp);
-  try {
-    fn();
-  } finally {
-    setCurrentResults(original);
-  }
-}
-
 // ---------- Friendly error messages ----------
 
 function isMissingKeyError(err) {
@@ -780,6 +754,32 @@ const scanJurisdiction = { buyer: null, coBuyer: null };
 // late fire can't re-show stale results over a freshly-cleared form.
 let completeRevealTimer = null;
 let activeUiRunId = null;
+const individualOperationFence = createOperationFence();
+let activeIndividualOperationId = null;
+
+function beginIndividualOperation() {
+  const token = individualOperationFence.start();
+  const operationId = createRunId();
+  activeIndividualOperationId = operationId;
+  return { token, operationId };
+}
+
+function isCurrentIndividualOperation(operation) {
+  return (
+    individualOperationFence.isCurrent(operation.token) &&
+    activeIndividualOperationId === operation.operationId
+  );
+}
+
+async function discardCancelledIndividualResult(operationId) {
+  const stored = await chrome.storage.session.get(STORAGE_KEYS.currentResults);
+  if (stored[STORAGE_KEYS.currentResults]?.operationId === operationId) {
+    await chrome.storage.session.remove(STORAGE_KEYS.currentResults);
+  }
+  if (getCurrentResults()?.operationId === operationId) {
+    setCurrentResults(null);
+  }
+}
 
 function cacheCurrentFormData() {
   return cacheFormData(elements, {
@@ -850,8 +850,11 @@ async function handleRunAllChecks() {
   setIsRunning(true);
   const runId = createRunId();
   activeUiRunId = runId;
+  const isCurrentRun = () =>
+    activeUiRunId === runId && getIsRunning();
   setButtonsDisabled(elements, true);
   await clearTransientScreenshots();
+  if (!isCurrentRun()) return;
 
   const hasTrade = !!customerData.tradeVin;
 
@@ -868,18 +871,21 @@ async function handleRunAllChecks() {
   }
 
   await cacheCurrentFormData();
+  if (!isCurrentRun()) return;
 
   try {
     const response = await chrome.runtime.sendMessage({
       type: "RUN_ALL_CHECKS",
       data: { customer: customerData, hasTrade, runId },
     });
+    if (!isCurrentRun()) return;
     if (!response?.success) {
       throw new Error(
         response?.error || "Failed to start background checks"
       );
     }
   } catch (e) {
+    if (!isCurrentRun()) return;
     console.error("Start Check Error:", e);
     showToast("Could not start checks: " + describeError(e), "error");
     setIsRunning(false);
@@ -897,8 +903,9 @@ function showHistorySaveWarning() {
   );
 }
 
-async function saveHistoryAndRefresh(results) {
-  const saved = await saveToHistory(results);
+async function saveHistoryAndRefresh(results, shouldSave = () => true) {
+  const saved = await saveToHistory(results, { shouldSave });
+  if (!shouldSave()) return false;
   if (!saved) {
     showHistorySaveWarning();
     return false;
@@ -913,24 +920,36 @@ async function handleRunOfac() {
     showToast("Name is required for OFAC check", "warning");
     return;
   }
+  const operation = beginIndividualOperation();
+  const isCurrent = () => isCurrentIndividualOperation(operation);
   setButtonsDisabled(elements, true);
   showLoading("Running OFAC screening...");
   try {
     const result = await runOfacCheck(customerData);
+    if (!isCurrent()) return;
     const results = mergeIntoCurrentResults(customerData, "ofac", result, {
       replace: true,
       runType: "individual",
       runLabel: "OFAC Only",
+      operationId: operation.operationId,
     });
     displayIndividualResult(elements, "ofac", result);
     setInputCollapsed(true);
     await persistCurrentResults();
-    await saveHistoryAndRefresh(results);
+    if (!isCurrent()) {
+      await discardCancelledIndividualResult(operation.operationId);
+      return;
+    }
+    await saveHistoryAndRefresh(results, isCurrent);
   } catch (error) {
-    showToast("OFAC check failed: " + describeError(error), "error");
+    if (isCurrent()) {
+      showToast("OFAC check failed: " + describeError(error), "error");
+    }
   } finally {
-    hideLoading();
-    setButtonsDisabled(elements, false);
+    if (isCurrent()) {
+      hideLoading();
+      setButtonsDisabled(elements, false);
+    }
   }
 }
 
@@ -947,11 +966,18 @@ async function handleRunRepeatOffender() {
     );
     return;
   }
+  const operation = beginIndividualOperation();
+  const isCurrent = () => isCurrentIndividualOperation(operation);
   setButtonsDisabled(elements, true);
   showLoading("Checking Repeat Offender status...");
   await clearTransientScreenshots();
+  if (!isCurrent()) return;
   try {
-    const result = await runRepeatOffenderCheck(customerData);
+    const result = await runRepeatOffenderCheck(
+      customerData,
+      operation.operationId
+    );
+    if (!isCurrent()) return;
     const results = mergeIntoCurrentResults(
       customerData,
       "repeatOffender",
@@ -960,17 +986,26 @@ async function handleRunRepeatOffender() {
         replace: true,
         runType: "individual",
         runLabel: "Repeat Offender",
+        operationId: operation.operationId,
       }
     );
     displayIndividualResult(elements, "repeatOffender", result);
     setInputCollapsed(true);
     await persistCurrentResults();
-    await saveHistoryAndRefresh(results);
+    if (!isCurrent()) {
+      await discardCancelledIndividualResult(operation.operationId);
+      return;
+    }
+    await saveHistoryAndRefresh(results, isCurrent);
   } catch (error) {
-    showToast("Repeat Offender check failed: " + describeError(error), "error");
+    if (isCurrent()) {
+      showToast("Repeat Offender check failed: " + describeError(error), "error");
+    }
   } finally {
-    hideLoading();
-    setButtonsDisabled(elements, false);
+    if (isCurrent()) {
+      hideLoading();
+      setButtonsDisabled(elements, false);
+    }
   }
 }
 
@@ -980,41 +1015,69 @@ async function handleRunTitle() {
     showToast("VIN is required for title check", "warning");
     return;
   }
+  const operation = beginIndividualOperation();
+  const isCurrent = () => isCurrentIndividualOperation(operation);
   setButtonsDisabled(elements, true);
   showLoading("Checking Title & Lien status...");
   await clearTransientScreenshots();
+  if (!isCurrent()) return;
   try {
-    const result = await runTitleCheck(customerData);
+    const result = await runTitleCheck(customerData, operation.operationId);
+    if (!isCurrent()) return;
     const results = mergeIntoCurrentResults(customerData, "title", result, {
       replace: true,
       runType: "individual",
       runLabel: "Title/Lien",
+      operationId: operation.operationId,
     });
     displayIndividualResult(elements, "title", result);
     setInputCollapsed(true);
     await persistCurrentResults();
-    await saveHistoryAndRefresh(results);
+    if (!isCurrent()) {
+      await discardCancelledIndividualResult(operation.operationId);
+      return;
+    }
+    await saveHistoryAndRefresh(results, isCurrent);
   } catch (error) {
-    showToast("Title check failed: " + describeError(error), "error");
+    if (isCurrent()) {
+      showToast("Title check failed: " + describeError(error), "error");
+    }
   } finally {
-    hideLoading();
-    setButtonsDisabled(elements, false);
+    if (isCurrent()) {
+      hideLoading();
+      setButtonsDisabled(elements, false);
+    }
   }
 }
 
 async function handleClear() {
+  let cancelledIndividualOperationId = activeIndividualOperationId;
+  const persistedIndividualOperation = cancelledIndividualOperationId
+    ? Promise.resolve(null)
+    : chrome.storage.session
+        .get(STORAGE_KEYS.activeIndividualOperationId)
+        .catch(() => null);
+  individualOperationFence.cancel();
+  activeIndividualOperationId = null;
+  hideLoading();
   const cancelledRunId = activeUiRunId;
   activeUiRunId = null;
   // Write the cancellation tombstone immediately. A delayed worker write may
   // still reach session storage, but it can no longer be accepted as current.
-  const fenceWrite = chrome.storage.session.set({
+  const fenceState = {
     [STORAGE_KEYS.cancelledRunId]: cancelledRunId,
     [STORAGE_KEYS.activeRunId]: null,
     [STORAGE_KEYS.stateRunId]: cancelledRunId,
     [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
     [STORAGE_KEYS.searchProgress]: 0,
     [STORAGE_KEYS.inFlightCheck]: null,
-  });
+  };
+  if (cancelledIndividualOperationId) {
+    fenceState[STORAGE_KEYS.cancelledIndividualOperationId] =
+      cancelledIndividualOperationId;
+    fenceState[STORAGE_KEYS.activeIndividualOperationId] = null;
+  }
+  const fenceWrite = chrome.storage.session.set(fenceState);
   setIsRunning(false);
   setButtonsDisabled(elements, false);
   resetInputPanel();
@@ -1048,10 +1111,34 @@ async function handleClear() {
   if (elements.hasCoBuyer) elements.hasCoBuyer.checked = false;
   elements.coBuyerSection?.classList.add("hidden");
 
+  const persistedIndividual = await persistedIndividualOperation;
+  if (!cancelledIndividualOperationId) {
+    cancelledIndividualOperationId =
+      persistedIndividual?.[STORAGE_KEYS.activeIndividualOperationId] || null;
+    if (cancelledIndividualOperationId) {
+      await chrome.storage.session.set({
+        [STORAGE_KEYS.cancelledIndividualOperationId]:
+          cancelledIndividualOperationId,
+        [STORAGE_KEYS.activeIndividualOperationId]: null,
+      });
+    }
+  }
   await fenceWrite;
-  chrome.runtime
-    .sendMessage({ type: "CANCEL_CURRENT_RUN", runId: cancelledRunId })
-    .catch(() => {});
+  const cancellationMessages = [
+    chrome.runtime.sendMessage({
+      type: "CANCEL_CURRENT_RUN",
+      runId: cancelledRunId,
+    }),
+  ];
+  if (cancelledIndividualOperationId) {
+    cancellationMessages.push(
+      chrome.runtime.sendMessage({
+        type: "CANCEL_INDIVIDUAL_OPERATION",
+        operationId: cancelledIndividualOperationId,
+      })
+    );
+  }
+  await Promise.allSettled(cancellationMessages);
   await chrome.storage.session.remove([
     STORAGE_KEYS.cachedFormData,
     STORAGE_KEYS.cachedAt,
@@ -1064,7 +1151,7 @@ async function handleClear() {
   ]);
 
   setCurrentResults(null);
-  chrome.action.setBadgeText({ text: "" });
+  await chrome.action.setBadgeText({ text: "" });
 
   elements.resultsSection.classList.add("hidden");
   elements.progressSection.classList.add("hidden");
@@ -1094,9 +1181,9 @@ async function openHistory() {
       const aging = findAgingDeals(history);
       if (aging.length) {
         showToast(
-          `${aging.length} deal${
+          `${aging.length} audit record${
             aging.length === 1 ? "" : "s"
-          } screened over a week ago — re-screen before delivery.`,
+          } from over a week ago — re-screen any open deal before delivery.`,
           "warning",
           7000
         );
@@ -1105,82 +1192,6 @@ async function openHistory() {
   } catch (e) {
     console.error("Re-screen reminder check failed:", e);
   }
-}
-
-function loadHistoryItem(item) {
-  hideModal(elements.historyModal);
-
-  if (item.fullResults) setCurrentResults(item.fullResults);
-
-  if (item.fullResults?.customer) {
-    const cust = item.fullResults.customer;
-    elements.firstName.value = cust.firstName || "";
-    elements.middleName.value = cust.middleName || "";
-    elements.lastName.value = cust.lastName || "";
-    elements.suffix.value = cust.suffix || "";
-    setDateInputValue(elements.dob, cust.dob || "");
-    elements.dlnPid.value = cust.dlnPid || "";
-    elements.tradeVin.value = cust.tradeVin || "";
-
-    if (elements.hasCoBuyer) {
-      elements.hasCoBuyer.checked = !!cust.hasCoBuyer;
-      elements.hasCoBuyer.dispatchEvent(new Event("change"));
-    }
-    if (cust.hasCoBuyer && cust.coBuyer) {
-      elements.cbFirstName.value = cust.coBuyer.firstName || "";
-      elements.cbMiddleName.value = cust.coBuyer.middleName || "";
-      elements.cbLastName.value = cust.coBuyer.lastName || "";
-      elements.cbSuffix.value = cust.coBuyer.suffix || "";
-      setDateInputValue(elements.cbDob, cust.coBuyer.dob || "");
-      elements.cbDlnPid.value = cust.coBuyer.dlnPid || "";
-    }
-    // Restore the scanned jurisdiction so re-running honors out-of-state gating.
-    scanJurisdiction.buyer = cust.buyerIsMichigan ?? null;
-    scanJurisdiction.coBuyer = cust.coBuyerIsMichigan ?? null;
-    updateJurisdictionTags();
-  } else if (item.customer) {
-    const names = item.customer.split(" ");
-    if (names.length > 0) elements.firstName.value = names[0];
-    if (names.length > 1)
-      elements.lastName.value = names[names.length - 1];
-    if (item.vin) elements.tradeVin.value = item.vin;
-  }
-
-  if (item.fullResults) {
-    if (item.fullResults.runType === "individual") {
-      displayStoredIndividualResult(item.fullResults);
-    } else {
-      displayResults(elements, item.fullResults);
-    }
-    elements.progressSection.classList.add("hidden");
-    elements.resultsSection.classList.remove("hidden");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  } else {
-    showToast(
-      "Form populated from history. Run All Checks to refresh results.",
-      "info",
-      7000
-    );
-  }
-}
-
-// Re-screen a prior deal before delivery: prefill the form from the stored
-// customer (reusing the scan-autofill path) and immediately run all checks
-// against the current OFAC SDN list and MDOS portal.
-function reScreenHistoryItem(item) {
-  const cust = item.fullResults?.customer;
-  if (!cust) {
-    showToast("This entry has no saved customer to re-screen.", "info");
-    return;
-  }
-  hideModal(elements.historyModal);
-  applyCustomerData(elements, cust);
-  // Honor the original out-of-state gating on the re-run.
-  scanJurisdiction.buyer = cust.buyerIsMichigan ?? null;
-  scanJurisdiction.coBuyer = cust.coBuyerIsMichigan ?? null;
-  updateJurisdictionTags();
-  showToast("Re-screening against the latest data…", "info");
-  handleRunAllChecks();
 }
 
 // ---------- Screenshot modal ----------
@@ -1198,10 +1209,11 @@ function printScreenshotModal() {
 }
 
 function downloadScreenshotModal() {
-  const src = elements.screenshotImage.src;
-  if (!src) return;
+  const src = ensureDataUrl(elements.screenshotImage.src);
+  const extension = imageDataUrlExtension(src);
+  if (!src || !extension) return;
   const link = document.createElement("a");
-  link.download = `compliance-screenshot-${Date.now()}.png`;
+  link.download = `compliance-screenshot-${Date.now()}.${extension}`;
   link.href = src;
   link.click();
 }
@@ -1268,7 +1280,10 @@ async function handleSessionStorageChanges(changes) {
     isCurrentRunState(runState, activeUiRunId);
   const nextResults = changes[STORAGE_KEYS.currentResults]?.newValue;
   const acceptsIndividualResult =
-    !activeUiRunId && nextResults?.runType === "individual";
+    !activeUiRunId &&
+    activeIndividualOperationId != null &&
+    nextResults?.runType === "individual" &&
+    nextResults.operationId === activeIndividualOperationId;
 
   // Each branch independently try/catch'd so one bad update doesn't break others.
 

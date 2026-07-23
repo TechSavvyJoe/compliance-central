@@ -39,11 +39,14 @@ export function initDatePicker(input) {
 
   const toggle = shell.querySelector(".date-picker-toggle");
   const popover = document.createElement("div");
+  popover.id = `${input.id}DatePicker`;
   popover.className = "date-picker-popover";
   popover.hidden = true;
   popover.setAttribute("role", "dialog");
   popover.setAttribute("aria-label", input.getAttribute("aria-label") || "Choose birth date");
   shell.appendChild(popover);
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-controls", popover.id);
 
   // Persistent live region for screen-reader navigation announcements. It must
   // live OUTSIDE the popover (whose innerHTML is replaced on every render) so

@@ -174,6 +174,7 @@ export async function startRunAllChecks(data) {
 
 async function runAllChecks(data, runId, signal, onInitialized) {
   const { customer, hasTrade } = data;
+  const isAborted = () => abortedRunId === runId || signal.aborted;
 
   const results = {
     customer,
@@ -186,14 +187,52 @@ async function runAllChecks(data, runId, signal, onInitialized) {
   };
 
   try {
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
-      [STORAGE_KEYS.searchProgress]: 0,
-      [STORAGE_KEYS.currentResults]: results,
-      [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
-      [STORAGE_KEYS.activeRunId]: runId,
-      [STORAGE_KEYS.stateRunId]: runId,
+    const initialPublication = await atomicStateUpdate((current) => {
+      // Clear may win before this delayed message reaches a restarted worker.
+      // Honor its persisted tombstone before ever republishing RUNNING.
+      if (
+        isAborted() ||
+        current[STORAGE_KEYS.cancelledRunId] === runId
+      ) {
+        return {};
+      }
+      return {
+        [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
+        [STORAGE_KEYS.searchProgress]: 0,
+        [STORAGE_KEYS.currentResults]: results,
+        [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
+        [STORAGE_KEYS.activeRunId]: runId,
+        [STORAGE_KEYS.stateRunId]: runId,
+      };
     });
+    if (initialPublication.error) throw initialPublication.error;
+    if (!initialPublication.applied) {
+      onInitialized?.({
+        success: false,
+        cancelled: true,
+        error: "Run was cancelled before it started.",
+        runId,
+      });
+      return { success: false, cancelled: true, runId };
+    }
+
+    // A side-panel tombstone can land while the storage write is pending.
+    // Re-read before acknowledging start so that delayed initialization never
+    // tells the UI a cleared run is active.
+    const persisted = await chrome.storage.session.get([
+      STORAGE_KEYS.activeRunId,
+      STORAGE_KEYS.stateRunId,
+      STORAGE_KEYS.cancelledRunId,
+    ]);
+    if (isAborted() || !hasActiveRunState(persisted, runId)) {
+      onInitialized?.({
+        success: false,
+        cancelled: true,
+        error: "Run was cancelled before it started.",
+        runId,
+      });
+      return { success: false, cancelled: true, runId };
+    }
     onInitialized?.({ success: true, status: "started", runId });
   } catch (error) {
     onInitialized?.({
@@ -206,7 +245,6 @@ async function runAllChecks(data, runId, signal, onInitialized) {
     throw error;
   }
 
-  const isAborted = () => abortedRunId === runId || signal.aborted;
   if (isAborted()) {
     return { success: false, cancelled: true, runId };
   }

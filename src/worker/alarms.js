@@ -7,6 +7,7 @@
 
 import { initDB } from "../../ofac/storage.js";
 import { handleGetDataStatus, performSDNUpdate } from "./ofac-check.js";
+import { purgeHistory } from "./history.js";
 
 const UPDATE_ALARM_NAME = "ofac-sdn-update";
 const UPDATE_HOUR_LOCAL = 6;
@@ -38,6 +39,7 @@ export function registerAlarmListeners() {
       // Persist the next refresh before doing a potentially long first download.
       // If Chrome stops the worker mid-update, the alarm still recovers later.
       await setupUpdateAlarm();
+      await purgeHistory();
       if (details.reason === "install") {
         await initDB();
         await performSDNUpdate();
@@ -56,6 +58,7 @@ export function registerAlarmListeners() {
   chrome.runtime.onStartup.addListener(async () => {
     try {
       await setupUpdateAlarm();
+      await purgeHistory();
       await initDB();
       const status = await handleGetDataStatus();
       if (status.needsUpdate) {
@@ -69,6 +72,7 @@ export function registerAlarmListeners() {
   chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       if (alarm.name === UPDATE_ALARM_NAME) {
+        await purgeHistory();
         await performSDNUpdate();
       }
     } catch (err) {

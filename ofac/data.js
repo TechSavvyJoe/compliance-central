@@ -12,6 +12,7 @@ import { CONFIG } from "../lib/config.js";
 const SDN_XML_URL = CONFIG.ofac.sdnDataUrl;
 const SDN_FETCH_TIMEOUT_MS = 60000;
 const MAX_SDN_XML_BYTES = 64 * 1024 * 1024;
+const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function assertAllowedHost(finalUrl) {
   let parsedUrl;
@@ -364,12 +365,51 @@ export async function downloadAndParseSDN() {
   };
 }
 
-export function needsUpdate(lastUpdate) {
+export function needsUpdate(lastUpdate, now = Date.now()) {
   if (!lastUpdate) return true;
   const t = new Date(lastUpdate).getTime();
   // Fail safe: an unparseable/unknown timestamp means the age is unknown, so
   // treat it as needing a refresh rather than silently assuming it's fresh.
   if (Number.isNaN(t)) return true;
-  const hoursSince = (Date.now() - t) / 3600000;
+
+  // Allow a few minutes of harmless device-clock skew. A timestamp materially
+  // in the future, however, could otherwise suppress refreshes indefinitely.
+  if (t - now > MAX_FUTURE_CLOCK_SKEW_MS) return true;
+
+  const hoursSince = (now - t) / 3600000;
   return hoursSince >= 24;
+}
+
+function parseCanonicalIsoTime(value) {
+  if (typeof value !== "string" || !value.trim()) return Number.NaN;
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return Number.NaN;
+  return new Date(time).toISOString() === value ? time : Number.NaN;
+}
+
+/**
+ * Refuse a feed whose publication date moves backwards (or becomes invalid)
+ * once a valid publication date has been stored. This check must run before
+ * replacing IndexedDB data so a stale/invalid download cannot overwrite the
+ * last known-good SDN list and its timestamps.
+ */
+export function assertPublicationDateDoesNotRegress(
+  previousPublishDate,
+  incomingPublishDate
+) {
+  const previousTime = parseCanonicalIsoTime(previousPublishDate);
+  if (Number.isNaN(previousTime)) return;
+
+  const incomingTime = parseCanonicalIsoTime(incomingPublishDate);
+  if (Number.isNaN(incomingTime)) {
+    throw new Error(
+      "SDN update rejected: the incoming publication date is invalid. Keeping the previous list."
+    );
+  }
+
+  if (incomingTime < previousTime) {
+    throw new Error(
+      "SDN update rejected: the incoming publication date is older than the stored list. Keeping the previous list."
+    );
+  }
 }

@@ -21,9 +21,11 @@ test("generated date-picker month controls have unique form identifiers", () => 
 });
 
 test("data-use disclosure ties remote checks to an affirmative user action", () => {
-  assert.match(sidepanelHtml, /OFAC stays here/);
-  assert.match(sidepanelHtml, /locally for 30 days \(50 records\)/);
-  assert.match(sidepanelHtml, /Repeat Offender\/Title checks securely[\s\S]*?send only needed fields/);
+  assert.match(sidepanelHtml, /OFAC stays on this computer/);
+  assert.match(sidepanelHtml, /anonymous outcomes stay[\s\S]*?up to 30 days/);
+  assert.match(sidepanelHtml, /State checks send the name, birth date/);
+  assert.match(sidepanelHtml, /license\/ID number,[\s\S]*?trade-in VIN when used/);
+  assert.match(sidepanelHtml, /Compliance Central over HTTPS/);
   assert.match(sidepanelHtml, /Running a check means you agree/);
   assert.match(sidepanelHtml, />Details<\/a>/);
   for (const id of [

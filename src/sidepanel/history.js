@@ -6,11 +6,14 @@
 
 import { CONFIG } from "../../lib/config.js";
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import {
+  historyAuditId,
+  minimizeHistoryEntry,
+} from "../../lib/history-retention.js";
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
 import { calculateFinalDecision } from "./checks.js";
 
-const RETENTION_DAYS = CONFIG.limits.dataRetentionDays;
 const MAX_ENTRIES = CONFIG.limits.maxHistoryEntries;
 const RESCREEN_DAYS = CONFIG.reminders?.rescreenDays ?? 7;
 
@@ -46,12 +49,35 @@ export function decisionMeta(decision) {
   }
 }
 
-// Map a stored per-check value to a chip state.
-//   true -> pass, false -> failState, "na" -> na, undefined -> none (not run)
-function checkState(value, failState = "fail") {
-  if (value === "na") return "na";
-  if (value === undefined) return "none";
-  return value ? "pass" : failState;
+export function auditStateMeta(kind, value) {
+  const maps = {
+    ofac: {
+      clear: ["pass", "Clear"],
+      match: ["fail", "Potential match"],
+      stale: ["review", "Stale data"],
+      error: ["review", "Unavailable"],
+      review: ["review", "Review"],
+      not_run: ["none", "Not run"],
+    },
+    repeat: {
+      eligible: ["pass", "Eligible"],
+      flagged: ["fail", "Flagged"],
+      error: ["review", "Unavailable"],
+      review: ["review", "Review"],
+      na: ["na", "N/A"],
+      not_run: ["none", "Not run"],
+    },
+    title: {
+      clear: ["pass", "Clear"],
+      lien: ["review", "Lien"],
+      branded: ["review", "Branded"],
+      review: ["review", "Review"],
+      error: ["review", "Unavailable"],
+      not_run: ["none", "Not run"],
+    },
+  };
+  const [state, label] = maps[kind]?.[value] || ["review", "Review"];
+  return { state, label };
 }
 
 function statusChip(label, fullName, state) {
@@ -79,69 +105,57 @@ export function findAgingDeals(history, days = RESCREEN_DAYS, now = Date.now()) 
 
 export async function purgeOldHistoryEntries() {
   try {
-    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
-    const history = storage[STORAGE_KEYS.complianceHistory] || [];
-    if (history.length === 0) return 0;
-
-    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const filtered = history.filter((entry) => {
-      const t = new Date(entry.timestamp).getTime();
-      if (Number.isNaN(t)) return false; // drop entries with corrupt timestamps
-      return t > cutoff;
+    const result = await chrome.runtime.sendMessage({
+      type: "PURGE_HISTORY",
     });
-
-    const purged = history.length - filtered.length;
-    if (purged > 0) {
-      await chrome.storage.local.set({
-        [STORAGE_KEYS.complianceHistory]: filtered,
-      });
+    if (!result?.success) {
+      throw new Error(result?.error || "History retention failed");
     }
-    return purged;
+    return result.purged;
   } catch (error) {
     console.error("Error purging history:", error);
     return 0;
   }
 }
 
-export async function saveToHistory(results) {
+export async function saveToHistory(results, { shouldSave = () => true } = {}) {
   try {
-    await purgeOldHistoryEntries();
+    if (!shouldSave()) return false;
     const finalDecision = historyDecision(results);
 
-    const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
-    const history = storage[STORAGE_KEYS.complianceHistory] || [];
     const checks = results.checks || {};
-    const archivedResults = archiveResultsForHistory({
-      ...results,
-      finalDecision,
-    });
-
-    history.unshift({
-      id: Date.now(),
-      customer: `${results.customer.firstName} ${results.customer.lastName}`,
-      vin: results.customer.tradeVin || null,
+    const parsedTimestamp = new Date(results.timestamp).getTime();
+    const id = Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now();
+    const auditId = historyAuditId(results);
+    const entry = minimizeHistoryEntry({
+      id,
+      auditId,
       timestamp: results.timestamp,
       decision: finalDecision.level,
       runType: results.runType || "full",
       runLabel: results.runLabel || "Run All Checks",
-      checks: {
-        ofac: checks.ofac?.passed,
-        repeatOffender:
-          checks.repeatOffender?.status === "not_applicable"
-            ? "na"
-            : checks.repeatOffender?.passed,
-        title: checks.title?.passed,
-      },
-      fullResults: archivedResults,
+      hasTrade: Boolean(results.customer?.tradeVin || checks.title),
+      hasCoBuyer: Boolean(results.customer?.hasCoBuyer),
+      fullResults: { ...results, finalDecision },
     });
+    if (!entry) return false;
+    if (!shouldSave()) return false;
+    const response = await chrome.runtime.sendMessage({
+      type: "SAVE_HISTORY_ENTRY",
+      data: { entry },
+    });
+    if (!response?.success || !response.saved) return false;
 
-    if (history.length > MAX_ENTRIES) {
-      history.length = MAX_ENTRIES;
+    if (!shouldSave()) {
+      const removal = await chrome.runtime.sendMessage({
+        type: "REMOVE_HISTORY_ENTRY",
+        data: { auditId },
+      });
+      if (!removal?.success) {
+        throw new Error(removal?.error || "Cancelled history cleanup failed");
+      }
+      return false;
     }
-
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.complianceHistory]: history,
-    });
     return true;
   } catch (error) {
     console.error("Error saving to history:", error);
@@ -160,26 +174,6 @@ function historyDecision(results) {
 
   if (results.finalDecision) return results.finalDecision;
   return calculateFinalDecision(results.checks || {});
-}
-
-export function archiveResultsForHistory(results) {
-  const checks = results.checks || {};
-  const stripped = {};
-  for (const [key, value] of Object.entries(checks)) {
-    if (!value || typeof value !== "object") {
-      stripped[key] = value;
-      continue;
-    }
-    // Keep status/text for reprints; drop bulky base64 evidence from long-term storage.
-    const { screenshotData: _omit, ...rest } = value;
-    stripped[key] = rest;
-  }
-  return {
-    ...results,
-    runType: results.runType || "full",
-    runLabel: results.runLabel || "Run All Checks",
-    checks: stripped,
-  };
 }
 
 export async function updateHistoryCount(historyCountEl) {
@@ -217,9 +211,9 @@ export async function populateHistoryModal(historyListEl) {
     }
 
     const shown = history.slice(0, MAX_ENTRIES);
-    const summary = `<div class="history-summary">${history.length} record${
+    const summary = `<div class="history-summary">${history.length} audit record${
       history.length === 1 ? "" : "s"
-    } · newest first</div>`;
+    } · no customer identity saved</div>`;
 
     historyListEl.innerHTML =
       summary +
@@ -236,7 +230,7 @@ export async function populateHistoryModal(historyListEl) {
             year: "numeric",
           });
           const days = daysSince(item.timestamp);
-          const isFull = item.runType !== "individual" && !!item.fullResults?.customer;
+          const isFull = item.runType !== "individual";
           const aging = isFull && days != null && days >= RESCREEN_DAYS;
           const agoBadge =
             days != null
@@ -251,72 +245,55 @@ export async function populateHistoryModal(historyListEl) {
           const decisionItemCls = `decision-${dm.cls.replace("dec-", "")}`;
 
           const checks = item.checks || {};
-          const chips =
-            statusChip("OFAC", "OFAC sanctions screening", checkState(checks.ofac)) +
+          const ofacMeta = auditStateMeta("ofac", checks.ofac);
+          const repeatMeta = auditStateMeta("repeat", checks.repeatOffender);
+          const titleMeta = auditStateMeta("title", checks.title);
+          let chips =
             statusChip(
-              "Repeat",
-              "Michigan Repeat Offender check",
-              checkState(checks.repeatOffender)
+              `OFAC: ${ofacMeta.label}`,
+              "Buyer OFAC SDN name screening",
+              ofacMeta.state
             ) +
             statusChip(
-              "Title",
-              "Title & lien check",
-              checkState(checks.title, "review")
+              `Repeat: ${repeatMeta.label}`,
+              "Buyer Michigan Repeat Offender check",
+              repeatMeta.state
+            ) +
+            statusChip(
+              `Title: ${titleMeta.label}`,
+              "Title and lien check",
+              titleMeta.state
             );
+          if (item.hasCoBuyer) {
+            const cbOfac = auditStateMeta("ofac", checks.coBuyerOfac);
+            const cbRepeat = auditStateMeta(
+              "repeat",
+              checks.coBuyerRepeatOffender
+            );
+            chips +=
+              statusChip(
+                `Co-buyer OFAC: ${cbOfac.label}`,
+                "Co-buyer OFAC SDN name screening",
+                cbOfac.state
+              ) +
+              statusChip(
+                `Co-buyer Repeat: ${cbRepeat.label}`,
+                "Co-buyer Michigan Repeat Offender check",
+                cbRepeat.state
+              );
+          }
 
-          const tradeText = item.vin
-            ? `VIN …${sanitizeHTML(item.vin.slice(-6))}`
-            : "No trade-in";
+          const tradeText = item.hasTrade ? "Trade-in included" : "No trade-in";
           const runText =
             item.runType === "individual"
               ? ` · ${sanitizeHTML(item.runLabel || "Partial")}`
               : "";
 
-          const full = item.fullResults;
-          const hasOfac = !!full?.checks?.ofac;
-          const hasRepeat = !!full?.checks?.repeatOffender;
-          const hasTitle = !!full?.checks?.title;
-          const hasReports = hasOfac || hasRepeat || hasTitle;
-
-          // One tidy row per report: label + print + PDF (icon buttons).
-          const repRow = (label, present, printCls, dlCls, extraCls = "") =>
-            present
-              ? `<div class="rep-row ${extraCls}">
-                   <span class="rep-name">${label}</span>
-                   <span class="rep-btns">
-                     <button class="btn-rep ${printCls}" data-index="${index}" title="Print ${label}" aria-label="Print ${label}">${ICONS.printer}</button>
-                     <button class="btn-rep ${dlCls}" data-index="${index}" title="Download ${label} PDF" aria-label="Download ${label} PDF">${ICONS.download}</button>
-                   </span>
-                 </div>`
-              : "";
-
-          const reports = hasReports
-            ? `<details class="history-reports">
-                 <summary class="history-reports-toggle">
-                   <span class="reports-summary-icon">${ICONS.fileText}</span>
-                   Reports
-                   <span class="rep-chevron">${ICONS.chevron}</span>
-                 </summary>
-                 <div class="history-reports-panel">
-                   ${repRow(
-                     "Full deal jacket",
-                     true,
-                     "history-print-all",
-                     "history-download-all",
-                     "rep-row-all"
-                   )}
-                   ${repRow("OFAC", hasOfac, "history-print-ofac", "history-download-ofac")}
-                   ${repRow("Repeat Offender", hasRepeat, "history-print-repeat", "history-download-repeat")}
-                   ${repRow("Title & Lien", hasTitle, "history-print-title", "history-download-title")}
-                 </div>
-               </details>`
-            : "";
-
           return `
         <div class="history-item ${decisionItemCls}" data-index="${index}">
           <div class="history-item-header">
             <div class="history-id">
-              <span class="history-customer">${sanitizeHTML(item.customer)}</span>
+              <span class="history-customer">Audit ${sanitizeHTML(item.reference)}</span>
               <span class="history-meta">
                 <span>${dateStr} · ${timeStr}</span>
                 ${agoBadge}
@@ -327,14 +304,8 @@ export async function populateHistoryModal(historyListEl) {
           </div>
           <div class="history-checks">${chips}</div>
           <div class="history-actions">
-            <button class="btn-hist btn-hist-primary history-view-btn" data-index="${index}" title="View &amp; restore this deal to the form"><span class="btn-hist-ic">${ICONS.eye}</span>View &amp; Restore</button>
-            ${
-              isFull
-                ? `<button class="btn-hist history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}" title="Re-screen against the latest data"><span class="btn-hist-ic">${ICONS.play}</span>Re-screen</button>`
-                : ""
-            }
+            <button class="btn-hist btn-hist-primary history-new-btn" data-index="${index}" title="Start a new screening"><span class="btn-hist-ic">${ICONS.play}</span>Start new screening</button>
           </div>
-          ${reports}
         </div>`;
         })
         .join("");
@@ -351,12 +322,13 @@ export async function clearAllHistory(historyListEl, historyCountEl) {
   );
   if (!confirmed) return false;
 
-  // Remove the retired per-check feed too so older installations are fully
-  // cleaned up even though new versions no longer write it.
-  await chrome.storage.local.remove([
-    STORAGE_KEYS.complianceHistory,
-    STORAGE_KEYS.searchHistory,
-  ]);
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "CLEAR_HISTORY" });
+    if (!result?.success) return false;
+  } catch (error) {
+    console.error("Error clearing history:", error);
+    return false;
+  }
   historyListEl.innerHTML =
     '<div class="history-empty"><strong>History cleared</strong><span>New compliance checks will appear here.</span></div>';
   await updateHistoryCount(historyCountEl);

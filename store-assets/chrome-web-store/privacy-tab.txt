@@ -16,13 +16,13 @@ sidePanel —
 The entire user interface is a Chrome side panel; this permission opens and renders it.
 
 storage —
-Saves bounded compliance text history (up to 30 days / 50 records), preferences, and (optionally) a custom backend API key locally on the device. History can include customer name, date of birth, DLN/PID, VIN, and check results. Portal screenshots are session-only current-run evidence and are not retained in long-term history.
+Saves preferences and bounded anonymous audit history (up to 30 days / 50 records). Persistent records contain an anonymous reference, timestamp, overall decision, check outcomes, and co-buyer/trade-in workflow flags; they exclude customer identity, VINs, screenshots, and full report payloads.
 
 unlimitedStorage —
-Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded local text history. Portal screenshots are session-only current-run evidence, not retained in long-term compliance history.
+Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded anonymous audit history. Customer identity, VINs, full results, and portal screenshots remain session-only.
 
 alarms —
-Schedules an automatic daily refresh of the local OFAC sanctions list so screenings use current data.
+Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 
 Host permission https://sanctionslistservice.ofac.treas.gov/ —
 Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
@@ -32,6 +32,8 @@ Allows the official Treasury Sanctions List Service download to follow its signe
 
 Host permission https://compliance-central-api.fly.dev/ —
 The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal. It also relays the optional phone license-scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read (deleted on pickup; the license image is never transmitted).
+
+The hosting service receives ordinary network request metadata. Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention; the app does not write them to a database or application log.
 
 Are you using remote code?  →  NO
 (All code is bundled in the package; nothing is fetched and executed remotely.)
@@ -44,10 +46,10 @@ DATA USAGE  (the checkbox form)
 
 Data types to mark as COLLECTED:
   • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
-  • Authentication information  (optional custom backend API key only; stored locally and sent securely only to the selected compliance backend for requested checks)
+  • Website content  (Michigan portal responses and screenshots returned for user-requested checks; session-only)
   • Web history: NO
   • Location, financial, health, personal communications, etc.: NO
-  (The trade-in VIN is sent only for the optional title check — note under "other" if asked.)
+  (The trade-in VIN is sent only for the optional title check — note under "other" if asked. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history is anonymous. User-requested PDF or CSV downloads remain in the user's chosen location.)
 
 Check ALL THREE required certifications (they are all true for this extension):
   [x] I do not sell or transfer user data to third parties, outside of the approved use cases.
@@ -56,3 +58,11 @@ Check ALL THREE required certifications (they are all true for this extension):
 
 Privacy policy URL:
 https://techsavvyjoe.github.io/compliance-central/
+
+
+==================================================
+LIMITED USE DISCLOSURE
+==================================================
+Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.
+
+Information is used only to provide the extension's user-requested compliance checks, phone-to-computer transfer, local preferences, and anonymous audit records. It is not used for advertising, market research, credit scoring, or unrelated purposes. Human access is limited to a user's explicit support request, security investigation, legal requirement, or aggregated operations that cannot identify a person.

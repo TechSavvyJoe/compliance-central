@@ -219,7 +219,10 @@ async function openSession(attempt) {
   }
   const key = generateKeyB64();
   const sep = SCAN_PAGE.includes("?") ? "&" : "?";
-  const url = `${SCAN_PAGE}${sep}s=${encodeURIComponent(sessionId)}&cb=20260722-21#k=${key}`;
+  // Both pairing capabilities live in the fragment, which browsers do not
+  // send in HTTP requests or server logs.
+  const fragment = new URLSearchParams({ s: sessionId, k: key });
+  const url = `${SCAN_PAGE}${sep}cb=20260722-23#${fragment.toString()}`;
   return { sessionId, key, url };
 }
 

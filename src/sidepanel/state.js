@@ -38,11 +38,13 @@ export function mergeIntoCurrentResults(customer, checkKey, result, options = {}
           timestamp: new Date().toISOString(),
           runType: options.runType || "individual",
           runLabel: options.runLabel || "Individual Check",
+          operationId: options.operationId || null,
         }
       : currentResults;
   cur.customer = customer;
   cur.runType = options.runType || cur.runType || "individual";
   cur.runLabel = options.runLabel || cur.runLabel || "Individual Check";
+  cur.operationId = options.operationId || cur.operationId || null;
   cur.checks = cur.checks || {};
   cur.checks[checkKey] = result;
   currentResults = cur;

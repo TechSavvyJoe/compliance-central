@@ -7,12 +7,12 @@
 
 const HEADERS = [
   "Timestamp",
-  "Customer",
-  "Date of Birth",
-  "Trade VIN",
+  "Audit Reference",
   "Run",
-  "OFAC",
-  "Repeat Offender",
+  "Buyer OFAC",
+  "Buyer Repeat Offender",
+  "Co-Buyer OFAC",
+  "Co-Buyer Repeat Offender",
   "Title & Lien",
   "Final Decision",
 ];
@@ -21,15 +21,41 @@ const HEADERS = [
 // LF, and double any embedded quotes. Prevents a name with a comma from
 // shifting every downstream column (a silent audit-trail corruption).
 function csvCell(value) {
-  const s = value === null || value === undefined ? "" : String(value);
+  let s = value === null || value === undefined ? "" : String(value);
+  // Spreadsheet applications may execute cells beginning with these formula
+  // markers. Prefix an apostrophe so exported audit text stays inert.
+  if (/^\s*[=+\-@]/.test(s) || /^[\t\r]/.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-function checkLabel(value, trueLabel, falseLabel) {
-  if (value === "na") return "N/A";
-  if (value === true) return trueLabel;
-  if (value === false) return falseLabel;
-  return "—"; // not run
+function stateLabel(kind, value) {
+  const labels = {
+    ofac: {
+      clear: "Clear",
+      match: "Potential match",
+      stale: "Stale data — review",
+      error: "Unavailable",
+      review: "Review",
+      not_run: "Not run",
+    },
+    repeat: {
+      eligible: "Eligible",
+      flagged: "Flagged",
+      error: "Unavailable",
+      review: "Review",
+      na: "N/A",
+      not_run: "Not run",
+    },
+    title: {
+      clear: "Clear",
+      lien: "Active lien",
+      branded: "Branded title",
+      review: "Review",
+      error: "Unavailable",
+      not_run: "Not run",
+    },
+  };
+  return labels[kind]?.[value] || "Review";
 }
 
 /**
@@ -41,16 +67,17 @@ export function buildAuditCsv(history) {
   const rows = [HEADERS];
   for (const item of history || []) {
     const checks = item.checks || {};
-    const dob = item.fullResults?.customer?.dob || "";
     rows.push([
       item.timestamp || "",
-      item.customer || "",
-      dob,
-      item.vin || "",
+      item.reference || "",
       item.runLabel || item.runType || "Run All Checks",
-      checkLabel(checks.ofac, "Clear", "Match"),
-      checkLabel(checks.repeatOffender, "Eligible", "Flagged"),
-      checkLabel(checks.title, "Clear", "Review"),
+      stateLabel("ofac", checks.ofac),
+      stateLabel("repeat", checks.repeatOffender),
+      item.hasCoBuyer ? stateLabel("ofac", checks.coBuyerOfac) : "N/A",
+      item.hasCoBuyer
+        ? stateLabel("repeat", checks.coBuyerRepeatOffender)
+        : "N/A",
+      stateLabel("title", checks.title),
       item.decision || "",
     ]);
   }

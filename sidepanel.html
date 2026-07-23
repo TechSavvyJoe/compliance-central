@@ -106,6 +106,8 @@
                   aria-required="true"
                   aria-haspopup="dialog"
                   aria-expanded="false"
+                  aria-controls="dobDatePicker"
+                  role="combobox"
                 />
                 <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Date of Birth calendar">
                   <span class="icon icon-calendar"></span>
@@ -176,6 +178,8 @@
                   aria-required="true"
                   aria-haspopup="dialog"
                   aria-expanded="false"
+                  aria-controls="cbDobDatePicker"
+                  role="combobox"
                 />
                 <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Co-Buyer Date of Birth calendar">
                   <span class="icon icon-calendar"></span>
@@ -227,10 +231,11 @@
 
         <section class="action-section">
           <p id="dataUseNote" class="data-use-note">
-            Privacy: OFAC stays here. Name, birth date, ID number, VIN, and results are
-            saved locally for 30 days (50 records). Repeat Offender/Title checks securely
-            send only needed fields. Running a check means you agree.
-            <a href="https://techsavvyjoe.github.io/compliance-central/" target="_blank" rel="noopener noreferrer">Details</a>
+            Privacy: OFAC stays on this computer. State checks send the name, birth date,
+            license/ID number, and trade-in VIN when used to Compliance Central over HTTPS.
+            Details and screenshots stay this session; anonymous outcomes stay up to 30 days.
+            Running a check means you agree.
+            <a href="https://techsavvyjoe.github.io/compliance-central/#privacy-policy" target="_blank" rel="noopener noreferrer">Details</a>
           </p>
 
           <div class="main-actions" role="group" aria-label="Primary actions">
@@ -240,7 +245,7 @@
             </button>
             <button id="clearBtn" class="btn-secondary btn-ghost">
               <span class="btn-icon icon icon-trash"></span>
-              Clear
+              Clear form
             </button>
           </div>
 
@@ -297,13 +302,14 @@
           </div>
         </section>
 
-        <section id="resultsSection" class="results-section hidden" aria-label="Compliance check results">
+        <section id="resultsSection" class="results-section hidden" aria-labelledby="resultsSectionTitle">
+          <h2 id="resultsSectionTitle" class="visually-hidden">Compliance check results</h2>
           <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
 
           <div class="results-grid">
             <div class="result-card" id="ofacResultCard">
               <div class="result-header">
-                <h4><span class="check-icon icon icon-globe"></span>OFAC Screening</h4>
+                <h3><span class="check-icon icon icon-globe"></span>OFAC Screening</h3>
                 <span class="result-status status-pass" id="ofacResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="ofacResultDetail">No matches in SDN list</p>
@@ -319,7 +325,7 @@
 
             <div class="result-card" id="repeatResultCard">
               <div class="result-header">
-                <h4><span class="check-icon icon icon-ban"></span>Repeat Offender</h4>
+                <h3><span class="check-icon icon icon-ban"></span>Repeat Offender</h3>
                 <span class="result-status status-pass" id="repeatResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="repeatResultDetail">Eligible per MDOS repeat-offender response</p>
@@ -335,7 +341,7 @@
 
             <div class="result-card" id="titleResultCard">
               <div class="result-header">
-                <h4><span class="check-icon icon icon-file"></span>Title &amp; Lien</h4>
+                <h3><span class="check-icon icon icon-file"></span>Title &amp; Lien</h3>
                 <span class="result-status status-skipped" id="titleResultStatus">No Trade</span>
               </div>
               <p class="result-detail" id="titleResultDetail">No trade-in provided</p>
@@ -355,7 +361,7 @@
             <div class="results-grid">
               <div class="result-card" id="cbOfacResultCard">
                 <div class="result-header">
-                  <h4><span class="check-icon icon icon-globe"></span>OFAC (Co-Buyer)</h4>
+                  <h3><span class="check-icon icon icon-globe"></span>OFAC (Co-Buyer)</h3>
                   <span class="result-status status-pass" id="cbOfacResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbOfacResultDetail">No matches in SDN list</p>
@@ -371,7 +377,7 @@
 
               <div class="result-card" id="cbRepeatResultCard">
                 <div class="result-header">
-                  <h4><span class="check-icon icon icon-ban"></span>Repeat Offender (Co-Buyer)</h4>
+                  <h3><span class="check-icon icon icon-ban"></span>Repeat Offender (Co-Buyer)</h3>
                   <span class="result-status status-pass" id="cbRepeatResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbRepeatResultDetail">Eligible per MDOS repeat-offender response</p>
@@ -410,7 +416,7 @@
       <div id="historyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
         <div class="modal-content">
           <div class="modal-header">
-            <h3 id="historyModalTitle">Compliance History</h3>
+            <h2 id="historyModalTitle">Audit History</h2>
             <button class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
           </div>
           <div class="modal-body" id="historyList" aria-live="polite"></div>
@@ -430,7 +436,7 @@
       <div id="screenshotModal" class="modal-overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="screenshotTitle">
         <div class="modal-content screenshot-modal">
           <div class="modal-header">
-            <h3 id="screenshotTitle">MDOS Screenshot</h3>
+            <h2 id="screenshotTitle">Michigan State-Site Screenshot</h2>
             <button id="closeScreenshotModal" class="modal-close" aria-label="Close screenshot modal">&times;</button>
           </div>
           <div class="modal-body">
@@ -450,59 +456,41 @@
       <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
         <div class="modal-content">
           <div class="modal-header">
-            <h3 id="settingsModalTitle">Settings</h3>
+            <h2 id="settingsModalTitle">Settings</h2>
             <button class="modal-close" id="closeSettingsModal" aria-label="Close settings">&times;</button>
           </div>
           <div class="modal-body">
             <div class="settings-group">
-              <h4 class="settings-heading"><span class="icon icon-key"></span>Access</h4>
-              <p id="apiKeyStatus" class="settings-status connected">All checks active — no setup needed.</p>
-              <p class="settings-help">
-                Every check — OFAC, Repeat Offender, and Title/Lien — is included
-                <strong>free</strong>, with no account, key, or setup. Just enter the
-                customer's info and run.
-              </p>
-
-              <details class="settings-advanced">
-                <summary>Advanced: use your own backend key</summary>
-                <label class="settings-label" for="apiKeyInput">Custom backend key</label>
-                <div class="api-key-row">
-                  <input
-                    type="password"
-                    id="apiKeyInput"
-                    class="settings-input"
-                    placeholder="Leave blank to use built-in access"
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
-                  <button type="button" id="toggleApiKeyVisibility" class="btn-secondary btn-sm" aria-label="Show custom backend key" aria-pressed="false">
-                    <span class="icon icon-eye"></span>
-                  </button>
-                </div>
-                <div class="settings-actions">
-                  <button id="saveApiKeyBtn" class="btn-primary btn-sm">Save</button>
-                  <button id="clearApiKeyBtn" class="btn-secondary btn-sm">Use Built-in</button>
-                </div>
-                <p class="settings-help settings-help-muted">
-                  Only needed if you run your own Compliance Central backend. Stored only on this device.
-                </p>
-              </details>
-
-              <p class="settings-help settings-help-muted">
-                Questions? Email <a id="supportEmailLink" href="#">support</a>.
-              </p>
+              <h3 class="settings-heading"><span class="icon icon-check"></span>Service</h3>
+              <p id="serviceStatus" class="settings-status connected">All checks are ready — no setup needed.</p>
+              <p class="settings-help">OFAC, Repeat Offender, Title/Lien, and phone scanning are included. There is no account or key to configure.</p>
             </div>
 
             <div class="settings-group">
-              <h4 class="settings-heading"><span class="icon icon-ban"></span>Re-screen reminder</h4>
+              <h3 class="settings-heading"><span class="icon icon-ban"></span>Re-screen reminder</h3>
               <label class="checkbox-label">
                 <input type="checkbox" id="rescreenReminderToggle" />
                 <span class="checkbox-text">Remind me to re-screen deals before delivery</span>
               </label>
               <p class="settings-help settings-help-muted">
-                When opening History, flag any deal screened more than a week ago.
-                The OFAC SDN list changes daily, so re-screen before delivery.
+                When opening Audit History, flag records older than a week.
+                Re-enter or scan the customer details to run a fresh check before delivery.
               </p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-heading"><span class="icon icon-trash"></span>Privacy &amp; data</h3>
+              <p class="settings-help">Audit History saves only an anonymous reference, time, and outcomes—never names, birth dates, license numbers, VINs, screenshots, or backend keys.</p>
+              <div class="settings-actions">
+                <button id="settingsClearHistoryBtn" class="btn-secondary btn-sm">Clear audit history</button>
+                <a id="settingsPrivacyLink" class="btn-secondary btn-sm settings-link-button" href="#" target="_blank" rel="noopener noreferrer">Privacy details</a>
+              </div>
+            </div>
+
+            <div class="settings-group settings-support">
+              <h3 class="settings-heading"><span class="icon icon-info"></span>Help</h3>
+              <p class="settings-help">Questions? Email <a id="supportEmailLink" href="#">support</a>.</p>
+              <p id="settingsVersion" class="settings-help settings-help-muted"></p>
             </div>
           </div>
         </div>
@@ -517,7 +505,7 @@
     <div id="scanPairModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanPairTitle" aria-describedby="scanPairInstructions">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 id="scanPairTitle">Scan with your phone</h3>
+          <h2 id="scanPairTitle">Scan with your phone</h2>
           <button class="modal-close" id="scanPairCloseX" aria-label="Close pairing modal">&times;</button>
         </div>
         <div class="modal-body">

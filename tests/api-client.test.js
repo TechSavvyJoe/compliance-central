@@ -32,6 +32,21 @@ test("with no saved override, requests use the built-in default key", async () =
   assert.equal(res.success, true);
 });
 
+test("a retired saved override cannot replace the built-in service key", async () => {
+  stubStorage("cc_untrusted_override");
+  let sentKey = null;
+  globalThis.fetch = async (_url, opts) => {
+    sentKey = opts.headers["x-api-key"];
+    return {
+      ok: true,
+      json: async () => ({ success: true, status: "eligible", passed: true }),
+    };
+  };
+
+  await backendRepeatOffenderCheck({ firstName: "A", lastName: "B" });
+  assert.equal(sentKey, CONFIG.backend.defaultApiKey);
+});
+
 test("a backend HTTP error surfaces the server's error message", async () => {
   stubStorage("test-key");
   globalThis.fetch = async () => ({

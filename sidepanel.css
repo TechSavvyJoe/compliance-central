@@ -202,7 +202,7 @@ body.modal-open {
 .scan-license-hint {
   margin: 7px 2px 14px;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   line-height: 1.45;
   text-align: center;
 }
@@ -391,7 +391,7 @@ body.modal-open {
 .form-group-small { flex: 0 0 100px; }
 
 .form-group label {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -446,7 +446,7 @@ body.modal-open {
   gap: 5px;
   margin-top: 1px;
   color: var(--danger-text);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -748,7 +748,8 @@ body.modal-open {
 }
 
 .helper-text {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -1146,7 +1147,7 @@ body.modal-open {
   margin-bottom: var(--spacing-sm);
   gap: 8px;
 }
-.result-header h4 {
+.result-header h3 {
   font-size: 0.9rem;
   font-weight: 600;
   display: inline-flex;
@@ -1313,7 +1314,7 @@ body.modal-open {
   padding: var(--spacing-md);
   border-bottom: 1px solid var(--border-color);
 }
-.modal-header h3 {
+.modal-header h2 {
   font-size: 1rem;
   font-weight: 600;
 }
@@ -1435,7 +1436,7 @@ body.modal-open {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   margin-top: 4px;
 }
@@ -1443,7 +1444,7 @@ body.modal-open {
 
 .history-decision {
   flex-shrink: 0;
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1472,7 +1473,7 @@ body.modal-open {
 }
 
 .history-age {
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   padding: 1px 8px;
@@ -1497,7 +1498,7 @@ body.modal-open {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 3px 9px 3px 8px;
   border-radius: 7px;
@@ -1720,6 +1721,17 @@ body.modal-open {
 }
 
 /* Utility */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
 .hidden { display: none !important; }
 
 /* Scrollbar */
@@ -1945,6 +1957,11 @@ body.modal-open {
 
 /* Settings panel */
 .settings-group { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.settings-group + .settings-group {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+}
 .settings-heading {
   display: flex;
   align-items: center;
@@ -1960,24 +1977,6 @@ body.modal-open {
 }
 .settings-help-muted { color: var(--text-muted); }
 .settings-help a { color: var(--info); text-decoration: underline; }
-.settings-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-}
-.api-key-row { display: flex; gap: var(--spacing-sm); }
-.settings-input {
-  flex: 1;
-  padding: 10px 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  color: var(--text-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-}
-.settings-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
 .settings-status {
   font-size: 0.78rem;
   font-weight: 500;
@@ -1989,18 +1988,13 @@ body.modal-open {
 .settings-actions { display: flex; gap: var(--spacing-sm); }
 .settings-actions .btn-primary,
 .settings-actions .btn-secondary { flex: 1; }
-.settings-advanced { margin-top: var(--spacing-xs); }
-.settings-advanced > summary {
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  padding: 6px 0;
-  list-style: revert;
-  user-select: none;
+.settings-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
-.settings-advanced > summary:hover { color: var(--text-secondary); }
-.settings-advanced[open] > summary { margin-bottom: var(--spacing-sm); color: var(--text-secondary); }
-.settings-advanced > *:not(summary) { margin-top: var(--spacing-sm); }
+.settings-support { padding-bottom: var(--spacing-xs); }
 
 @media (prefers-reduced-motion: reduce) {
   *,

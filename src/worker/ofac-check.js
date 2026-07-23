@@ -2,7 +2,11 @@
  * OFAC SDN screening logic.
  */
 
-import { downloadAndParseSDN, needsUpdate } from "../../ofac/data.js";
+import {
+  assertPublicationDateDoesNotRegress,
+  downloadAndParseSDN,
+  needsUpdate,
+} from "../../ofac/data.js";
 import { searchSDNEntries } from "../../ofac/search.js";
 import {
   initDB,
@@ -176,6 +180,15 @@ async function runSDNUpdate() {
         } entries (expected at least ${floor}). Keeping the previous list.`
       );
     }
+
+    // A valid prior publication date is a monotonic floor. Validate before
+    // replacing any records or timestamps so a stale/invalid feed leaves the
+    // complete last known-good cache untouched.
+    const previousPublishDate = await getSetting("publishDate");
+    assertPublicationDateDoesNotRegress(
+      previousPublishDate,
+      result.publishDate
+    );
 
     // Atomic clear+store: a failure here rolls back and preserves the old list.
     await replaceSDNEntries(result.entries);

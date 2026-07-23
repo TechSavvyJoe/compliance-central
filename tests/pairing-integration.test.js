@@ -275,7 +275,10 @@ test("an older pairing cancel function cannot cancel a newer autofill", async ()
   // This closure belongs to the superseded first session and must be inert.
   cancelFirst();
 
-  const key = new URL(secondUrls[0]).hash.slice("#k=".length);
+  const key = new URLSearchParams(
+    new URL(secondUrls[0]).hash.slice(1)
+  ).get("k");
+  assert.ok(key, "pairing QR fragment should contain the encryption key");
   const blob = await encryptPayload(key, {
     buyer: {
       firstName: "Synthetic",

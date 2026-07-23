@@ -202,14 +202,14 @@ const copyBlock = (eyebrow, headlineHtml, sub, bullets) => `
 // ---------- screenshots ----------
 const screen01 = stage(
   copyBlock(
-    "One customer, every check",
-    `Run all your checks.<br>Get <span class="a">one clear decision.</span>`,
-    "OFAC sanctions, Repeat Offender, and Title/Lien — together in a single side-panel run, with a printable Deal Jacket.",
-    ["Approved / Review / Denied at a glance", "Print or save a PDF for the deal file", "Co-buyer screened in the same run"]
+    "Illustrative result",
+    `Run all your checks.<br><span class="a">Review one combined result.</span>`,
+    "OFAC SDN name screening, Repeat Offender, and Title/Lien outcomes appear together for the current side-panel run.",
+    ["Labeled outcomes at a glance", "Print or download the current-run record", "Co-buyer outcomes in the same run"]
   ),
   `
   <div class="decision ok"><div class="dbadge ok"><span class="ico">${I.shieldcheck}</span>APPROVED</div>
-    <div class="dtext">All checks passed — clear to proceed</div></div>
+    <div class="dtext">No review conditions returned in this example</div></div>
   ${rcard(I.globe, "OFAC Screening", "Pass", "pass", "No matches in SDN list", evBtns)}
   ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible per MDOS response", evBtns)}
   ${rcard(I.file, "Title &amp; Lien", "Clear", "pass", "2021 Ford F-150 · Clean · No liens", evBtns)}
@@ -220,14 +220,14 @@ const screen02 = stage(
   copyBlock(
     "Free · No account",
     `OFAC sanctions screening,<br><span class="a">100% on your device.</span>`,
-    "Match buyers against the U.S. Treasury OFAC SDN list instantly. Nothing about your customer ever leaves your computer for this check — and every check is free, with no account.",
-    ["Works the moment you install", "Daily auto-refresh of the sanctions list", "Fuzzy name + alias matching"]
+    "Compare buyer names with the locally downloaded U.S. Treasury OFAC SDN list. Customer information stays on your computer for this check.",
+    ["No account required", "Daily list-refresh attempt with freshness checks", "Fuzzy name + alias matching for review"]
   ),
   `
   <div class="sectitle">${I.globe} OFAC Only</div>
   ${rcard(I.globe, "OFAC Screening", "Pass", "pass", "No matches across 17,400+ SDN entries", evBtns)}
   <div class="rcard" style="border-style:dashed">
-    <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>100% on-device — nothing transmitted</div>
+    <div class="rname" style="font-size:12px"><span class="ico" style="color:${C.gold}">${I.shieldcheck}</span>OFAC customer data stays on-device</div>
     <div class="rdetail">Repeat Offender &amp; Title/Lien are included too — no account or setup needed.</div>
   </div>
   `
@@ -235,10 +235,10 @@ const screen02 = stage(
 
 const screen03 = stage(
   copyBlock(
-    "Trade-in, covered",
-    `Title &amp; lien checks,<br><span class="a">in one look.</span>`,
-    "Enter the trade-in VIN and get the title brand, lien status, and vehicle details — pulled straight from the state record. Free, no setup.",
-    ["Title brand: Clean / Salvage / Rebuilt", "Active liens & lienholder", "Year, make, model & weight"]
+    "Illustrative result · Trade-in",
+    `Title &amp; lien results,<br><span class="a">in one view.</span>`,
+    "Enter the trade-in VIN to request available title brand, lien status, and vehicle details through the MDOS workflow. The finished report includes the actual captured Michigan state page.",
+    ["Title brand: Clean / Salvage / Rebuilt", "Active liens & lienholder", "Actual state-page capture in the report"]
   ),
   `
   <div class="sectitle">${I.file} Title &amp; Lien</div>
@@ -257,7 +257,7 @@ const screen03 = stage(
 
 const screen04 = stage(
   copyBlock(
-    "Scan instead of typing",
+    "Instructional composite · Phone scan",
     `Point your phone.<br><span class="a">Fields fill automatically.</span>`,
     "Open the pairing code, then aim at the large, wide barcode on the back of the license or state ID. The scanner captures it automatically.",
     ["No perfect alignment needed", "License image stays on the phone", "Encrypted, one-time field transfer"]
@@ -302,22 +302,21 @@ const histItem = (name, decision, cls, meta) => `
 <div class="rcard" style="padding:11px 12px">
   <div class="rhead"><span class="rname" style="font-size:13px">${name}</span><span class="pill ${cls}">${decision}</span></div>
   <div class="rdetail">${meta}</div>
-  <div class="btnrow"><span class="btn"><span class="ico">${I.printer}</span>Print All</span><span class="btn"><span class="ico">${I.download}</span>All PDF</span></div>
 </div>`;
 
 const screen05 = stage(
   copyBlock(
-    "Documented &amp; printable",
-    `Recent checks, ready<br><span class="a">when you need them.</span>`,
-    "Text results stay on your device for up to 30 days or 50 records, so you can review, re-screen, print, or export recent deals. Portal screenshots remain current-run evidence only.",
-    ["Review or re-screen recent deals", "Portal screenshots stay session-only", "Clear local history anytime"]
+    "Anonymous audit history",
+    `Recent outcomes,<br><span class="a">without customer identity.</span>`,
+    "Up to 50 outcome-only audit records stay on your device for no more than 30 days. Names, dates of birth, license numbers, VINs, and screenshots are excluded.",
+    ["Anonymous reference + timestamp", "Decision and check outcomes only", "Clear local history anytime"]
   ),
   `
   <div class="sectitle">${I.history} Compliance History &nbsp;<span style="color:${C.muted};font-weight:500">· 3 today, 41 total</span></div>
-  ${histItem("John Anderson", "APPROVED", "pass", "Today 9:14 AM · VIN ···09186")}
-  ${histItem("Maria Gomez", "APPROVED", "pass", "Today 8:51 AM · No Trade-In")}
-  ${histItem("R. Whitfield", "REVIEW", "warn", "Yesterday 4:32 PM · Salvage title")}
-  ${histItem("D. Coleman", "APPROVED", "pass", "Yesterday 2:05 PM · VIN ···44120")}
+  ${histItem("CC-20260722-091421", "APPROVED", "pass", "Today 9:14 AM · Trade-in included")}
+  ${histItem("CC-20260722-085105", "APPROVED", "pass", "Today 8:51 AM · No trade-in")}
+  ${histItem("CC-20260721-163204", "REVIEW", "warn", "Yesterday 4:32 PM · Title review")}
+  ${histItem("CC-20260721-140512", "APPROVED", "pass", "Yesterday 2:05 PM · Trade-in included")}
   `
 );
 
@@ -346,7 +345,7 @@ const promoMarquee = `<!doctype html><html><head><meta charset="utf-8"><style>${
   <div class="left">
     <div style="display:flex;align-items:center;gap:16px">${shield(58)}<div style="font-size:30px;font-weight:800;letter-spacing:-.5px">Compliance Central</div></div>
     <div style="font-size:54px;font-weight:800;line-height:1.05;letter-spacing:-1.6px">OFAC, Repeat Offender &amp;<br>Title checks &mdash; <span style="color:${C.gold}">one click.</span></div>
-    <div style="font-size:19px;color:${C.text2};max-width:560px;line-height:1.5">Screen buyers, generate a printable Deal Jacket, and keep every result documented — built for Michigan auto dealers.</div>
+    <div style="font-size:19px;color:${C.text2};max-width:560px;line-height:1.5">Screen buyers and download current-run Deal Jacket records — built for Michigan auto dealers.</div>
     <div style="display:flex;gap:12px">
       <span class="chip"><span class="ico">${I.globe}</span>OFAC sanctions</span>
       <span class="chip"><span class="ico">${I.ban}</span>Repeat Offender</span>
@@ -354,7 +353,7 @@ const promoMarquee = `<!doctype html><html><head><meta charset="utf-8"><style>${
     </div>
   </div>
   <div class="mpanel">${pHead()}<div class="pbody">
-    <div class="decision ok"><div class="dbadge ok"><span class="ico">${I.shieldcheck}</span>APPROVED</div><div class="dtext">All checks passed</div></div>
+    <div class="decision ok"><div class="dbadge ok"><span class="ico">${I.shieldcheck}</span>APPROVED</div><div class="dtext">No review conditions returned in this example</div></div>
     ${rcard(I.globe, "OFAC", "Pass", "pass", "No SDN matches")}
     ${rcard(I.ban, "Repeat Offender", "Pass", "pass", "Eligible")}
     ${rcard(I.file, "Title &amp; Lien", "Clear", "pass", "Clean · No liens")}
@@ -492,9 +491,11 @@ async function writeUploadAssets() {
 
   for (const name of ["small-promo-440x280", "marquee-promo-1400x560"]) {
     const png = join(IMAGES, "promotional", `${name}.png`);
+    const jpg = join(IMAGES, "promotional", `${name}.jpg`);
     await sharp(png)
       .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
-      .toFile(join(UPLOAD, `${name}.jpg`));
+      .toFile(jpg);
+    copyFileSync(jpg, join(UPLOAD, `${name}.jpg`));
   }
 }
 

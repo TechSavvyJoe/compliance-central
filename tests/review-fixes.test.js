@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ensureDataUrl } from "../lib/data-url.js";
+import { ensureDataUrl, imageDataUrlExtension } from "../lib/data-url.js";
 import { sanitizeScanPayload } from "../src/sidepanel/scan-pairing.js";
 import { getApiKey } from "../lib/api-client.js";
 import { CONFIG } from "../lib/config.js";
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
-import { isCurrentRunState } from "../lib/run-fence.js";
+import { createOperationFence, isCurrentRunState } from "../lib/run-fence.js";
 import { clearAllHistory } from "../src/sidepanel/history.js";
 
 test("ensureDataUrl accepts png/jpeg/webp data URLs and raw base64", () => {
@@ -29,6 +29,13 @@ test("ensureDataUrl rejects XSS breakout and non-image schemes", () => {
   assert.equal(ensureDataUrl("javascript:alert(1)"), null);
   assert.equal(ensureDataUrl(""), null);
   assert.equal(ensureDataUrl(null), null);
+});
+
+test("screenshot downloads preserve the validated image format", () => {
+  assert.equal(imageDataUrlExtension("data:image/jpeg;base64,QUJDRA=="), "jpg");
+  assert.equal(imageDataUrlExtension("data:image/webp;base64,QUJDRA=="), "webp");
+  assert.equal(imageDataUrlExtension("data:image/png;base64,QUJDRA=="), "png");
+  assert.equal(imageDataUrlExtension("javascript:alert(1)"), null);
 });
 
 test("sanitizeScanPayload clips fields and rejects incomplete identities", () => {
@@ -148,10 +155,35 @@ test("run fence rejects cancelled and stale run state", () => {
   );
 });
 
+test("operation fence invalidates stale and cancelled individual checks", () => {
+  const fence = createOperationFence();
+  const first = fence.start();
+  assert.equal(fence.isCurrent(first), true);
+
+  const second = fence.start();
+  assert.equal(fence.isCurrent(first), false);
+  assert.equal(fence.isCurrent(second), true);
+
+  fence.cancel();
+  assert.equal(fence.isCurrent(second), false);
+});
+
 test("Clear All removes current and legacy history keys", async () => {
   const removed = [];
   globalThis.confirm = () => true;
   globalThis.chrome = {
+    runtime: {
+      async sendMessage(message) {
+        if (message.type !== "CLEAR_HISTORY") {
+          return { success: false, error: "Unexpected message" };
+        }
+        await globalThis.chrome.storage.local.remove([
+          STORAGE_KEYS.complianceHistory,
+          STORAGE_KEYS.searchHistory,
+        ]);
+        return { success: true, cleared: true };
+      },
+    },
     storage: {
       local: {
         async remove(keys) {
@@ -173,21 +205,15 @@ test("Clear All removes current and legacy history keys", async () => {
   ]);
 });
 
-test("getApiKey prefers Settings override over the built-in default", async () => {
+test("getApiKey ignores retired or injected Settings overrides", async () => {
   globalThis.chrome = {
     storage: {
       local: {
-        async get(key) {
-          if (key === STORAGE_KEYS.backendApiKey) {
-            return { [STORAGE_KEYS.backendApiKey]: "cc_override_test" };
-          }
-          return {};
+        async get() {
+          throw new Error("getApiKey must not read local storage");
         },
       },
     },
   };
-  assert.equal(await getApiKey(), "cc_override_test");
-
-  globalThis.chrome.storage.local.get = async () => ({});
   assert.equal(await getApiKey(), CONFIG.backend.defaultApiKey);
 });

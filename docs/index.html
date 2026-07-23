@@ -254,9 +254,9 @@
         <h3>Data Use at a Glance</h3>
         <ul>
             <li><strong>OFAC screening stays on your device.</strong> No customer information is transmitted for an OFAC-only check.</li>
-            <li><strong>Repeat Offender and Title/Lien checks use our secure service.</strong> The entered name, date of birth, license/ID number, and VIN when used are sent over HTTPS only to retrieve the requested official state result.</li>
+            <li><strong>Repeat Offender and Title/Lien checks use our HTTPS service.</strong> The entered name, date of birth, license/ID number, and VIN when used are sent only to request the selected MDOS portal response.</li>
             <li><strong>Phone scan images stay on the phone.</strong> Only the text fields you approve are sent to your computer in an encrypted, single-use package.</li>
-            <li><strong>Text history is local and limited.</strong> Up to 50 records are kept on your device for no more than 30 days. Portal screenshots are available for the current run only and are excluded from long-term history.</li>
+            <li><strong>Persistent history is anonymous and limited.</strong> Up to 50 outcome-only audit records are kept on your device for no more than 30 days. Customer identity, VINs, and portal screenshots are excluded from persistent history.</li>
         </ul>
     </div>
 
@@ -269,7 +269,9 @@
         <h3>2. What Data the Extension Handles</h3>
         <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. This information is used only to perform the screenings you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the compliance checks.</p>
         <ul>
-            <li><strong>Stored only on your device:</strong> bounded text history, including the customer fields and check results, and your settings are saved locally using Chrome's <code>storage</code> API. History is limited to 50 records and 30 days and can be cleared at any time. Portal screenshots are not kept in long-term history. We do not maintain a server-side database of your searches.</li>
+            <li><strong>Current-run data stays in the browser session:</strong> customer fields, results, and portal screenshots are available only for the active working session and are not written to persistent extension storage.</li>
+            <li><strong>Persistent audit history is anonymous:</strong> each record contains an anonymous reference, timestamp, overall decision, individual check outcomes, and whether the run included a co-buyer or trade-in. It does not contain customer names, dates of birth, license/ID numbers, VINs, screenshots, or full report payloads. Audit history is limited to 50 records and 30 days and can be cleared at any time.</li>
+            <li><strong>Files you choose to download:</strong> a PDF or CSV is saved only when you request it. Downloaded files may contain the details shown in the report and remain wherever you save them until you delete them.</li>
             <li><strong>No tracking or analytics:</strong> the extension does not track your browsing, and does not use Google Analytics or any third-party advertising or analytics network.</li>
         </ul>
     </div>
@@ -279,8 +281,9 @@
         <p>The <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks are performed by our secure backend service hosted on Fly.io, which queries the Michigan Department of State (MDOS) portal on your behalf using automated browsing.</p>
         <ul>
             <li>For these two checks only, the buyer/co-buyer <strong>name, date of birth, and DLN/PID</strong> (and the <strong>VIN</strong> for a title check) are transmitted to our backend over an encrypted HTTPS connection.</li>
-            <li>The backend processes this data <strong>in memory</strong> to obtain the official MDOS result and screenshot, then <strong>returns the result and immediately discards the data</strong>. It is not written to a database or log. The returned portal screenshot is current-run evidence and is not added to long-term history.</li>
-            <li>The extension includes built-in access to the backend, so these checks work for everyone with no account or setup. (Advanced users may optionally supply their own backend key in Settings, stored only on their device.)</li>
+            <li>The backend processes this data <strong>in memory</strong> to request the MDOS portal response and current-run screenshot. Submitted customer data is not intentionally retained after the request completes and is not written to a database or application log. The returned portal screenshot is current-run evidence and is not added to persistent history.</li>
+            <li>Like any hosted web service, Fly.io receives ordinary network request metadata. Compliance Central uses the request IP address transiently in memory for rate limiting and abuse prevention; the app does not write it to its database or application log.</li>
+            <li>The extension includes built-in access to the backend, so these checks work without an account, API key, or setup.</li>
         </ul>
     </div>
 
@@ -291,7 +294,7 @@
             <li><strong>Scanning and parsing happen on your phone</strong> &mdash; the barcode on the back of the license is read and decoded in your phone's browser. The <strong>license image is never uploaded or transmitted</strong>.</li>
             <li>Only the parsed text fields (<strong>name, date of birth, and license/ID number</strong>) travel to your computer, and they are <strong>end-to-end encrypted</strong>: the desktop extension generates a one-time key that exists only inside the QR code, your phone encrypts the fields with it, and our backend merely relays an <strong>encrypted package it cannot read</strong>.</li>
             <li>That encrypted package is <strong>single-use, expires in about two minutes, and is deleted the moment your computer retrieves it</strong>. It is never written to a database or log.</li>
-            <li>Once the fields autofill, they are handled exactly like manually typed data: used only for the checks you request and, if a result is saved, included in the bounded local text history described above.</li>
+            <li>Once the fields autofill, they are handled exactly like manually typed data: used only for the checks you request and kept in the current browser session. Persistent audit history records outcomes without the scanned identity fields.</li>
         </ul>
     </div>
 
@@ -305,7 +308,7 @@
         <ul>
             <li><strong>U.S. Treasury OFAC Sanctions List Service</strong> (<code>sanctionslistservice.ofac.treas.gov</code>): provides the official SDN list the extension downloads for local screening. Treasury redirects the file download to its dedicated AWS GovCloud storage host. Only the public list is downloaded &mdash; no customer data is sent.</li>
             <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
-            <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and not persisted; for the optional license scan it relays only an encrypted, single-use package it cannot read.</li>
+            <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and is not intentionally retained after each request; ordinary network metadata is handled as described above. For the optional license scan, the service relays only an encrypted, single-use package it cannot read.</li>
             <li><strong>GitHub Pages</strong> (<code>techsavvyjoe.github.io</code>): serves the static phone scan page (and this policy). The scan page performs the barcode decoding on your phone; the license image is not sent to it.</li>
         </ul>
     </div>
@@ -315,29 +318,35 @@
         <p>The extension requests only the permissions it needs:</p>
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
-            <li><code>storage</code> &mdash; to save bounded local text history, settings, and an optional custom backend key.</li>
-            <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded local text history. Portal screenshots remain session-only.</li>
+            <li><code>storage</code> &mdash; to save preferences and bounded, anonymous audit history.</li>
+            <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded, anonymous audit history. Customer identity, VINs, and portal screenshots remain session-only.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
             <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), plus <code>compliance-central-api.fly.dev</code> (MDOS backend).</li>
         </ul>
     </div>
 
     <div class="section">
-        <h3>8. Your Rights and Choices</h3>
+        <h3>8. Chrome Web Store Limited Use</h3>
+        <p>Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements. See the <a href="https://developer.chrome.com/docs/webstore/program-policies/limited-use" target="_blank" rel="noopener noreferrer">official Limited Use requirements</a>.</p>
+        <p>Information is used only to provide the compliance checks, phone-to-computer transfer, local preferences, and audit records described in this policy. It is not used for advertising, market research, credit scoring, or any purpose unrelated to the extension's single purpose. Human access is limited to a user's explicit support request, security investigation, legal requirement, or aggregated operations that cannot identify a person.</p>
+    </div>
+
+    <div class="section">
+        <h3>9. Your Rights and Choices</h3>
         <ul>
             <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
-            <li>Remove any optional backend key you've set, at any time from Settings.</li>
+            <li>Delete any reports you downloaded from the location where you saved them.</li>
             <li>Uninstalling the extension removes all locally stored data.</li>
         </ul>
     </div>
 
     <div class="section" id="get-access">
-        <h3>9. No Account Needed</h3>
-        <p>All checks &mdash; OFAC, Repeat Offender, and Title/Lien &mdash; are included free, with no account, sign-up, or API key. Just install and use. (Advanced users may optionally configure their own backend key in Settings.)</p>
+        <h3>10. No Account Needed</h3>
+        <p>All checks &mdash; OFAC, Repeat Offender, and Title/Lien &mdash; are included free, with no account, sign-up, or API key. Just install and use.</p>
     </div>
 
     <div class="section">
-        <h3>10. Contact Us</h3>
+        <h3>11. Contact Us</h3>
         <p>Questions about this policy, the extension, or backend access? Email <a href="mailto:joejgallant@gmail.com">joejgallant@gmail.com</a> or use the Chrome Web Store support page for this listing.</p>
     </div>
 

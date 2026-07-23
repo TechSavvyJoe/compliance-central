@@ -12,9 +12,15 @@ import {
   handleGetDataStatus,
 } from "./ofac-check.js";
 import {
+  cancelIndividualOperation,
   handleRepeatOffenderCheck,
   handleTitleCheck,
 } from "./mdos-check.js";
+import {
+  handleHistoryMessage,
+  HISTORY_MESSAGES,
+  validateHistoryMessage,
+} from "./history.js";
 import { CONFIG } from "../../lib/config.js";
 
 function isRecord(value) {
@@ -62,6 +68,12 @@ function isValidRunId(value) {
   );
 }
 
+function isValidRequiredOperationId(value) {
+  return (
+    typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(value)
+  );
+}
+
 function validatePayload(type, data) {
   switch (type) {
     case "RUN_ALL_CHECKS":
@@ -78,12 +90,21 @@ function validatePayload(type, data) {
       return isValidPerson(data, false);
     case "RUN_REPEAT_OFFENDER":
     case "RUN_SEARCH":
-      return isValidPerson(data, true);
+      return (
+        isValidPerson(data, true) &&
+        isValidRequiredOperationId(data.operationId)
+      );
     case "RUN_TITLE_CHECK":
       return (
         isRecord(data) &&
-        isBoundedString(data.vin, CONFIG.validation.vinLength, true)
+        isBoundedString(data.vin, CONFIG.validation.vinLength, true) &&
+        isValidRequiredOperationId(data.operationId)
       );
+    case HISTORY_MESSAGES.append:
+    case HISTORY_MESSAGES.remove:
+    case HISTORY_MESSAGES.purge:
+    case HISTORY_MESSAGES.clear:
+      return validateHistoryMessage(type, data);
     default:
       return true;
   }
@@ -113,7 +134,14 @@ export async function handleMessage(message, sender) {
 
   const invalidCancelId =
     message.type === "CANCEL_CURRENT_RUN" && !isValidRunId(message.runId);
-  if (invalidCancelId || !validatePayload(message.type, message.data)) {
+  const invalidOperationCancelId =
+    message.type === "CANCEL_INDIVIDUAL_OPERATION" &&
+    !isValidRequiredOperationId(message.operationId);
+  if (
+    invalidCancelId ||
+    invalidOperationCancelId ||
+    !validatePayload(message.type, message.data)
+  ) {
     return { success: false, error: `Invalid ${message.type} payload` };
   }
 
@@ -133,6 +161,9 @@ export async function handleMessage(message, sender) {
     case "CANCEL_CURRENT_RUN":
       return cancelCurrentRun(message.runId);
 
+    case "CANCEL_INDIVIDUAL_OPERATION":
+      return cancelIndividualOperation(message.operationId);
+
     case "RUN_OFAC_CHECK":
       return handleOfacCheck(message.data);
 
@@ -145,6 +176,12 @@ export async function handleMessage(message, sender) {
 
     case "getDataStatus":
       return handleGetDataStatus();
+
+    case HISTORY_MESSAGES.append:
+    case HISTORY_MESSAGES.remove:
+    case HISTORY_MESSAGES.purge:
+    case HISTORY_MESSAGES.clear:
+      return handleHistoryMessage(message.type, message.data);
 
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };

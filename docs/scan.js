@@ -33,13 +33,14 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.20";
+const SCANNER_BUILD = "scanner-2026-07-22.23";
 
-// Pairing data is split between query and fragment so the relay never receives
-// the AES key in the URL request.
+// Pairing capabilities stay entirely in the fragment, which is never sent in
+// the HTTP request. This keeps both the mailbox id and AES key out of logs.
 const params = new URLSearchParams(location.search);
-const sessionId = params.get("s") || "";
-const keyB64 = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+const fragmentParams = new URLSearchParams(location.hash.slice(1));
+const sessionId = fragmentParams.get("s") || "";
+const keyB64 = fragmentParams.get("k") || "";
 // Diagnostics are privacy-safe (field codes/lengths only), but production users
 // should not see implementation details. Enable deliberately with ?debug=1.
 const DEBUG = params.get("debug") === "1";
@@ -92,6 +93,94 @@ let lastPayload = null;
 let deliveryGeneration = 0;
 let activeDeliveryController = null;
 let commercialProviderTeardown = Promise.resolve();
+let scanFeedbackAudioContext = null;
+
+function createScanSuccessFeedbackGate() {
+  let signaledGeneration = null;
+  return {
+    claim(generation, currentGeneration) {
+      if (
+        !Number.isSafeInteger(generation) ||
+        generation !== currentGeneration ||
+        generation === signaledGeneration
+      ) {
+        return false;
+      }
+      signaledGeneration = generation;
+      return true;
+    },
+  };
+}
+
+const scanSuccessFeedbackGate = createScanSuccessFeedbackGate();
+
+function getScanFeedbackAudioContext() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!scanFeedbackAudioContext || scanFeedbackAudioContext.state === "closed") {
+      scanFeedbackAudioContext = new AudioContextClass();
+    }
+    return scanFeedbackAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+function primeScanSuccessFeedback() {
+  const context = getScanFeedbackAudioContext();
+  if (!context || context.state !== "suspended") return;
+  context.resume().catch(() => {});
+}
+
+function scheduleScanSuccessSound(context) {
+  try {
+    const now = context.currentTime;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(1047, now);
+    oscillator.frequency.setValueAtTime(1397, now + 0.045);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.008);
+    gain.gain.setValueAtTime(0.045, now + 0.085);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.addEventListener("ended", () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    }, { once: true });
+    oscillator.start(now);
+    oscillator.stop(now + 0.135);
+  } catch {
+    // Audio is supplemental; the focused review screen remains the confirmation.
+  }
+}
+
+function playScanSuccessFeedback(generation) {
+  if (!scanSuccessFeedbackGate.claim(generation, captureGen)) return false;
+
+  let reduceMotion = false;
+  try {
+    reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {}
+  if (!reduceMotion && typeof navigator.vibrate === "function") {
+    try { navigator.vibrate(45); } catch {}
+  }
+
+  const context = getScanFeedbackAudioContext();
+  if (!context) return true;
+  const ready = context.state === "suspended"
+    ? context.resume()
+    : Promise.resolve();
+  ready.then(() => {
+    if (generation === captureGen && context.state === "running") {
+      scheduleScanSuccessSound(context);
+    }
+  }).catch(() => {});
+  return true;
+}
 
 function show(name) {
   const changed = visibleScreenName !== name;
@@ -967,6 +1056,7 @@ async function beginCapture(which, { waitForGesture = false } = {}) {
   try {
     const { person, raw } = await scanLicenseBarcode(gen);
     if (gen !== captureGen) return;
+    playScanSuccessFeedback(gen);
     await stopCamera();
     if (gen !== captureGen) return;
     pending = person;
@@ -1084,6 +1174,7 @@ async function decodePhoto(file) {
           const verdict = evaluateDetection(raw);
           if (verdict.ok) {
             pending = verdict.person;
+            playScanSuccessFeedback(gen);
             renderReview(verdict.person);
             clearError();
             diag(`provider Dynamsoft · photo len ${raw.length}`);
@@ -1112,6 +1203,7 @@ async function decodePhoto(file) {
         const verdict = evaluateDetection(raw);
         if (verdict.ok) {
           pending = verdict.person;
+          playScanSuccessFeedback(gen);
           renderReview(verdict.person);
           clearError();
           diag(`wasm original photo · len ${raw.length}`);
@@ -1174,6 +1266,7 @@ async function decodePhoto(file) {
           const verdict = evaluateDetection(raw);
           if (verdict.ok) {
             pending = verdict.person;
+            playScanSuccessFeedback(gen);
             renderReview(verdict.person);
             clearError();
             show("review");
@@ -1361,6 +1454,7 @@ async function finish() {
 }
 
 function resetAll() {
+  primeScanSuccessFeedback();
   deliveryGeneration++;
   if (activeDeliveryController) activeDeliveryController.abort();
   activeDeliveryController = null;
@@ -1376,8 +1470,14 @@ function resetAll() {
 }
 
 el("confirmBtn").addEventListener("click", onConfirm);
-el("rescanBtn").addEventListener("click", () => beginCapture(capturing));
-el("yesCoBuyerBtn").addEventListener("click", () => beginCapture("coBuyer"));
+el("rescanBtn").addEventListener("click", () => {
+  primeScanSuccessFeedback();
+  beginCapture(capturing);
+});
+el("yesCoBuyerBtn").addEventListener("click", () => {
+  primeScanSuccessFeedback();
+  beginCapture("coBuyer");
+});
 el("noCoBuyerBtn").addEventListener("click", finish);
 el("startOverBtn").addEventListener("click", resetAll);
 el("retrySendBtn").addEventListener("click", () => {
@@ -1386,11 +1486,13 @@ el("retrySendBtn").addEventListener("click", () => {
   deliverPayload(lastPayload, generation);
 });
 el("startBtn").addEventListener("click", () => {
+  primeScanSuccessFeedback();
   el("startBtn").classList.add("hidden");
   // Explicit user gesture — always attempt getUserMedia from here.
   beginCapture(capturing, { waitForGesture: false });
 });
 el("photoBtn").addEventListener("click", () => {
+  primeScanSuccessFeedback();
   choosingPhoto = true;
   captureGen++;
   stopCamera();
@@ -1464,6 +1566,7 @@ if (promoteToTopLevelIfNeeded()) {
     .catch(() => {
       wasmReady = false;
     });
-  const ctx = classifyBrowseContext(window);
-  beginCapture("buyer", { waitForGesture: ctx.constrained });
+  // One clear tap reliably unlocks Web Audio before the first automatic
+  // capture, so the success beep is available on mobile browsers.
+  beginCapture("buyer", { waitForGesture: true });
 }

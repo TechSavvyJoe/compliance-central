@@ -10,6 +10,7 @@ import {
   decisionMeta,
   saveToHistory,
 } from "../src/sidepanel/history.js";
+import { handleHistoryMessage } from "../src/worker/history.js";
 
 const manifest = JSON.parse(
   await readFile(new URL("../manifest.json", import.meta.url), "utf8")
@@ -23,6 +24,42 @@ test("OFAC errors require review instead of approval", () => {
 
   assert.equal(decision.level, "REVIEW");
   assert.equal(decision.approved, false);
+});
+
+test("confirmed blockers remain denied when an unrelated check is unavailable", () => {
+  const ofacBlocker = calculateFinalDecision({
+    ofac: { passed: false, matches: [{ name: "Confirmed candidate" }] },
+    repeatOffender: {
+      passed: false,
+      status: "error",
+      error: "State service unavailable",
+    },
+  });
+  assert.equal(ofacBlocker.level, "DENIED");
+  assert.match(ofacBlocker.reason, /OFAC match/i);
+
+  const repeatBlocker = calculateFinalDecision({
+    ofac: { passed: false, status: "error", error: "SDN unavailable" },
+    repeatOffender: { passed: false, status: "ineligible" },
+  });
+  assert.equal(repeatBlocker.level, "DENIED");
+  assert.match(repeatBlocker.reason, /Repeat offender/i);
+});
+
+test("unknown or contradictory Repeat Offender responses require review", () => {
+  const base = { ofac: { passed: true } };
+  for (const repeatOffender of [
+    { passed: false, status: "eligible" },
+    { passed: true, status: "ineligible" },
+    { passed: false, status: "mystery" },
+    { passed: true },
+    { passed: true, status: "not_applicable" },
+  ]) {
+    const decision = calculateFinalDecision({ ...base, repeatOffender });
+    assert.equal(decision.level, "REVIEW");
+    assert.equal(decision.approved, false);
+    assert.match(decision.reason, /unrecognized or contradictory/i);
+  }
 });
 
 test("missing required checks do not produce approval or false denial", () => {
@@ -166,11 +203,16 @@ test("date picker normalizes typed DOB values for existing checks", () => {
   assert.equal(normalizeDateValue("1980-01-31"), "1980-01-31");
 });
 
-test("history archives keep printable text evidence without screenshot payloads", async () => {
+test("history persists only anonymous typed audit outcomes", async () => {
   const stored = {
     [STORAGE_KEYS.complianceHistory]: [],
   };
   globalThis.chrome = {
+    runtime: {
+      sendMessage(message) {
+        return handleHistoryMessage(message.type, message.data);
+      },
+    },
     storage: {
       local: {
         async get(key) {
@@ -178,6 +220,11 @@ test("history archives keep printable text evidence without screenshot payloads"
         },
         async set(update) {
           Object.assign(stored, update);
+        },
+      },
+      session: {
+        async get() {
+          return {};
         },
       },
     },
@@ -219,16 +266,32 @@ test("history archives keep printable text evidence without screenshot payloads"
 
   const archived = stored[STORAGE_KEYS.complianceHistory][0];
   assert.equal(archived.decision, "PARTIAL");
-  assert.equal(archived.fullResults.customer.dob, "1980-01-01");
-  assert.equal(archived.fullResults.customer.dlnPid, "S123456789012");
-  assert.equal(archived.fullResults.customer.coBuyer.dob, "1981-02-03");
-  assert.equal(archived.fullResults.checks.repeatOffender.rawText, "official portal pass information");
-  assert.equal(archived.fullResults.checks.repeatOffender.screenshotData, undefined);
-  assert.equal(archived.fullResults.checks.ofac.entriesSearched, 12345);
+  assert.match(archived.reference, /^CC-\d{8}-\d{6}$/);
+  assert.equal(archived.hasCoBuyer, true);
+  assert.equal(archived.hasTrade, true);
+  assert.equal(archived.checks.ofac, "clear");
+  assert.equal(archived.checks.repeatOffender, "eligible");
+  const serialized = JSON.stringify(archived);
+  for (const privateValue of [
+    "Jane",
+    "Doe",
+    "1980-01-01",
+    "S123456789012",
+    "1HGBH41JXMN109186",
+    "official portal pass information",
+    "data:image/png",
+  ]) {
+    assert.doesNotMatch(serialized, new RegExp(privateValue));
+  }
 });
 
 test("history save reports storage failure to its caller", async () => {
   globalThis.chrome = {
+    runtime: {
+      sendMessage(message) {
+        return handleHistoryMessage(message.type, message.data);
+      },
+    },
     storage: {
       local: {
         async get(key) {
@@ -236,6 +299,11 @@ test("history save reports storage failure to its caller", async () => {
         },
         async set() {
           throw new Error("quota unavailable");
+        },
+      },
+      session: {
+        async get() {
+          return {};
         },
       },
     },

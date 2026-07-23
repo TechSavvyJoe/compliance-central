@@ -122,6 +122,8 @@ Does this item collect or use user data? Yes.
 
 Data handled (entered by the dealer about a customer):
 • Personally identifiable information — name, date of birth, government ID (Michigan DLN/PID): Collected, transmitted (HTTPS) to the extension's backend for MDOS checks only. Not sold. Not stored server-side.
+• Website content — Michigan portal responses and screenshots returned for user-requested checks; retained only for the current browser session.
+• Location — the hosting service receives the request IP address. Compliance Central uses it transiently in memory for rate limiting and abuse prevention and does not write it to a database or application log.
 • Vehicle identifier (VIN): transmitted for the optional title check only.
 • Browser session: customer fields, VINs, full results, and portal screenshots stay in session storage so the current run can be reviewed, printed, or downloaded.
 • Persistent history: only anonymous references, timestamps, overall decisions, check outcomes, and co-buyer/trade-in workflow flags are retained for up to 30 days / 50 records.

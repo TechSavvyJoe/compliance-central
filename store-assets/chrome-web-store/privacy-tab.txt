@@ -47,8 +47,11 @@ DATA USAGE  (the checkbox form)
 Data types to mark as COLLECTED:
   • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
   • Website content  (Michigan portal responses and screenshots returned for user-requested checks; session-only)
+  • Location  (the hosting service receives the request IP address; Compliance Central uses it transiently in memory for rate limiting and abuse prevention, and does not write it to a database or application log)
+
+Data types to leave UNCHECKED:
   • Web history: NO
-  • Location, financial, health, personal communications, etc.: NO
+  • Financial, health, authentication, personal communications, user activity, etc.: NO
   (The trade-in VIN is sent only for the optional title check — note under "other" if asked. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history is anonymous. User-requested PDF or CSV downloads remain in the user's chosen location.)
 
 Check ALL THREE required certifications (they are all true for this extension):

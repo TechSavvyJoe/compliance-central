@@ -59,7 +59,8 @@ test("release copy describes session data and anonymous persistent audit history
   for (const source of [policy, description, listing, privacyTab, submissionPrompt]) {
     assert.match(source, /anonymous/i);
     assert.match(source, /session/i);
-    assert.doesNotMatch(source, /optional custom backend|custom backend API key|Authentication information/i);
+    assert.doesNotMatch(source, /optional custom backend|custom backend API key/i);
+    assert.doesNotMatch(source, /Check:\s*Authentication information/i);
   }
 
   assert.match(policy, /Downloaded files may contain the details shown in the report/);
@@ -94,4 +95,8 @@ test("OFAC records are clearly app-generated and do not imitate government lette
 
 test("Web Store declarations cover captured Michigan website content", () => {
   assert.match(privacyTab, /Website content[\s\S]*Michigan portal responses and screenshots/);
+  assert.match(privacyTab, /Location[\s\S]*request IP address[\s\S]*transiently in memory/);
+  assert.match(submissionPrompt, /Check: Website content/);
+  assert.match(submissionPrompt, /Check: Location/);
+  assert.doesNotMatch(submissionPrompt, /Do NOT check: location/i);
 });

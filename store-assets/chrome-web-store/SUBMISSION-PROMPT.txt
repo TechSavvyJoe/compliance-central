@@ -99,14 +99,17 @@ PERMISSION JUSTIFICATIONS (there is one box per permission — paste the matchin
 - alarms: Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 - Host permission https://sanctionslistservice.ofac.treas.gov/: Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
 - Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/: Allows Treasury's signed OFAC-list download redirect to its dedicated AWS GovCloud file host.
-- Host permission https://compliance-central-api.fly.dev/: Performs Repeat Offender and Title/Lien checks and relays the optional end-to-end encrypted phone scan package, which the backend cannot read.
+- Host permission https://compliance-central-api.fly.dev/: Performs Repeat Offender and Title/Lien checks and relays the optional end-to-end encrypted phone scan package, which the backend cannot read. The hosting service receives ordinary network request metadata; Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention, and does not write them to a database or application log.
 
 ARE YOU USING REMOTE CODE? → No. (All code is bundled in the package; nothing is fetched and executed remotely.)
 
 DATA USAGE (the checkbox form):
 - "Does this item collect or use user data?" → Yes.
-- Data collected: Personally identifiable information — name, date of birth, and government ID (driver's license number / PID). These fields are transmitted only for user-requested MDOS checks. The trade-in VIN is sent only for the optional title check. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history contains only anonymous references, timestamps, overall decisions, check outcomes, and workflow flags. User-requested PDF or CSV files remain in the user's chosen download location.
-- Do NOT check: location, web history, financial/payment info, health, personal communications.
+- Check: Personally identifiable information — name, date of birth, and government ID (driver's license number / PID). These fields are transmitted only for user-requested MDOS checks.
+- Check: Website content — Michigan portal responses and screenshots returned for user-requested checks; session-only.
+- Check: Location — the hosting service receives the request IP address, which is used transiently in memory for rate limiting and abuse prevention and is not written to a database or application log.
+- The trade-in VIN is sent only for the optional title check. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history contains only anonymous references, timestamps, overall decisions, check outcomes, and workflow flags. User-requested PDF or CSV files remain in the user's chosen download location.
+- Do NOT check: web history, authentication information, financial/payment information, health information, personal communications, or user activity.
 - Check all three required certifications (all are true for this extension):
    (1) I do not sell or transfer user data to third parties, outside of the approved use cases.
    (2) I do not use or transfer user data for purposes that are unrelated to my item's single purpose.

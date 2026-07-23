@@ -24,6 +24,12 @@ __pycache__/
 # Sensitive
 .env
 
+# This extension does not ship identity documents or local scan files.
+*.pdf
+*.PDF
+*.heic
+*.HEIC
+
 # Generated compliance exports may contain customer identity data.
 Compliance*.pdf
 OFAC_*.pdf

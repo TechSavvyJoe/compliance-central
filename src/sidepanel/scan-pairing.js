@@ -22,7 +22,8 @@ const MAX_DLN = 32;
 const MAX_DOB = 10;
 const MAX_VIN = CONFIG.validation.vinLength;
 const PAIR_REQUEST_TIMEOUT_MS = Math.min(15_000, WINDOW_MS);
-const SESSION_ID_RE = /^[a-f0-9]{32}$/;
+const SESSION_ID_RE =
+  /^(?:[a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i;
 const MICHIGAN_IIN = "636032";
 const JURISDICTION_RE = /^[A-Z]{2}$/;
 

@@ -14,7 +14,7 @@ function jaroSimilarity(s1, s2) {
   const len1 = str1.length;
   const len2 = str2.length;
 
-  const matchDistance = Math.floor(Math.max(len1, len2) / 2) - 1;
+  const matchDistance = Math.max(0, Math.floor(Math.max(len1, len2) / 2) - 1);
 
   const s1Matches = new Array(len1).fill(false);
   const s2Matches = new Array(len2).fill(false);
@@ -74,7 +74,23 @@ export function jaroWinkler(s1, s2, p = 0.1) {
 
 export function normalizeName(name) {
   if (!name) return "";
-  return String(name)
+  const charMap = {
+    ø: "o",
+    Ø: "O",
+    æ: "ae",
+    Æ: "AE",
+    ß: "ss",
+    ł: "l",
+    Ł: "L",
+    œ: "oe",
+    Œ: "OE",
+  };
+  const mapped = String(name).replace(
+    /[øØæÆßłŁœŒ]/g,
+    (character) => charMap[character] || character
+  );
+
+  return mapped
     .normalize("NFKD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
@@ -168,19 +184,22 @@ export function calculateNameSimilarity(searchName, sdnName) {
   let totalWeight = 0;
   let weightedScore = 0;
 
-  if (sNorm.last) {
+  if (sNorm.last && dNorm.last) {
     weightedScore += lastScore * 0.5;
     totalWeight += 0.5;
   }
-  if (sNorm.first) {
+  if (sNorm.first && dNorm.first) {
     weightedScore += firstScore * 0.35;
     totalWeight += 0.35;
   }
-  if (hasMiddle && sNorm.middle) {
+  if (hasMiddle && sNorm.middle && dNorm.middle) {
     weightedScore += middleScore * 0.15;
     totalWeight += 0.15;
   }
 
+  // If the target had none of the components we searched for (e.g. searching
+  // first+last against a target with only an alias or completely malformed),
+  // totalWeight is 0. Fall back to 0.
   const finalScore =
     totalWeight > 0 ? (weightedScore / totalWeight) * 100 : 0;
   return Math.round(finalScore);
@@ -288,6 +307,10 @@ export function searchSDNEntries(searchName, sdnEntries, threshold = 85) {
     }
   }
 
-  matches.sort((a, b) => b.score - a.score);
+  const CONFIDENCE_WEIGHT = { high: 3, medium: 2, low: 1 };
+  matches.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return (CONFIDENCE_WEIGHT[b.confidence] || 0) - (CONFIDENCE_WEIGHT[a.confidence] || 0);
+  });
   return matches;
 }

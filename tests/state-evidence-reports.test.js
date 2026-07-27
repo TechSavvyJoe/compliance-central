@@ -139,6 +139,33 @@ test("standalone and combined print HTML preserve every state-site capture", () 
   assert.doesNotMatch(combined, /class="mdos-banner"|class="breadcrumb"/);
 });
 
+test("print layouts preserve field height and leave optional name fields blank", () => {
+  const results = reportFixture();
+  const repeatPage = getRepeatReportPageHTML(results);
+  const standalone = repeatReportHTML(results);
+  const combined = combinedAllReportHTML(results);
+
+  assert.match(
+    repeatPage,
+    /Middle Name<\/div>\s*<div class="form-value"><\/div>/
+  );
+  assert.match(
+    repeatPage,
+    /Suffix<\/div>\s*<div class="form-value"><\/div>/
+  );
+  assert.doesNotMatch(
+    repeatPage,
+    /(?:Middle Name|Suffix)<\/div>\s*<div class="form-value">Not provided/
+  );
+
+  for (const html of [standalone, combined]) {
+    assert.match(html, /\.form-value\s*\{[^}]*min-height:\s*36px/);
+    assert.match(html, /\.form-value\s*\{[^}]*height:\s*auto/);
+    assert.doesNotMatch(html, /\.form-value\s*\{[^}]*height:\s*18px/);
+    assert.match(html, /print-color-adjust:\s*exact/);
+  }
+});
+
 test("HTML fallback is prominent and never presents an app summary as a state page", () => {
   const results = reportFixture();
   delete results.checks.repeatOffender.screenshotData;

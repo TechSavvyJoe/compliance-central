@@ -38,14 +38,27 @@ export async function runOfacCheck(customerData) {
     throw new Error(response?.error || "OFAC check failed");
   }
 
+  const result = response.result;
+  if (
+    !result ||
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    typeof result.hasMatch !== "boolean" ||
+    !Array.isArray(result.matches)
+  ) {
+    throw new Error(
+      "The OFAC check returned an incomplete result. Please try again."
+    );
+  }
+
   return {
-    passed: !response.result.hasMatch,
-    matches: response.result.matches || [],
-    matchCount: response.result.matchCount || 0,
-    entriesSearched: response.result.entriesSearched || 0,
-    lastUpdate: response.result.lastUpdate,
-    stale: !!response.result.stale,
-    dataAgeHours: response.result.dataAgeHours,
+    passed: !result.hasMatch,
+    matches: result.matches,
+    matchCount: result.matchCount || 0,
+    entriesSearched: result.entriesSearched || 0,
+    lastUpdate: result.lastUpdate,
+    stale: !!result.stale,
+    dataAgeHours: result.dataAgeHours,
     timestamp: new Date().toISOString(),
   };
 }
@@ -68,7 +81,19 @@ export async function runRepeatOffenderCheck(customerData, operationId) {
     throw new Error(response?.error || "Repeat Offender check failed");
   }
 
-  let screenshotData = response.result.screenshotData;
+  const result = response.result;
+  if (
+    !result ||
+    typeof result !== "object" ||
+    Array.isArray(result) ||
+    !["eligible", "ineligible"].includes(result.status)
+  ) {
+    throw new Error(
+      "The Repeat Offender check returned an incomplete result. Please try again."
+    );
+  }
+
+  let screenshotData = result.screenshotData;
   if (!screenshotData) {
     try {
       const stored = await chrome.storage.session.get(
@@ -84,9 +109,9 @@ export async function runRepeatOffenderCheck(customerData, operationId) {
   }
 
   return {
-    passed: response.result.status === "eligible",
-    status: response.result.status,
-    rawText: response.result.rawText || "",
+    passed: result.status === "eligible",
+    status: result.status,
+    rawText: result.rawText || "",
     screenshotData,
     timestamp: new Date().toISOString(),
   };
@@ -305,21 +330,26 @@ export function calculateFinalDecision(checks) {
     }
 
     const titleBrand = checks.title.titleBrand;
+    const allBrands = [titleBrand, ...(checks.title.vehicleBrands || [])].filter(
+      (brand) => typeof brand === "string"
+    );
 
-    const hasProblemBrand =
-      titleBrand &&
-      titleBrand !== "CLEAN" &&
-      titleBrand !== "UNKNOWN" &&
-      titleBrand !== "undefined" &&
-      titleBrand.toLowerCase() !== "none" &&
-      titleBrand.toLowerCase() !== "no brands" &&
-      !titleBrand.toLowerCase().includes("no brand");
+    const problemBrands = allBrands.filter(
+      (brand) =>
+        brand &&
+        brand !== "CLEAN" &&
+        brand !== "UNKNOWN" &&
+        brand !== "undefined" &&
+        brand.toLowerCase() !== "none" &&
+        brand.toLowerCase() !== "no brands" &&
+        !brand.toLowerCase().includes("no brand")
+    );
 
-    if (hasProblemBrand) {
+    if (problemBrands.length > 0) {
       return {
         approved: false,
         level: "REVIEW",
-        reason: `Trade title branded as ${titleBrand} - requires disclosure`,
+        reason: `Trade title branded as ${problemBrands.join(", ")} - requires disclosure`,
         warnings: [],
       };
     }

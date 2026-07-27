@@ -97,14 +97,16 @@ async function publishIndividualSideEffects(operation, updates, badgeStatus) {
 export async function cancelIndividualOperation(operationId) {
   const controller = individualControllers.get(operationId);
   controller?.abort();
+  individualControllers.delete(operationId);
 
   return withIndividualSideEffectLock(async () => {
     const stored = await chrome.storage.session.get(
       STORAGE_KEYS.activeIndividualOperationId
     );
     const activeId = stored[STORAGE_KEYS.activeIndividualOperationId];
-    // A delayed cancellation for an older operation must not clear a newer one.
-    if (activeId && activeId !== operationId) {
+    // A delayed cancellation for an older operation must not clear a newer one,
+    // nor should it wipe state if the operation is already finished (activeId is null).
+    if (activeId !== operationId) {
       return { success: true, cancelled: false };
     }
 
@@ -160,7 +162,13 @@ export async function handleRepeatOffenderCheck(searchData) {
     );
     return published ? result : cancelledResult();
   } catch (error) {
-    if (operation?.controller.signal.aborted) return cancelledResult();
+    if (
+      operation?.controller.signal.aborted ||
+      searchData?.signal?.aborted ||
+      error?.name === "AbortError"
+    ) {
+      return cancelledResult();
+    }
     throw error;
   } finally {
     finishIndividualOperation(operation);
@@ -199,7 +207,13 @@ export async function handleTitleCheck(data) {
     );
     return published ? result : cancelledResult();
   } catch (error) {
-    if (operation?.controller.signal.aborted) return cancelledResult();
+    if (
+      operation?.controller.signal.aborted ||
+      data?.signal?.aborted ||
+      error?.name === "AbortError"
+    ) {
+      return cancelledResult();
+    }
     throw error;
   } finally {
     finishIndividualOperation(operation);

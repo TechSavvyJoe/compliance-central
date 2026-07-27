@@ -612,7 +612,12 @@ export function displayIndividualResult(elements, type, result) {
     );
   } else if (type === "repeatOffender") {
     elements.repeatResultCard?.classList.remove("hidden");
-    if (result.error || result.status === "error") {
+    if (result.status === "not_applicable") {
+      setResultStatus(elements.repeatResultStatus, "skipped", "Skipped");
+      elements.repeatResultDetail.textContent = "N/A — out of state";
+      setActionVisibility(elements.printRepeatBtn, false);
+      setActionVisibility(elements.downloadRepeatBtn, false);
+    } else if (result.error || result.status === "error") {
       const isKey = result.error === MISSING_API_KEY;
       setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
       elements.repeatResultDetail.textContent = friendlyCheckError(

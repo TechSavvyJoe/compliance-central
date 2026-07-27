@@ -122,6 +122,22 @@ test("pairing rejects malformed session responses before rendering a QR", async 
   assert.equal(rendered, false);
 });
 
+test("pairing rejects malformed hyphenated session IDs", async () => {
+  installChrome();
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    async json() {
+      return { sessionId: "1111111111111111111111111111111-" };
+    },
+  });
+
+  await assert.rejects(
+    startPairing(makeElements(), () => {}, () => {}),
+    /invalid session/i
+  );
+});
+
 test("session creation timeout remains active while reading the response body", async () => {
   installChrome();
   globalThis.setTimeout = (callback, delay, ...args) =>

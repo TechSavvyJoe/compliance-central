@@ -92,8 +92,14 @@ function decodeXMLText(value) {
   return text.replace(
     /&(?:#(\d+)|#x([\da-f]+)|(amp|lt|gt|quot|apos));/gi,
     (entity, decimal, hex, named) => {
-      if (decimal) return String.fromCodePoint(Number(decimal));
-      if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+      if (decimal) {
+        const cp = Number(decimal);
+        return cp >= 0 && cp <= 0x10FFFF ? String.fromCodePoint(cp) : "";
+      }
+      if (hex) {
+        const cp = Number.parseInt(hex, 16);
+        return cp >= 0 && cp <= 0x10FFFF ? String.fromCodePoint(cp) : "";
+      }
       return {
         amp: "&",
         lt: "<",
@@ -107,7 +113,7 @@ function decodeXMLText(value) {
 
 function tagPattern(tagName, flags = "") {
   return new RegExp(
-    `<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}\\s*>`,
+    `(?:<${tagName}(?:\\s[^>]*)?\\/>)|(?:<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}\\s*>)`,
     flags
   );
 }

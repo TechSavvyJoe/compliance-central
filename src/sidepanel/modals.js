@@ -17,7 +17,7 @@ const FOCUSABLE_SELECTOR = [
 
 function getFocusable(modalEl) {
   return Array.from(modalEl.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
-    (el) => el.offsetParent !== null || el === document.activeElement
+    (el) => el.getClientRects().length > 0 || el === document.activeElement
   );
 }
 

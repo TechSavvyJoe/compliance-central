@@ -19,8 +19,8 @@
             <h1>Compliance Central</h1>
             <span class="subtitle">Michigan Dealer Compliance Hub</span>
           </div>
-          <button id="settingsBtn" class="header-action-btn" aria-label="Open settings" title="Settings">
-            <span class="icon icon-settings"></span>
+          <button type="button" id="settingsBtn" class="header-action-btn" aria-label="Open settings" title="Settings">
+            <span class="icon icon-settings" aria-hidden="true"></span>
           </button>
         </div>
       </header>
@@ -28,36 +28,34 @@
       <main id="main-content" class="hub-main" role="main">
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 
-        <button
+        <button type="button"
           id="inputSummaryBar"
           class="input-summary-bar hidden"
-          type="button"
           aria-expanded="false"
           aria-controls="inputPanel"
         >
-          <span class="input-summary-icon icon icon-user"></span>
+          <span class="input-summary-icon icon icon-user" aria-hidden="true"></span>
           <span class="input-summary-text" id="inputSummaryText">Customer details</span>
           <span class="input-summary-edit"
             ><span id="inputSummaryAction">Edit</span
-            ><span class="icon icon-chevron section-toggle"></span
+            ><span class="icon icon-chevron section-toggle" aria-hidden="true"></span
           ></span>
         </button>
 
         <div id="inputPanel">
         <section class="input-section">
           <h2 class="section-title">
-            <span class="section-icon icon icon-user"></span>
+            <span class="section-icon icon icon-user" aria-hidden="true"></span>
             Customer Information
             <span id="buyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h2>
 
-          <button
+          <button type="button"
             id="scanLicenseBtn"
-            type="button"
             class="btn-secondary btn-ghost scan-license-btn"
             aria-describedby="scanLicenseHint"
           >
-            <span class="btn-icon icon icon-user"></span>
+            <span class="btn-icon icon icon-user" aria-hidden="true"></span>
             Scan license with phone
           </button>
           <p id="scanLicenseHint" class="scan-license-hint">
@@ -106,11 +104,9 @@
                   aria-required="true"
                   aria-haspopup="dialog"
                   aria-expanded="false"
-                  aria-controls="dobDatePicker"
-                  role="combobox"
                 />
-                <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Date of Birth calendar">
-                  <span class="icon icon-calendar"></span>
+                <button type="button" class="date-picker-toggle" aria-label="Open Date of Birth calendar" aria-haspopup="dialog" aria-expanded="false" aria-controls="dobDatePicker">
+                  <span class="icon icon-calendar" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -131,7 +127,7 @@
 
         <section id="coBuyerSection" class="input-section cobuyer-section hidden">
           <h2 class="section-title">
-            <span class="section-icon icon icon-users"></span>
+            <span class="section-icon icon icon-users" aria-hidden="true"></span>
             Co-Buyer Information
             <span id="coBuyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h2>
@@ -178,11 +174,9 @@
                   aria-required="true"
                   aria-haspopup="dialog"
                   aria-expanded="false"
-                  aria-controls="cbDobDatePicker"
-                  role="combobox"
                 />
-                <button type="button" class="date-picker-toggle" tabindex="-1" aria-label="Open Co-Buyer Date of Birth calendar">
-                  <span class="icon icon-calendar"></span>
+                <button type="button" class="date-picker-toggle" aria-label="Open Co-Buyer Date of Birth calendar" aria-haspopup="dialog" aria-expanded="false" aria-controls="cbDobDatePicker">
+                  <span class="icon icon-calendar" aria-hidden="true"></span>
                 </button>
               </div>
             </div>
@@ -196,15 +190,14 @@
 
         <section class="input-section trade-section">
           <h2>
-            <button
+            <button type="button"
               class="section-title trade-section-title"
               id="tradeSectionHeader"
-              type="button"
               aria-expanded="false"
               aria-controls="tradeSectionContent"
             >
               <span class="trade-title-left">
-                <span class="section-icon icon icon-car"></span>
+                <span class="section-icon icon icon-car" aria-hidden="true"></span>
                 Trade-In Vehicle
               </span>
               <span class="optional-label">(Optional)</span>
@@ -222,7 +215,7 @@
             </div>
 
             <div class="trade-hint">
-              <span class="icon icon-file"></span>
+              <span class="icon icon-file" aria-hidden="true"></span>
               Title/lien check only runs if VIN provided
             </div>
           </div>
@@ -239,27 +232,27 @@
           </p>
 
           <div class="main-actions" role="group" aria-label="Primary actions">
-            <button id="runAllChecksBtn" class="btn-primary btn-large" aria-describedby="dataUseNote">
-              <span class="btn-icon icon icon-play"></span>
+            <button type="button" id="runAllChecksBtn" class="btn-primary btn-large" aria-describedby="dataUseNote">
+              <span class="btn-icon icon icon-play" aria-hidden="true"></span>
               Run All Checks
             </button>
-            <button id="clearBtn" class="btn-secondary btn-ghost">
-              <span class="btn-icon icon icon-trash"></span>
+            <button type="button" id="clearBtn" class="btn-secondary btn-ghost">
+              <span class="btn-icon icon icon-trash" aria-hidden="true"></span>
               Clear form
             </button>
           </div>
 
           <div class="individual-checks" role="group" aria-label="Run one compliance check">
-            <button id="runOfacBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
-              <span class="btn-icon icon icon-globe"></span>
+            <button type="button" id="runOfacBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
+              <span class="btn-icon icon icon-globe" aria-hidden="true"></span>
               OFAC Only
             </button>
-            <button id="runRepeatOffenderBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
-              <span class="btn-icon icon icon-ban"></span>
+            <button type="button" id="runRepeatOffenderBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
+              <span class="btn-icon icon icon-ban" aria-hidden="true"></span>
               Repeat Offender
             </button>
-            <button id="runTitleBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote" disabled>
-              <span class="btn-icon icon icon-file"></span>
+            <button type="button" id="runTitleBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote" disabled>
+              <span class="btn-icon icon icon-file" aria-hidden="true"></span>
               Title/Lien
             </button>
           </div>
@@ -270,15 +263,15 @@
 
           <div class="check-items">
             <div class="check-item">
-              <span class="check-name"><span class="check-icon icon icon-globe"></span>OFAC Screening</span>
+              <span class="check-name"><span class="check-icon icon icon-globe" aria-hidden="true"></span>OFAC Screening</span>
               <span id="ofacStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
             <div class="check-item">
-              <span class="check-name"><span class="check-icon icon icon-ban"></span>Repeat Offender</span>
+              <span class="check-name"><span class="check-icon icon icon-ban" aria-hidden="true"></span>Repeat Offender</span>
               <span id="repeatStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
             <div class="check-item" id="titleCheckItem">
-              <span class="check-name"><span class="check-icon icon icon-file"></span>Title &amp; Lien</span>
+              <span class="check-name"><span class="check-icon icon icon-file" aria-hidden="true"></span>Title &amp; Lien</span>
               <span id="titleStatus" class="status-indicator status-waiting">Waiting</span>
             </div>
           </div>
@@ -309,84 +302,84 @@
           <div class="results-grid">
             <div class="result-card" id="ofacResultCard">
               <div class="result-header">
-                <h3><span class="check-icon icon icon-globe"></span>OFAC Screening</h3>
+                <h3><span class="check-icon icon icon-globe" aria-hidden="true"></span>OFAC Screening</h3>
                 <span class="result-status status-pass" id="ofacResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="ofacResultDetail">No matches in SDN list</p>
               <div class="result-actions">
-                <button class="btn-secondary btn-sm" id="printOfacBtn">
-                  <span class="icon icon-printer"></span>Print
+                <button type="button" class="btn-secondary btn-sm" id="printOfacBtn">
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print
                 </button>
-                <button class="btn-secondary btn-emphasis btn-sm" id="downloadOfacBtn">
-                  <span class="icon icon-download"></span>Download PDF
+                <button type="button" class="btn-secondary btn-emphasis btn-sm" id="downloadOfacBtn">
+                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
                 </button>
               </div>
             </div>
 
             <div class="result-card" id="repeatResultCard">
               <div class="result-header">
-                <h3><span class="check-icon icon icon-ban"></span>Repeat Offender</h3>
+                <h3><span class="check-icon icon icon-ban" aria-hidden="true"></span>Repeat Offender</h3>
                 <span class="result-status status-pass" id="repeatResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="repeatResultDetail">Eligible per MDOS repeat-offender response</p>
               <div class="result-actions">
-                <button class="btn-secondary btn-sm hidden" id="printRepeatBtn">
-                  <span class="icon icon-printer"></span>Print
+                <button type="button" class="btn-secondary btn-sm hidden" id="printRepeatBtn">
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print
                 </button>
-                <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadRepeatBtn">
-                  <span class="icon icon-download"></span>Download PDF
+                <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadRepeatBtn">
+                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
                 </button>
               </div>
             </div>
 
             <div class="result-card" id="titleResultCard">
               <div class="result-header">
-                <h3><span class="check-icon icon icon-file"></span>Title &amp; Lien</h3>
+                <h3><span class="check-icon icon icon-file" aria-hidden="true"></span>Title &amp; Lien</h3>
                 <span class="result-status status-skipped" id="titleResultStatus">No Trade</span>
               </div>
               <p class="result-detail" id="titleResultDetail">No trade-in provided</p>
               <div class="result-actions">
-                <button class="btn-secondary btn-sm hidden" id="printTitleBtn">
-                  <span class="icon icon-printer"></span>Print
+                <button type="button" class="btn-secondary btn-sm hidden" id="printTitleBtn">
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print
                 </button>
-                <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadTitleBtn">
-                  <span class="icon icon-download"></span>Download PDF
+                <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadTitleBtn">
+                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
                 </button>
               </div>
             </div>
           </div>
 
           <div id="coBuyerResultsSection" class="cobuyer-results hidden">
-            <h2 class="section-subtitle"><span class="icon icon-users"></span>Co-Buyer Results</h2>
+            <h2 class="section-subtitle"><span class="icon icon-users" aria-hidden="true"></span>Co-Buyer Results</h2>
             <div class="results-grid">
               <div class="result-card" id="cbOfacResultCard">
                 <div class="result-header">
-                  <h3><span class="check-icon icon icon-globe"></span>OFAC (Co-Buyer)</h3>
+                  <h3><span class="check-icon icon icon-globe" aria-hidden="true"></span>OFAC (Co-Buyer)</h3>
                   <span class="result-status status-pass" id="cbOfacResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbOfacResultDetail">No matches in SDN list</p>
                 <div class="result-actions">
-                  <button class="btn-secondary btn-sm" id="printCbOfacBtn">
-                    <span class="icon icon-printer"></span>Print
+                  <button type="button" class="btn-secondary btn-sm" id="printCbOfacBtn">
+                    <span class="icon icon-printer" aria-hidden="true"></span>Print
                   </button>
-                  <button class="btn-secondary btn-emphasis btn-sm" id="downloadCbOfacBtn">
-                    <span class="icon icon-download"></span>Download PDF
+                  <button type="button" class="btn-secondary btn-emphasis btn-sm" id="downloadCbOfacBtn">
+                    <span class="icon icon-download" aria-hidden="true"></span>Download PDF
                   </button>
                 </div>
               </div>
 
               <div class="result-card" id="cbRepeatResultCard">
                 <div class="result-header">
-                  <h3><span class="check-icon icon icon-ban"></span>Repeat Offender (Co-Buyer)</h3>
+                  <h3><span class="check-icon icon icon-ban" aria-hidden="true"></span>Repeat Offender (Co-Buyer)</h3>
                   <span class="result-status status-pass" id="cbRepeatResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbRepeatResultDetail">Eligible per MDOS repeat-offender response</p>
                 <div class="result-actions">
-                  <button class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
-                    <span class="icon icon-printer"></span>Print
+                  <button type="button" class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
+                    <span class="icon icon-printer" aria-hidden="true"></span>Print
                   </button>
-                  <button class="btn-secondary btn-emphasis btn-sm hidden" id="downloadCbRepeatBtn">
-                    <span class="icon icon-download"></span>Download PDF
+                  <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadCbRepeatBtn">
+                    <span class="icon icon-download" aria-hidden="true"></span>Download PDF
                   </button>
                 </div>
               </div>
@@ -394,20 +387,20 @@
           </div>
 
           <div class="all-actions">
-            <button id="printAllBtn" class="btn-secondary">
-              <span class="btn-icon icon icon-printer"></span>
+            <button type="button" id="printAllBtn" class="btn-secondary">
+              <span class="btn-icon icon icon-printer" aria-hidden="true"></span>
               Print All
             </button>
-            <button id="downloadPdfBtn" class="btn-secondary btn-emphasis">
-              <span class="btn-icon icon icon-download"></span>
+            <button type="button" id="downloadPdfBtn" class="btn-secondary btn-emphasis">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
               Download PDF
             </button>
           </div>
         </section>
 
         <section class="history-section">
-          <button id="viewHistoryBtn" class="btn-secondary btn-ghost btn-full">
-            <span class="btn-icon icon icon-history"></span>
+          <button type="button" id="viewHistoryBtn" class="btn-secondary btn-ghost btn-full">
+            <span class="btn-icon icon icon-history" aria-hidden="true"></span>
             View History (<span id="historyCount">0 today</span>)
           </button>
         </section>
@@ -417,16 +410,16 @@
         <div class="modal-content">
           <div class="modal-header">
             <h2 id="historyModalTitle">Audit History</h2>
-            <button class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
+            <button type="button" class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
           </div>
           <div class="modal-body" id="historyList" aria-live="polite"></div>
           <div class="modal-footer">
-            <button id="exportAuditLogBtn" class="btn-hist" title="Export the full audit log as a CSV file">
-              <span class="btn-icon icon icon-download"></span>
+            <button type="button" id="exportAuditLogBtn" class="btn-hist" title="Export the full audit log as a CSV file">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
               Export CSV
             </button>
-            <button id="clearAllHistoryBtn" class="btn-hist btn-hist-danger" title="Permanently clear all compliance history">
-              <span class="btn-icon icon icon-trash"></span>
+            <button type="button" id="clearAllHistoryBtn" class="btn-hist btn-hist-danger" title="Permanently clear all compliance history">
+              <span class="btn-icon icon icon-trash" aria-hidden="true"></span>
               Clear All
             </button>
           </div>
@@ -437,17 +430,17 @@
         <div class="modal-content screenshot-modal">
           <div class="modal-header">
             <h2 id="screenshotTitle">Michigan State-Site Screenshot</h2>
-            <button id="closeScreenshotModal" class="modal-close" aria-label="Close screenshot modal">&times;</button>
+            <button type="button" id="closeScreenshotModal" class="modal-close" aria-label="Close screenshot modal">&times;</button>
           </div>
           <div class="modal-body">
             <img id="screenshotImage" class="screenshot-img" alt="MDOS Screenshot" />
           </div>
           <div class="modal-actions">
-            <button id="printScreenshotBtn" class="btn-primary">
-              <span class="btn-icon icon icon-printer"></span> Print
+            <button type="button" id="printScreenshotBtn" class="btn-primary">
+              <span class="btn-icon icon icon-printer" aria-hidden="true"></span> Print
             </button>
-            <button id="downloadScreenshotBtn" class="btn-secondary">
-              <span class="btn-icon icon icon-download"></span> Download PNG
+            <button type="button" id="downloadScreenshotBtn" class="btn-secondary">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span> Download PNG
             </button>
           </div>
         </div>
@@ -457,17 +450,17 @@
         <div class="modal-content">
           <div class="modal-header">
             <h2 id="settingsModalTitle">Settings</h2>
-            <button class="modal-close" id="closeSettingsModal" aria-label="Close settings">&times;</button>
+            <button type="button" class="modal-close" id="closeSettingsModal" aria-label="Close settings">&times;</button>
           </div>
           <div class="modal-body">
             <div class="settings-group">
-              <h3 class="settings-heading"><span class="icon icon-check"></span>Service</h3>
+              <h3 class="settings-heading"><span class="icon icon-check" aria-hidden="true"></span>Service</h3>
               <p id="serviceStatus" class="settings-status connected">All checks are ready — no setup needed.</p>
               <p class="settings-help">OFAC, Repeat Offender, Title/Lien, and phone scanning are included. There is no account or key to configure.</p>
             </div>
 
             <div class="settings-group">
-              <h3 class="settings-heading"><span class="icon icon-ban"></span>Re-screen reminder</h3>
+              <h3 class="settings-heading"><span class="icon icon-ban" aria-hidden="true"></span>Re-screen reminder</h3>
               <label class="checkbox-label">
                 <input type="checkbox" id="rescreenReminderToggle" />
                 <span class="checkbox-text">Remind me to re-screen deals before delivery</span>
@@ -479,16 +472,16 @@
             </div>
 
             <div class="settings-group">
-              <h3 class="settings-heading"><span class="icon icon-trash"></span>Privacy &amp; data</h3>
+              <h3 class="settings-heading"><span class="icon icon-trash" aria-hidden="true"></span>Privacy &amp; data</h3>
               <p class="settings-help">Audit History saves only an anonymous reference, time, and outcomes—never names, birth dates, license numbers, VINs, screenshots, or backend keys.</p>
               <div class="settings-actions">
-                <button id="settingsClearHistoryBtn" class="btn-secondary btn-sm">Clear audit history</button>
+                <button type="button" id="settingsClearHistoryBtn" class="btn-secondary btn-sm">Clear audit history</button>
                 <a id="settingsPrivacyLink" class="btn-secondary btn-sm settings-link-button" href="#" target="_blank" rel="noopener noreferrer">Privacy details</a>
               </div>
             </div>
 
             <div class="settings-group settings-support">
-              <h3 class="settings-heading"><span class="icon icon-info"></span>Help</h3>
+              <h3 class="settings-heading"><span class="icon icon-info" aria-hidden="true"></span>Help</h3>
               <p class="settings-help">Questions? Email <a id="supportEmailLink" href="#">support</a>.</p>
               <p id="settingsVersion" class="settings-help settings-help-muted"></p>
             </div>
@@ -506,7 +499,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="scanPairTitle">Scan with your phone</h2>
-          <button class="modal-close" id="scanPairCloseX" aria-label="Close pairing modal">&times;</button>
+          <button type="button" class="modal-close" id="scanPairCloseX" aria-label="Close pairing modal">&times;</button>
         </div>
         <div class="modal-body">
           <p id="scanPairInstructions" class="hint">On your phone, open the camera and point it at this code. You'll
@@ -515,7 +508,7 @@
           <p id="scanPairStatus" class="scan-pair-status" role="status" aria-live="polite">Creating a secure connection…</p>
         </div>
         <div class="modal-footer">
-          <button id="scanPairCancel" class="btn-secondary btn-ghost">Cancel</button>
+          <button type="button" id="scanPairCancel" class="btn-secondary btn-ghost">Cancel</button>
         </div>
       </div>
     </div>

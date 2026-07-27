@@ -49,6 +49,10 @@ export function formatDlnForMdos(dln) {
     .toUpperCase();
 }
 
+function optionalReportValue(value) {
+  return sanitizeHTML(String(value || "").trim());
+}
+
 function reportDate(value, fallback = "Not recorded") {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
@@ -185,6 +189,9 @@ function tryPrintViaIframe(html, waitForImages) {
       }
     };
 
+    // Ensure the iframe is always removed eventually, even if schedulePrint hangs.
+    setTimeout(cleanup, PRINT_TIMEOUT_MS);
+
     const triggerPrint = () => {
       try {
         win.focus();
@@ -195,7 +202,6 @@ function tryPrintViaIframe(html, waitForImages) {
         return;
       }
       win.addEventListener("afterprint", cleanup, { once: true });
-      setTimeout(cleanup, PRINT_TIMEOUT_MS);
     };
 
     schedulePrint(win, doc, waitForImages, triggerPrint).catch(() => {
@@ -499,7 +505,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
           </div>
           <div class="form-field">
             <div class="form-label">Middle Name</div>
-            <div class="form-value">${sanitizeHTML(c.middleName) || "Not provided"}</div>
+            <div class="form-value">${optionalReportValue(c.middleName)}</div>
           </div>
           <div class="form-field">
             <div class="form-label">Last Name</div>
@@ -507,7 +513,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
           </div>
           <div class="form-field">
             <div class="form-label">Suffix</div>
-            <div class="form-value">${sanitizeHTML(c.suffix) || "Not provided"}</div>
+            <div class="form-value">${optionalReportValue(c.suffix)}</div>
           </div>
         </div>
         
@@ -843,7 +849,7 @@ export function combinedAllReportHTML(currentResults) {
   if (cbOfac && coBuyer) {
     sections.push(
       ofacBlock(
-        `<p><strong>Name:</strong> ${sanitizeHTML(coBuyer.firstName || "")} ${sanitizeHTML(coBuyer.middleName || "")} ${sanitizeHTML(coBuyer.lastName || "")}${coBuyer.suffix ? " " + sanitizeHTML(coBuyer.suffix) : ""}</p>
+        `<p><strong>Name:</strong> ${buildSanitizedName(coBuyer)}</p>
          <p><strong>DOB:</strong> ${sanitizeHTML(coBuyer.dob || "Not Provided")}</p>
          <p><strong>DLN/PID:</strong> ${sanitizeHTML(coBuyer.dlnPid || "Not Provided")}</p>`,
         cbOfac,
@@ -871,7 +877,7 @@ export function combinedAllReportHTML(currentResults) {
   <style>
     @page { size: portrait; margin: 0.5in; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; padding: 20px; color: #333; background: #fff; }
+    body { font-family: Arial, sans-serif; padding: 20px; color: #333; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page { page-break-after: always; min-height: 90vh; position: relative; }
     .page:last-child { page-break-after: auto; }
     .header { border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -925,7 +931,7 @@ export function combinedAllReportHTML(currentResults) {
     .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
     .form-field { display: flex; flex-direction: column; }
     .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
-    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .form-value { display: flex; align-items: center; min-height: 36px; height: auto; background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; line-height: 1.25; overflow-wrap: anywhere; }
     .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
     .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
     .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
@@ -2182,7 +2188,8 @@ export function repeatReportHTML(currentResults, isCoBuyer = false) {
   <title>Michigan Repeat Offender Check</title>
   <style>
     @page { size: portrait; margin: 0.5in; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 7.5in; margin: 0 auto; }
     .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
     .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
     .summary-notice { padding: 13px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a5f; border-radius: 6px; background: #f8fafc; margin-bottom: 14px; font-size: 11px; color: #475569; }
@@ -2193,7 +2200,7 @@ export function repeatReportHTML(currentResults, isCoBuyer = false) {
     .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
     .form-field { display: flex; flex-direction: column; }
     .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
-    .form-value { background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; height: 18px; line-height: 18px; }
+    .form-value { display: flex; align-items: center; min-height: 36px; height: auto; background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; text-transform: uppercase; line-height: 1.25; overflow-wrap: anywhere; }
     .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
     .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
     .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
@@ -2227,7 +2234,8 @@ export function titleReportHTML(currentResults) {
   <title>Michigan Title & Lien Check</title>
   <style>
     @page { size: portrait; margin: 0.5in; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; margin: 0; padding: 20px; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { max-width: 7.5in; margin: 0 auto; }
     .page-header { display: flex; justify-content: space-between; font-size: 10px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
     .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
     .summary-notice { padding: 13px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a5f; border-radius: 6px; background: #f8fafc; margin-bottom: 14px; font-size: 11px; color: #475569; }

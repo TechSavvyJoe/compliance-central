@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runOfacCheck, runTitleCheck } from "../src/sidepanel/checks.js";
+import {
+  runOfacCheck,
+  runRepeatOffenderCheck,
+  runTitleCheck,
+} from "../src/sidepanel/checks.js";
 
 test("runOfacCheck passes through stale and dataAgeHours", async () => {
   globalThis.chrome = {
@@ -45,6 +49,40 @@ test("runOfacCheck handles undefined response without throwing a TypeError", asy
         lastName: "User",
       }),
     /OFAC check failed/
+  );
+});
+
+test("runOfacCheck rejects a successful response with missing result data", async () => {
+  globalThis.chrome = {
+    runtime: {
+      sendMessage: async () => ({ success: true }),
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      runOfacCheck({
+        firstName: "Test",
+        lastName: "User",
+      }),
+    /incomplete result/i
+  );
+});
+
+test("runRepeatOffenderCheck rejects a successful response with no status", async () => {
+  globalThis.chrome = {
+    runtime: {
+      sendMessage: async () => ({ success: true, result: {} }),
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      runRepeatOffenderCheck({
+        firstName: "Test",
+        lastName: "User",
+      }),
+    /incomplete result/i
   );
 });
 

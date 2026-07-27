@@ -124,66 +124,72 @@ function isTrustedSender(sender) {
 }
 
 export async function handleMessage(message, sender) {
-  if (!message || typeof message.type !== "string") {
-    return { success: false, error: "Invalid message" };
-  }
+  try {
+    if (!message || typeof message.type !== "string") {
+      return { success: false, error: "Invalid message" };
+    }
 
-  if (!isTrustedSender(sender)) {
-    return { success: false, error: "Unauthorized sender" };
-  }
+    if (!isTrustedSender(sender)) {
+      return { success: false, error: "Unauthorized sender" };
+    }
 
-  const invalidCancelId =
-    message.type === "CANCEL_CURRENT_RUN" && !isValidRunId(message.runId);
-  const invalidOperationCancelId =
-    message.type === "CANCEL_INDIVIDUAL_OPERATION" &&
-    !isValidRequiredOperationId(message.operationId);
-  if (
-    invalidCancelId ||
-    invalidOperationCancelId ||
-    !validatePayload(message.type, message.data)
-  ) {
-    return { success: false, error: `Invalid ${message.type} payload` };
-  }
+    const invalidCancelId =
+      message.type === "CANCEL_CURRENT_RUN" && !isValidRunId(message.runId);
+    const operationId = message.data?.operationId || message.operationId;
+    const invalidOperationCancelId =
+      message.type === "CANCEL_INDIVIDUAL_OPERATION" &&
+      !isValidRequiredOperationId(operationId);
+    if (
+      invalidCancelId ||
+      invalidOperationCancelId ||
+      !validatePayload(message.type, message.data)
+    ) {
+      return { success: false, error: `Invalid ${message.type} payload` };
+    }
 
-  switch (message.type) {
-    case "RUN_ALL_CHECKS":
-      // Reject busy before starting so the sidepanel learns the truth.
-      if (isRunInFlight()) {
-        return {
-          success: false,
-          error: "A compliance run is already in progress.",
-        };
+    switch (message.type) {
+      case "RUN_ALL_CHECKS":
+        // Reject busy before starting so the sidepanel learns the truth.
+        if (isRunInFlight()) {
+          return {
+            success: false,
+            error: "A compliance run is already in progress.",
+          };
+        }
+        // Acknowledge only after the initial session state is durable. The rest
+        // of the run continues in the background and storage events drive UI.
+        return startRunAllChecks(message.data);
+
+      case "CANCEL_CURRENT_RUN":
+        return cancelCurrentRun(message.runId);
+
+      case "CANCEL_INDIVIDUAL_OPERATION":
+        return cancelIndividualOperation(operationId);
+
+      case "RUN_OFAC_CHECK":
+        return handleOfacCheck(message.data);
+
+      case "RUN_REPEAT_OFFENDER":
+      case "RUN_SEARCH":
+        return handleRepeatOffenderCheck(message.data);
+
+      case "RUN_TITLE_CHECK":
+        return handleTitleCheck(message.data);
+
+      case "getDataStatus":
+        return handleGetDataStatus();
+
+      case HISTORY_MESSAGES.append:
+      case HISTORY_MESSAGES.remove:
+      case HISTORY_MESSAGES.purge:
+      case HISTORY_MESSAGES.clear:
+        return handleHistoryMessage(message.type, message.data);
+
+      default:
+        return { success: false, error: `Unknown message type: ${message.type}` };
       }
-      // Acknowledge only after the initial session state is durable. The rest
-      // of the run continues in the background and storage events drive UI.
-      return startRunAllChecks(message.data);
-
-    case "CANCEL_CURRENT_RUN":
-      return cancelCurrentRun(message.runId);
-
-    case "CANCEL_INDIVIDUAL_OPERATION":
-      return cancelIndividualOperation(message.operationId);
-
-    case "RUN_OFAC_CHECK":
-      return handleOfacCheck(message.data);
-
-    case "RUN_REPEAT_OFFENDER":
-    case "RUN_SEARCH":
-      return handleRepeatOffenderCheck(message.data);
-
-    case "RUN_TITLE_CHECK":
-      return handleTitleCheck(message.data);
-
-    case "getDataStatus":
-      return handleGetDataStatus();
-
-    case HISTORY_MESSAGES.append:
-    case HISTORY_MESSAGES.remove:
-    case HISTORY_MESSAGES.purge:
-    case HISTORY_MESSAGES.clear:
-      return handleHistoryMessage(message.type, message.data);
-
-    default:
-      return { success: false, error: `Unknown message type: ${message.type}` };
+  } catch (error) {
+    console.error("Message handler failed:", error);
+    return { success: false, error: "Internal error processing message" };
   }
 }

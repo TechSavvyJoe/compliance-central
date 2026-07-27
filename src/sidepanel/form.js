@@ -245,8 +245,12 @@ export function validateField(
         return { valid: false, error: `${label} cannot be in the future` };
       }
 
-      const ageYears =
-        (Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      const today = new Date();
+      let ageYears = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        ageYears--;
+      }
 
       if (ageYears < CONFIG.validation.minAge) {
         return {

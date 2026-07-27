@@ -72,6 +72,7 @@ export function registerAlarmListeners() {
   chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       if (alarm.name === UPDATE_ALARM_NAME) {
+        await initDB();
         await purgeHistory();
         await performSDNUpdate();
       }

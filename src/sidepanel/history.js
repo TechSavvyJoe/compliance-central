@@ -88,7 +88,7 @@ function statusChip(label, fullName, state) {
     na: { cls: "hchip-na", icon: HISTORY_DASH },
     none: { cls: "hchip-none", icon: HISTORY_DASH },
   }[state] || { cls: "hchip-none", icon: HISTORY_DASH };
-  return `<span class="hchip ${meta.cls}" title="${fullName}">${meta.icon}<span class="hchip-label">${label}</span></span>`;
+  return `<span class="hchip ${meta.cls}" title="${sanitizeHTML(fullName)}">${meta.icon}<span class="hchip-label">${sanitizeHTML(label)}</span></span>`;
 }
 
 /**

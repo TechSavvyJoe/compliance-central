@@ -59,14 +59,14 @@ function reportFixture() {
 }
 
 function pdfContext() {
-  const calls = { images: [], text: [] };
+  const calls = { images: [], roundedRects: [], text: [] };
   const doc = {
     addImage: (...args) => calls.images.push(args),
     addPage() {},
     getImageProperties: () => ({ width: 1280, height: 1800 }),
     line() {},
     rect() {},
-    roundedRect() {},
+    roundedRect: (...args) => calls.roundedRects.push(args),
     setDrawColor() {},
     setFillColor() {},
     setFont() {},
@@ -134,12 +134,19 @@ test("standalone and combined print HTML preserve every state-site capture", () 
   ]) {
     assert.ok(combined.includes(screenshot));
   }
-  assert.match(repeat, /page-break-before: always/);
-  assert.match(title, /page-break-before: always/);
+  for (const html of [repeat, title, combined]) {
+    assert.match(html, /class="page evidence-page state-evidence"/);
+    assert.match(
+      html,
+      /\.page\s*\{[^}]*break-after:\s*page;[^}]*page-break-after:\s*always/
+    );
+    assert.doesNotMatch(html, /page-break-before:\s*always/);
+    assert.doesNotMatch(html, /min-height:\s*90vh/);
+  }
   assert.doesNotMatch(combined, /class="mdos-banner"|class="breadcrumb"/);
 });
 
-test("print layouts preserve field height and leave optional name fields blank", () => {
+test("print layouts keep values inside aligned rows and leave optional names blank", () => {
   const results = reportFixture();
   const repeatPage = getRepeatReportPageHTML(results);
   const standalone = repeatReportHTML(results);
@@ -159,10 +166,42 @@ test("print layouts preserve field height and leave optional name fields blank",
   );
 
   for (const html of [standalone, combined]) {
-    assert.match(html, /\.form-value\s*\{[^}]*min-height:\s*36px/);
-    assert.match(html, /\.form-value\s*\{[^}]*height:\s*auto/);
+    assert.match(html, /class="form-grid identity-grid"/);
+    assert.match(html, /class="form-grid id-grid"/);
+    assert.match(
+      html,
+      /\.identity-grid,\s*\.id-grid\s*\{[^}]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+    );
+    assert.match(html, /\.form-value\s*\{[^}]*min-height:\s*38px/);
+    assert.match(html, /\.form-value\s*\{[^}]*height:\s*100%/);
+    assert.match(html, /\.form-value\s*\{[^}]*overflow-wrap:\s*anywhere/);
     assert.doesNotMatch(html, /\.form-value\s*\{[^}]*height:\s*18px/);
+    assert.doesNotMatch(
+      html,
+      /\.form-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4/
+    );
     assert.match(html, /print-color-adjust:\s*exact/);
+  }
+});
+
+test("summary and state evidence are separate complete print sheets", () => {
+  const results = reportFixture();
+  const repeat = repeatReportHTML(results);
+  const title = titleReportHTML(results);
+
+  for (const html of [repeat, title]) {
+    assert.match(
+      html,
+      /<div class="portal-footer">[\s\S]*?<\/div>\s*<\/div>\s*<section class="page evidence-page state-evidence">/
+    );
+    assert.match(
+      html,
+      /\.state-evidence img\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*max-width:\s*100%;[^}]*max-height:\s*8\.5in/
+    );
+    assert.match(
+      html,
+      /\.portal-footer\s*\{[^}]*position:\s*absolute;[^}]*bottom:\s*0/
+    );
   }
 });
 
@@ -222,5 +261,41 @@ test("PDF fallback labels missing or invalid state evidence honestly", () => {
     fallbackPdf.calls.text.some((value) =>
       value.includes("app-generated summary, not a Michigan Department of State webpage")
     )
+  );
+});
+
+test("downloaded PDF rows grow and wrap instead of drawing values across lines", () => {
+  const results = reportFixture();
+  results.customer.firstName = "Alexandria-Catherine-Elizabeth";
+  results.customer.middleName = "Bartholomew";
+  results.customer.lastName = "Montgomery-Washington-Smythe";
+  delete results.checks.repeatOffender.screenshotData;
+
+  const wrapped = pdfContext();
+  wrapped.ctx.doc.splitTextToSize = (value) => {
+    const text = String(value);
+    if (text.includes("Montgomery-Washington-Smythe")) {
+      return [
+        "Alexandria-Catherine-Elizabeth Bartholomew",
+        "Montgomery-Washington-Smythe",
+      ];
+    }
+    return [text];
+  };
+
+  repeatSection(
+    results.checks.repeatOffender,
+    results.customer,
+    "Michigan Repeat Offender Check",
+    "SUBJECT SCREENED"
+  ).render(wrapped.ctx);
+
+  assert.ok(
+    wrapped.calls.roundedRects[0][3] >= 128,
+    "the subject box should grow to contain the wrapped name"
+  );
+  assert.ok(
+    wrapped.calls.text.includes("Montgomery-Washington-Smythe"),
+    "the wrapped continuation should be drawn inside the subject box"
   );
 });

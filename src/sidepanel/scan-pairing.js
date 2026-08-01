@@ -181,7 +181,7 @@ async function openSession(attempt) {
     attempt.controller.abort();
   }, PAIR_REQUEST_TIMEOUT_MS);
   let res;
-  let body = null;
+  let body;
   try {
     res = await fetch(`${RELAY_BASE}/pair/new`, {
       method: "POST",

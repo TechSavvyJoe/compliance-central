@@ -166,3 +166,35 @@ test("a persisted operation tombstone prevents a delayed worker request", async 
   assert.equal(result.cancelled, true);
   assert.equal(fetchCalls, 0);
 });
+
+test("a second individual Michigan check is rejected while one is active", async () => {
+  mockChromeSession();
+  const pending = deferredFetch();
+  let fetchCalls = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (...args) => {
+    fetchCalls += 1;
+    return originalFetch(...args);
+  };
+
+  const first = handleRepeatOffenderCheck({
+    firstName: "Test",
+    lastName: "Buyer",
+    dlnPid: "S123456789012",
+    operationId: "repeat-single-flight",
+  });
+  await pending.started;
+
+  const second = await handleTitleCheck({
+    vin: "1HGBH41JXMN109186",
+    operationId: "title-single-flight",
+  });
+  assert.equal(second.success, false);
+  assert.equal(second.busy, true);
+  assert.match(second.error, /already in progress/i);
+  assert.equal(fetchCalls, 1);
+
+  await cancelIndividualOperation("repeat-single-flight");
+  pending.resolve({ success: false, error: "cancelled test request" });
+  await first;
+});

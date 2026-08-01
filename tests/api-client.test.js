@@ -129,6 +129,41 @@ test("an incomplete title response fails closed", async () => {
   assert.match(result.error, /incomplete title result/i);
 });
 
+test("an incomplete Repeat Offender response fails closed", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ success: true, passed: true }),
+  });
+
+  const result = await backendRepeatOffenderCheck({
+    firstName: "A",
+    lastName: "B",
+  });
+  assert.equal(result.success, false);
+  assert.match(result.error, /incomplete Repeat Offender result/i);
+});
+
+test("a contradictory Repeat Offender response fails closed", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      success: true,
+      status: "eligible",
+      passed: false,
+      details: {},
+    }),
+  });
+
+  const result = await backendRepeatOffenderCheck({
+    firstName: "A",
+    lastName: "B",
+  });
+  assert.equal(result.success, false);
+  assert.match(result.error, /incomplete Repeat Offender result/i);
+});
+
 test("an unknown title status can never become a clean pass", async () => {
   stubStorage("test-key");
   globalThis.fetch = async () => ({
@@ -169,6 +204,27 @@ test("No Record Found remains review even if an older backend calls it CLEAN", a
   assert.equal(result.success, true);
   assert.equal(result.result.passed, false);
   assert.equal(result.result.titleBrand, "UNKNOWN");
+});
+
+test("a branded title cannot pass even if an older backend says it did", async () => {
+  stubStorage("test-key");
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      success: true,
+      passed: true,
+      details: {
+        titleStatus: "Rebuilt",
+        titleBrand: "REBUILT",
+        hasLien: false,
+      },
+    }),
+  });
+
+  const result = await backendTitleCheck({ vin: "1HGBH41JXMN109186" });
+  assert.equal(result.success, true);
+  assert.equal(result.result.passed, false);
+  assert.equal(result.result.titleBrand, "REBUILT");
 });
 
 test("an in-flight backend request can be cancelled", async () => {

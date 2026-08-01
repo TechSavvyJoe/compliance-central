@@ -14,7 +14,6 @@ import {
   IN_FLIGHT,
 } from "./lib/storage-keys.js";
 import { MISSING_API_KEY } from "./lib/api-client.js";
-import { ensureDataUrl, imageDataUrlExtension } from "./lib/data-url.js";
 import {
   createRunId,
   isCurrentRunState,
@@ -64,7 +63,6 @@ import {
   printCoBuyerRepeatScreenshot,
   printTitleScreenshot,
   printAllReports,
-  printHtmlDocument,
   downloadOfacReportPDF,
   downloadCoBuyerOfacReportPDF,
   downloadRepeatOffenderPDF,
@@ -190,14 +188,6 @@ const elements = {
   clearAllHistoryBtn: $("clearAllHistoryBtn"),
   exportAuditLogBtn: $("exportAuditLogBtn"),
   rescreenReminderToggle: $("rescreenReminderToggle"),
-
-  // Screenshot modal
-  screenshotModal: $("screenshotModal"),
-  screenshotTitle: $("screenshotTitle"),
-  screenshotImage: $("screenshotImage"),
-  closeScreenshotModal: $("closeScreenshotModal"),
-  printScreenshotBtn: $("printScreenshotBtn"),
-  downloadScreenshotBtn: $("downloadScreenshotBtn"),
 
   // Loading
   loadingOverlay: $("loadingOverlay"),
@@ -337,7 +327,7 @@ async function applyPersistedResults() {
     activeUiRunId = persisted.runId;
     setIsRunning(true);
     setButtonsDisabled(elements, true);
-    setInputCollapsed(true);
+    setInputCollapsed(true, persisted.results?.customer);
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
     updateProgress(elements, persisted.progress);
@@ -375,16 +365,16 @@ async function applyPersistedResults() {
   if (persisted.state === "individual" && persisted.results) {
     setCurrentResults(persisted.results);
     displayStoredIndividualResult(persisted.results);
-    setInputCollapsed(true);
+    setInputCollapsed(true, persisted.results.customer);
     elements.resultsSection.classList.remove("hidden");
     elements.progressSection.classList.add("hidden");
     return;
   }
 
   if (persisted.state === "complete" && persisted.results) {
-    activeUiRunId = persisted.runId;
     displayResults(elements, persisted.results);
-    setInputCollapsed(true);
+    setInputCollapsed(true, persisted.results.customer);
+    activeUiRunId = null;
     elements.resultsSection.classList.remove("hidden");
     elements.progressSection.classList.add("hidden");
   }
@@ -498,13 +488,6 @@ function initEventListeners() {
       showToast("Ready for a new screening — scan an ID or enter the details.", "info");
     }
   });
-
-  // Screenshot modal
-  elements.closeScreenshotModal.addEventListener("click", () =>
-    hideModal(elements.screenshotModal)
-  );
-  elements.printScreenshotBtn.addEventListener("click", printScreenshotModal);
-  elements.downloadScreenshotBtn.addEventListener("click", downloadScreenshotModal);
 
   // Per-check print buttons
   elements.printOfacBtn.addEventListener("click", () =>
@@ -687,14 +670,14 @@ function describeError(err) {
 // ---------- Collapsible customer/vehicle input ----------
 
 // Builds the one-line summary shown on the collapsed bar (name · DOB · DLN · VIN).
-function buildInputSummary() {
+function buildInputSummary(customerOverride = null) {
   const form = getFormData(elements);
   // On reload, results restore (applyPersistedResults) can race ahead of the
   // cached-form-data hydration, leaving the inputs momentarily empty. Fall back
   // to the restored results' customer so the summary never renders blank.
   const haveForm =
     form.firstName || form.lastName || form.dob || form.dlnPid || form.tradeVin;
-  const c = haveForm ? form : getCurrentResults()?.customer || form;
+  const c = customerOverride || (haveForm ? form : getCurrentResults()?.customer || form);
   const parts = [];
   const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
   if (name) parts.push(name);
@@ -715,12 +698,12 @@ function buildInputSummary() {
 // two-way toggle once a run has collapsed it: click to collapse, click to
 // expand, as often as needed. Inputs keep their values while hidden, so the
 // form still submits and re-collapses on the next run. Reset by handleClear.
-function setInputCollapsed(collapsed) {
+function setInputCollapsed(collapsed, summaryCustomer = null) {
   if (!elements.inputPanel || !elements.inputSummaryBar) return;
   elements.inputSummaryBar.classList.remove("hidden");
   const chevron = elements.inputSummaryBar.querySelector(".section-toggle");
   if (collapsed) {
-    elements.inputSummaryText.textContent = buildInputSummary();
+    elements.inputSummaryText.textContent = buildInputSummary(summaryCustomer);
     // If keyboard/SR focus is inside the panel we're about to hide, move it to
     // the (now-visible) summary bar so focus isn't silently lost to <body>.
     const focusInsidePanel = elements.inputPanel.contains(document.activeElement);
@@ -934,7 +917,7 @@ async function handleRunOfac() {
       operationId: operation.operationId,
     });
     displayIndividualResult(elements, "ofac", result);
-    setInputCollapsed(true);
+    setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
       await discardCancelledIndividualResult(operation.operationId);
@@ -990,7 +973,7 @@ async function handleRunRepeatOffender() {
       }
     );
     displayIndividualResult(elements, "repeatOffender", result);
-    setInputCollapsed(true);
+    setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
       await discardCancelledIndividualResult(operation.operationId);
@@ -1031,7 +1014,7 @@ async function handleRunTitle() {
       operationId: operation.operationId,
     });
     displayIndividualResult(elements, "title", result);
-    setInputCollapsed(true);
+    setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
       await discardCancelledIndividualResult(operation.operationId);
@@ -1194,30 +1177,6 @@ async function openHistory() {
   }
 }
 
-// ---------- Screenshot modal ----------
-
-function printScreenshotModal() {
-  const safeSrc = ensureDataUrl(elements.screenshotImage.src);
-  if (!safeSrc) {
-    showToast("Screenshot cannot be printed (invalid image data).", "warning");
-    return;
-  }
-  printHtmlDocument(
-    `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Compliance Screenshot</title></head><body style="margin:0;padding:20px;"><img src="${safeSrc}" style="max-width:100%;"/></body></html>`,
-    { waitForImages: true }
-  );
-}
-
-function downloadScreenshotModal() {
-  const src = ensureDataUrl(elements.screenshotImage.src);
-  const extension = imageDataUrlExtension(src);
-  if (!src || !extension) return;
-  const link = document.createElement("a");
-  link.download = `compliance-screenshot-${Date.now()}.${extension}`;
-  link.href = src;
-  link.click();
-}
-
 // ---------- Slow-check messaging ----------
 // MDOS (government portal) checks can take up to ~90s with no intermediate
 // progress. If the bar stalls, surface a reassuring "still running" note rather
@@ -1362,7 +1321,7 @@ function handleSearchStatusChange(changes) {
   if (status === SEARCH_STATUS.running) {
     setIsRunning(true);
     setButtonsDisabled(elements, true);
-    setInputCollapsed(true);
+    setInputCollapsed(true, getCurrentResults()?.customer);
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
     setCardsLoadingState(elements, true);
@@ -1393,11 +1352,14 @@ function handleSearchStatusChange(changes) {
   if (status === SEARCH_STATUS.complete) {
     setIsRunning(false);
     setButtonsDisabled(elements, false);
-    setInputCollapsed(true);
+    const results = getCurrentResults();
+    setInputCollapsed(true, results?.customer);
+    // The run is complete. Keeping this ID live makes the next individual
+    // result look stale and can leave its storage update invisible.
+    activeUiRunId = null;
     setCardsLoadingState(elements, false);
     clearSlowCheckTimers();
 
-    const results = getCurrentResults();
     if (results) {
       try {
         displayResults(elements, results);

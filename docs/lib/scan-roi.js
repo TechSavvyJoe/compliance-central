@@ -72,8 +72,8 @@ export function focusPdf417Band(crop, opts = {}) {
   const topSkip = Number.isFinite(opts.topSkip) ? opts.topSkip : 0.28;
   const bottomKeep = Number.isFinite(opts.bottomKeep) ? opts.bottomKeep : null;
 
-  let y = crop.y;
-  let height = crop.height;
+  let y;
+  let height;
 
   if (bottomKeep != null) {
     const keep = Math.max(0.35, Math.min(1, bottomKeep));

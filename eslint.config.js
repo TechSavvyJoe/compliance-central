@@ -1,7 +1,9 @@
+import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
 
 export default defineConfig([
+  js.configs.recommended,
   {
     ignores: [
       "node_modules/**",
@@ -22,6 +24,7 @@ export default defineConfig([
         ...globals.node,
         ...globals.serviceworker,
         ...globals.webextensions,
+        ZXing: "readonly",
       },
     },
     rules: {
@@ -32,8 +35,21 @@ export default defineConfig([
           varsIgnorePattern: "^_",
         },
       ],
+      eqeqeq: ["error", "smart"],
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      // Several boundary adapters intentionally replace transport/provider
+      // errors with safe user-facing messages instead of retaining raw causes.
+      "preserve-caught-error": "off",
       "no-var": "error",
       "prefer-const": "error",
+    },
+  },
+  {
+    files: ["docs/lib/aamva.js", "src/sidepanel/scan-pairing.js"],
+    rules: {
+      // These expressions deliberately strip ASCII control bytes from scanned
+      // AAMVA/PDF417 payloads before parsing or transport.
+      "no-control-regex": "off",
     },
   },
 ]);

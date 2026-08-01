@@ -59,10 +59,10 @@ function reportFixture() {
 }
 
 function pdfContext() {
-  const calls = { images: [], roundedRects: [], text: [] };
+  const calls = { addPages: 0, images: [], roundedRects: [], text: [] };
   const doc = {
     addImage: (...args) => calls.images.push(args),
-    addPage() {},
+    addPage() { calls.addPages++; },
     getImageProperties: () => ({ width: 1280, height: 1800 }),
     line() {},
     rect() {},
@@ -111,10 +111,12 @@ test("Repeat and Title HTML include the actual captured state webpage", () => {
     [repeat, REPEAT_SCREENSHOT],
     [title, TITLE_SCREENSHOT],
   ]) {
-    assert.match(html, /Actual Michigan state-site screenshot/);
+    assert.match(html, /State-Site Capture/);
     assert.match(html, /https:\/\/dsvsesvc\.sos\.state\.mi\.us\//);
-    assert.match(html, /state webpage, not a recreated mockup/);
-    assert.ok(html.includes(`<img src="${screenshot}"`));
+    assert.match(html, /Actual webpage captured/);
+    assert.ok(html.includes(`src="${screenshot}"`));
+    assert.match(html, /data-state-evidence-image/);
+    assert.match(html, />1 page</);
     assert.doesNotMatch(html, /class="mdos-banner"|class="breadcrumb"/);
   }
 });
@@ -148,6 +150,7 @@ test("standalone and combined print HTML preserve every state-site capture", () 
 
 test("print layouts keep values inside aligned rows and leave optional names blank", () => {
   const results = reportFixture();
+  delete results.checks.repeatOffender.screenshotData;
   const repeatPage = getRepeatReportPageHTML(results);
   const standalone = repeatReportHTML(results);
   const combined = combinedAllReportHTML(results);
@@ -184,19 +187,17 @@ test("print layouts keep values inside aligned rows and leave optional names bla
   }
 });
 
-test("summary and state evidence are separate complete print sheets", () => {
+test("successful Michigan reports print as one authentic evidence sheet each", () => {
   const results = reportFixture();
   const repeat = repeatReportHTML(results);
   const title = titleReportHTML(results);
 
   for (const html of [repeat, title]) {
+    assert.equal((html.match(/class="page(?:\s|")/g) || []).length, 1);
+    assert.doesNotMatch(html, /class="page repeat-page"|class="page title-page"/);
     assert.match(
       html,
-      /<div class="portal-footer">[\s\S]*?<\/div>\s*<\/div>\s*<section class="page evidence-page state-evidence">/
-    );
-    assert.match(
-      html,
-      /\.state-evidence img\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*max-width:\s*100%;[^}]*max-height:\s*8\.5in/
+      /\.state-evidence img\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*max-width:\s*100%;[^}]*max-height:\s*9\.2in/
     );
     assert.match(
       html,
@@ -205,14 +206,29 @@ test("summary and state evidence are separate complete print sheets", () => {
   }
 });
 
-test("HTML fallback is prominent and never presents an app summary as a state page", () => {
+test("HTML fallbacks stay on one page and never present an app summary as a state page", () => {
   const results = reportFixture();
   delete results.checks.repeatOffender.screenshotData;
-  const html = getRepeatReportPageHTML(results);
+  delete results.checks.title.screenshotData;
+  const reports = [repeatReportHTML(results), titleReportHTML(results)];
 
-  assert.match(html, /Actual Michigan state-site screenshot unavailable/);
-  assert.match(html, /app-generated summary, not a Michigan Department of State webpage/);
-  assert.match(html, /Re-run the check before relying on it/);
+  for (const html of reports) {
+    assert.equal((html.match(/class="page(?:\s|")/g) || []).length, 1);
+    assert.match(html, /Actual Michigan state-site screenshot unavailable/);
+    assert.match(html, /app-generated summary, not a Michigan Department of State webpage/);
+    assert.match(html, /Re-run the check before relying on it/);
+    assert.doesNotMatch(html, /<img\b/);
+  }
+});
+
+test("an unverified capture stays off the one-page fallback record", () => {
+  const results = reportFixture();
+  results.checks.repeatOffender.status = "unknown";
+  results.checks.repeatOffender.passed = false;
+  const html = repeatReportHTML(results);
+
+  assert.equal((html.match(/class="page(?:\s|")/g) || []).length, 1);
+  assert.match(html, /evidence could not be verified/i);
   assert.doesNotMatch(html, /<img\b/);
 });
 
@@ -233,10 +249,33 @@ test("Repeat and Title PDF sections embed the validated real captures", () => {
   assert.equal(repeatPdf.calls.images[0][0], REPEAT_SCREENSHOT);
   assert.equal(titlePdf.calls.images.length, 1);
   assert.equal(titlePdf.calls.images[0][0], TITLE_SCREENSHOT);
+  assert.equal(repeatPdf.calls.addPages, 0);
+  assert.equal(titlePdf.calls.addPages, 0);
+  assert.ok(repeatPdf.calls.images[0][4] > 480);
   for (const textCalls of [repeatPdf.calls.text, titlePdf.calls.text]) {
-    assert.ok(textCalls.includes("ACTUAL MICHIGAN STATE-SITE SCREENSHOT"));
-    assert.ok(textCalls.includes("Captured from https://dsvsesvc.sos.state.mi.us/"));
+    assert.ok(
+      textCalls.includes("ACTUAL MICHIGAN STATE-SITE CAPTURE · ONE-PAGE RECORD")
+    );
+    assert.ok(
+      textCalls.some((value) => value.includes("dsvsesvc.sos.state.mi.us"))
+    );
   }
+});
+
+test("PDF embedding preserves the backend JPEG format", () => {
+  const results = reportFixture();
+  results.checks.repeatOffender.screenshotData =
+    "data:image/jpeg;base64,UkVQRUFU";
+  const pdf = pdfContext();
+
+  repeatSection(
+    results.checks.repeatOffender,
+    results.customer,
+    "Michigan Repeat Offender Check",
+    "SUBJECT SCREENED"
+  ).render(pdf.ctx);
+
+  assert.equal(pdf.calls.images[0][1], "JPEG");
 });
 
 test("PDF fallback labels missing or invalid state evidence honestly", () => {

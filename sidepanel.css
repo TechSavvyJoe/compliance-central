@@ -1743,26 +1743,6 @@ body.modal-open {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
-/* Screenshot modal */
-.screenshot-modal {
-  max-width: 95%;
-  max-height: 95vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.screenshot-modal .modal-body {
-  flex: 1;
-  overflow: auto;
-  padding: var(--spacing-sm);
-  background: var(--bg-secondary);
-}
-.screenshot-img {
-  width: 100%;
-  height: auto;
-  border-radius: var(--border-radius-sm);
-}
-
 /* Toast notifications */
 .toast-container {
   position: fixed;

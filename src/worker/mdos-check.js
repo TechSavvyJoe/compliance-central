@@ -16,6 +16,18 @@ import { setBadgeForStatus } from "./badge.js";
 const individualControllers = new Map();
 let individualSideEffectLock = Promise.resolve();
 
+export function isIndividualMdosInFlight() {
+  return individualControllers.size > 0;
+}
+
+function busyResult() {
+  return {
+    success: false,
+    busy: true,
+    error: "A Michigan state-site check is already in progress.",
+  };
+}
+
 function withIndividualSideEffectLock(callback) {
   const task = individualSideEffectLock.then(callback, callback);
   individualSideEffectLock = task.catch(() => {});
@@ -130,6 +142,10 @@ export async function handleRepeatOffenderCheck(searchData) {
   if (hasSideEffects && !searchData.operationId) {
     return { success: false, error: "Missing check operation ID." };
   }
+  // Claim the individual slot before the first await. That makes the guard
+  // atomic within the service-worker event loop and prevents two side-panel
+  // clicks from creating overlapping MDOS portal sessions.
+  if (hasSideEffects && isIndividualMdosInFlight()) return busyResult();
   const operation = hasSideEffects
     ? await beginIndividualOperation(searchData.operationId)
     : null;
@@ -180,6 +196,7 @@ export async function handleTitleCheck(data) {
   if (hasSideEffects && !data.operationId) {
     return { success: false, error: "Missing check operation ID." };
   }
+  if (hasSideEffects && isIndividualMdosInFlight()) return busyResult();
   const operation = hasSideEffects
     ? await beginIndividualOperation(data.operationId)
     : null;

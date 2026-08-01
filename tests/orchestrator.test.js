@@ -308,6 +308,25 @@ test("message router rejects invalid messages and foreign senders", async () => 
   assert.equal(malformedRun.success, false);
   assert.match(malformedRun.error, /invalid RUN_ALL_CHECKS payload/i);
 
+  const invalidJurisdiction = await handleMessage(
+    {
+      type: "RUN_ALL_CHECKS",
+      data: {
+        hasTrade: false,
+        customer: {
+          firstName: "Jane",
+          lastName: "Doe",
+          dlnPid: "S123456789012",
+          hasCoBuyer: false,
+          buyerIsMichigan: "false",
+        },
+      },
+    },
+    { id: "test-ext-id", url: "chrome-extension://test-ext-id/sidepanel.html" }
+  );
+  assert.equal(invalidJurisdiction.success, false);
+  assert.match(invalidJurisdiction.error, /invalid RUN_ALL_CHECKS payload/i);
+
   const malformedCancel = await handleMessage(
     { type: "CANCEL_CURRENT_RUN", runId: { unexpected: true } },
     { id: "test-ext-id" }

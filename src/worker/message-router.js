@@ -15,6 +15,7 @@ import {
   cancelIndividualOperation,
   handleRepeatOffenderCheck,
   handleTitleCheck,
+  isIndividualMdosInFlight,
 } from "./mdos-check.js";
 import {
   handleHistoryMessage,
@@ -57,7 +58,13 @@ function isValidPerson(value, requireLicense = false) {
   ) {
     return false;
   }
+  if (!isOptionalBoolean(value.buyerIsMichigan)) return false;
+  if (!isOptionalBoolean(value.coBuyerIsMichigan)) return false;
   return true;
+}
+
+function isOptionalBoolean(value) {
+  return value === undefined || value === null || typeof value === "boolean";
 }
 
 function isValidRunId(value) {
@@ -150,10 +157,10 @@ export async function handleMessage(message, sender) {
     switch (message.type) {
       case "RUN_ALL_CHECKS":
         // Reject busy before starting so the sidepanel learns the truth.
-        if (isRunInFlight()) {
+        if (isRunInFlight() || isIndividualMdosInFlight()) {
           return {
             success: false,
-            error: "A compliance run is already in progress.",
+            error: "A compliance or Michigan state-site check is already in progress.",
           };
         }
         // Acknowledge only after the initial session state is durable. The rest
@@ -171,9 +178,21 @@ export async function handleMessage(message, sender) {
 
       case "RUN_REPEAT_OFFENDER":
       case "RUN_SEARCH":
+        if (isRunInFlight()) {
+          return {
+            success: false,
+            error: "A compliance run is already in progress.",
+          };
+        }
         return handleRepeatOffenderCheck(message.data);
 
       case "RUN_TITLE_CHECK":
+        if (isRunInFlight()) {
+          return {
+            success: false,
+            error: "A compliance run is already in progress.",
+          };
+        }
         return handleTitleCheck(message.data);
 
       case "getDataStatus":

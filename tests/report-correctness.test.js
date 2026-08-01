@@ -120,6 +120,31 @@ test("combined report preserves a confirmed denial despite another unavailable c
   assert.match(html, /Title \/ Lien[\s\S]*UNAVAILABLE/);
 });
 
+test("combined OFAC pages preserve readable potential-match details", () => {
+  const results = resultFixture();
+  results.checks.ofac = {
+    passed: false,
+    matchCount: 7,
+    matches: [
+      {
+        name: "Example & Person",
+        score: 97,
+        confidence: "high",
+        sdnBirthDate: "1980",
+        type: "Individual",
+      },
+    ],
+  };
+  const html = combinedAllReportHTML(results);
+
+  assert.match(html, /Example &amp; Person/);
+  assert.match(html, /Score: 97%/);
+  assert.match(html, /DOB match/);
+  assert.match(html, /SDN DOB 1980/);
+  assert.match(html, /6 additional potential match/);
+  assert.doesNotMatch(html, /Example & Person/);
+});
+
 test("combined PDF assembly includes summary plus Repeat and Title non-success pages", async () => {
   const results = resultFixture();
   const sections = combinedPdfSections(results);

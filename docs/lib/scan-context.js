@@ -8,7 +8,7 @@
  * @returns {{ embedded: boolean, tinyPopup: boolean, constrained: boolean }}
  */
 export function classifyBrowseContext(win = {}) {
-  let embedded = false;
+  let embedded;
   try {
     embedded = Boolean(win.top && win.self && win.top !== win.self);
   } catch {

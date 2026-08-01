@@ -16,6 +16,7 @@
 
 import { handleOfacCheck } from "./ofac-check.js";
 import { handleRepeatOffenderCheck, handleTitleCheck } from "./mdos-check.js";
+import { setBadgeForStatus } from "./badge.js";
 import { atomicStateUpdate } from "./state.js";
 import { createRunId, isCurrentRunState } from "../../lib/run-fence.js";
 import {
@@ -106,7 +107,11 @@ export async function cancelCurrentRun(requestedRunId) {
       STORAGE_KEYS.titleScreenshot,
       STORAGE_KEYS.lastResult,
     ]);
-    await chrome.action.setBadgeText({ text: "" });
+    try {
+      await chrome.action.setBadgeText({ text: "" });
+    } catch (error) {
+      console.error("Could not clear the toolbar badge:", error);
+    }
   }
   return { success: true, cancelled: wasRunning };
 }
@@ -214,6 +219,25 @@ async function runAllChecks(data, runId, signal, onInitialized) {
         runId,
       });
       return { success: false, cancelled: true, runId };
+    }
+
+    // Never carry prior individual-check evidence into a new full run. Besides
+    // being stale, those duplicate image blobs can consume enough session
+    // storage to make a later Print All payload fail.
+    await chrome.storage.session.remove([
+      STORAGE_KEYS.repeatOffenderScreenshot,
+      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
+      STORAGE_KEYS.titleScreenshot,
+      STORAGE_KEYS.lastResult,
+    ]);
+
+    // Never leave a prior customer's Repeat Offender result on the toolbar
+    // while a new full run is in progress. A badge API failure must not abort
+    // the compliance checks themselves.
+    try {
+      await chrome.action.setBadgeText({ text: "" });
+    } catch (error) {
+      console.error("Could not clear the toolbar badge:", error);
     }
 
     // A side-panel tombstone can land while the storage write is pending.
@@ -530,6 +554,18 @@ async function runAllChecks(data, runId, signal, onInitialized) {
       };
     });
     if (publication.error) throw publication.error;
+    if (publication.applied) {
+      try {
+        const repeatStatus = results.checks.repeatOffender?.status;
+        if (["eligible", "ineligible"].includes(repeatStatus)) {
+          await setBadgeForStatus(repeatStatus);
+        } else {
+          await chrome.action.setBadgeText({ text: "" });
+        }
+      } catch (error) {
+        console.error("Could not update the toolbar badge:", error);
+      }
+    }
     return publication.applied
       ? { success: true, runId }
       : { success: false, cancelled: true, runId };

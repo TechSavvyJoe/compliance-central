@@ -692,4 +692,29 @@ export function setButtonsDisabled(elements, disabled) {
   elements.runOfacBtn.disabled = disabled;
   elements.runRepeatOffenderBtn.disabled = disabled;
   elements.runTitleBtn.disabled = disabled || !elements.tradeVin.value.trim();
+
+  // A completed result must always stay bound to the exact identity that was
+  // submitted. Lock every identity/vehicle control while a check is active so
+  // the visible form cannot drift away from the in-flight request. Clear stays
+  // available because it is also the user's cancellation control.
+  for (const control of [
+    elements.firstName,
+    elements.middleName,
+    elements.lastName,
+    elements.suffix,
+    elements.dob,
+    elements.dlnPid,
+    elements.tradeVin,
+    elements.hasCoBuyer,
+    elements.cbFirstName,
+    elements.cbMiddleName,
+    elements.cbLastName,
+    elements.cbSuffix,
+    elements.cbDob,
+    elements.cbDlnPid,
+    elements.scanLicenseBtn,
+    elements.inputSummaryBar,
+  ]) {
+    if (control) control.disabled = disabled;
+  }
 }

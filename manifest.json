@@ -23,7 +23,10 @@
   "content_scripts": [
     {
       "matches": ["https://dsvsesvc.sos.state.mi.us/TAP/_/*"],
-      "js": ["sos-fee-quote-content.js"],
+      "js": [
+        "lib/html2canvas.min.js",
+        "sos-fee-quote-content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -31,7 +34,7 @@
     "default_path": "sidepanel.html"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' data: blob: https://dsvsesvc.sos.state.mi.us"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' data: blob: https://dsvsesvc.sos.state.mi.us https://www.michigan.gov"
   },
   "background": {
     "service_worker": "service-worker.js",

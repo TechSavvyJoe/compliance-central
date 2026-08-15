@@ -86,7 +86,9 @@ export async function lookupVin(value, { fetchImpl = fetch } = {}) {
 }
 
 function normal(value) {
-  return clean(value, 180).toLowerCase();
+  return clean(value, 180)
+    .toLowerCase()
+    .replace(/\s*([/&-])\s*/g, "$1");
 }
 
 function findField(fields, label) {

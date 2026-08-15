@@ -197,67 +197,91 @@ body.modal-open {
   border: 1px solid var(--border-color);
 }
 
-/* SOS fee quote: a separate, session-only sales-desk aid. */
-.sos-quote-section { padding: 16px 18px; }
+/* SOS fee quote — compact sales-desk workbench. */
+.sos-quote-section {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  border-color: rgba(255, 203, 5, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 203, 5, 0.035), transparent 118px),
+    var(--bg-card);
+}
+.sos-quote-section::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--gold);
+}
 .sos-quote-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.sos-quote-heading .section-title { margin: 0; }
-.sos-quote-intro { margin: 6px 0 0; color: var(--text-muted); font-size: 0.76rem; line-height: 1.45; }
-.sos-quote-source { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border-color); border-radius: 999px; color: var(--text-muted); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; }
-.sos-quote-source.is-calculated { border-color: rgba(34, 197, 94, 0.45); background: var(--success-bg); color: #8cf0ae; }
-.sos-quote-source.is-manual { border-color: rgba(245, 158, 11, 0.45); background: var(--warning-bg); color: #ffd27d; }
-.sos-quote-mode { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 15px 0 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--border-color); }
-.sos-quote-mode legend { width: 100%; margin-bottom: 2px; color: var(--text-secondary); font-size: 0.76rem; font-weight: 700; }
-.sos-quote-mode label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; }
-.sos-quote-mode input { width: 16px; height: 16px; accent-color: var(--gold); }
-.sos-quote-status { min-height: 38px; margin: 0; padding: 9px 10px; border-radius: var(--border-radius-sm); background: var(--bg-input); color: var(--text-secondary); font-size: 0.76rem; line-height: 1.4; }
-.sos-vin-lookup { margin-top: 10px; padding: 9px 10px; border: 1px solid rgba(125, 211, 252, 0.25); border-radius: var(--border-radius-sm); background: rgba(14, 165, 233, 0.05); color: var(--text-secondary); }
-.sos-vin-lookup summary { cursor: pointer; color: #7dd3fc; font-size: 0.76rem; font-weight: 700; }
-.sos-vin-lookup p { margin: 8px 0 0; color: var(--text-muted); font-size: 0.7rem; line-height: 1.42; }
-.sos-optional, .sos-unverified { margin-left: 4px; color: var(--text-muted); font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2px; }
-.sos-unverified { color: #fbbf24; }
-.sos-vin-controls { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
-.sos-vin-controls input { min-width: 0; flex: 1 1 140px; width: auto; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.04em; text-transform: uppercase; }
-.sos-vin-controls .btn-sm { flex: 0 0 auto; }
-.sos-vin-status:not(:empty) { padding-top: 2px; }
-.sos-lien-status:not(:empty) { padding: 7px 8px; border-left: 3px solid #7dd3fc; border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0; background: rgba(14, 165, 233, 0.08); color: var(--text-secondary); }
-.sos-lien-status.is-warning { border-left-color: #fbbf24; background: rgba(245, 158, 11, 0.09); color: #fde68a; }
-.sos-lien-status.is-error { border-left-color: #f87171; background: rgba(239, 68, 68, 0.09); color: #fecaca; }
-.sos-workspace { margin-top: 12px; padding: 11px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); background: rgba(15, 23, 42, 0.16); }
-.sos-workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.sos-workspace-heading h3 { margin: 0; color: var(--text-primary); font-size: 0.82rem; }
-.sos-workspace-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: 0.69rem; line-height: 1.4; }
-.sos-workspace-heading .btn-sm { flex: 0 0 auto; white-space: nowrap; }
-.sos-workspace-status { min-height: 32px; margin: 10px 0 0; color: var(--text-secondary); font-size: 0.73rem; line-height: 1.42; }
-.sos-workspace-status.is-error { color: #fca5a5; }
-.sos-workspace-status.is-busy { color: #7dd3fc; }
-.sos-official-fields { display: grid; gap: 9px; margin-top: 9px; }
-.sos-field-section { display: grid; gap: 8px; padding-top: 9px; border-top: 1px solid rgba(148, 163, 184, 0.16); }
-.sos-field-section:first-child { padding-top: 0; border-top: 0; }
-.sos-field-section-title { margin: 0; color: #dbeafe; font-size: 0.71rem; font-weight: 700; }
-.sos-official-field { display: grid; gap: 5px; min-width: 0; }
-.sos-official-field > label, .sos-official-field legend { color: var(--text-secondary); font-size: 0.71rem; font-weight: 600; }
-.sos-official-field select, .sos-official-field input[type="text"] { width: 100%; min-width: 0; }
-.sos-official-field select:disabled, .sos-official-field input:disabled { cursor: not-allowed; opacity: 0.55; }
-.sos-official-radio { display: flex; flex-wrap: wrap; gap: 5px 8px; margin: 0; padding: 0; border: 0; }
-.sos-official-radio label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-secondary); font-size: 0.72rem; cursor: pointer; }
-.sos-official-radio input { width: 15px; height: 15px; margin: 0; accent-color: var(--gold); }
-.sos-workspace-actions { display: flex; margin-top: 11px; }
-.sos-workspace-actions .btn-sm { flex: 1; justify-content: center; }
-.sos-workspace-actions .btn-sm:disabled { opacity: 0.55; }
-.sos-quote-plate-preview { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 10px; border: 1px solid rgba(255, 203, 5, 0.28); border-radius: var(--border-radius-sm); background: rgba(255, 203, 5, 0.06); }
+.sos-quote-heading .section-title { margin: 1px 0 0; font-size: 1rem; letter-spacing: -0.01em; }
+.sos-eyebrow { color: var(--gold); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
+.sos-quote-source { flex: 0 0 auto; margin-top: 2px; padding: 4px 7px; border: 1px solid rgba(125, 211, 252, 0.3); border-radius: 5px; background: rgba(14, 165, 233, 0.07); color: #bae6fd; font-size: 0.61rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.sos-quote-source.is-calculated { border-color: rgba(34, 197, 94, 0.42); background: var(--success-bg); color: #a7f3d0; }
+.sos-quote-source.is-busy { border-color: rgba(56, 189, 248, 0.45); color: #7dd3fc; }
+.sos-quote-source.is-handoff { border-color: rgba(245, 158, 11, 0.48); background: var(--warning-bg); color: #fde68a; }
+.sos-quote-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 12px 0 9px; padding: 3px; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; background: rgba(6, 17, 31, 0.55); }
+.sos-quote-mode label { position: relative; cursor: pointer; }
+.sos-quote-mode input { position: absolute; opacity: 0; pointer-events: none; }
+.sos-quote-mode span { display: flex; justify-content: center; padding: 6px 8px; border-radius: 5px; color: var(--text-muted); font-size: 0.72rem; font-weight: 750; transition: background var(--transition-fast), color var(--transition-fast); }
+.sos-quote-mode input:checked + span { background: #f5c400; color: #0a1c30; box-shadow: 0 1px 5px rgba(0,0,0,.2); }
+.sos-vin-lookup { margin: 0 0 9px; border: 1px solid rgba(125, 211, 252, 0.18); border-radius: 7px; background: rgba(14, 165, 233, 0.045); }
+.sos-vin-lookup summary { display: flex; justify-content: space-between; padding: 7px 9px; cursor: pointer; color: #bae6fd; font-size: 0.68rem; font-weight: 750; list-style-position: inside; }
+.sos-vin-lookup[open] summary { border-bottom: 1px solid rgba(125, 211, 252, 0.13); }
+.sos-optional { color: var(--text-muted); font-size: 0.57rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.sos-vin-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; padding: 8px 8px 0; }
+.sos-vin-controls input { min-width: 0; height: 32px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #0e2640; color: var(--text-primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
+.sos-vin-note, .sos-vin-status, .sos-lien-status { margin: 6px 8px 8px; color: var(--text-muted); font-size: .63rem; line-height: 1.35; }
+.sos-vin-status:not(:empty), .sos-lien-status:not(:empty) { padding: 6px 7px; border-left: 2px solid #7dd3fc; background: rgba(14,165,233,.07); }
+.sos-lien-status.is-warning { border-left-color: #fbbf24; color: #fde68a; }
+.sos-lien-status.is-error { border-left-color: #f87171; color: #fecaca; }
+.sos-local-workbench { padding: 9px; border: 1px solid rgba(255,255,255,.075); border-radius: 8px; background: rgba(6,17,31,.3); }
+.sos-local-workbench[hidden], .sos-control[hidden] { display: none; }
+.sos-local-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 7px; }
+.sos-control { display: grid; min-width: 0; gap: 3px; margin: 0; padding: 0; border: 0; }
+.sos-control-wide { grid-column: span 1; }
+.sos-control > label, .sos-control legend { color: #cbd9e7; font-size: .61rem; font-weight: 750; letter-spacing: .025em; }
+.sos-control select, .sos-control input[type="text"] { width: 100%; min-width: 0; height: 33px; padding: 5px 7px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #102b47; color: #f8fafc; font: 650 .7rem/1.15 "Segoe UI", system-ui, sans-serif; }
+.sos-control select { padding-right: 22px; text-overflow: ellipsis; }
+.sos-control input::placeholder { color: #7891a9; }
+.sos-control select:hover, .sos-control input[type="text"]:hover { border-color: rgba(125,211,252,.38); }
+.sos-control select[aria-invalid="true"], .sos-control input[aria-invalid="true"], .sos-control[aria-invalid="true"] { border-color: #f87171; }
+.sos-control small { color: var(--text-muted); font-size: .61rem; line-height: 1.3; }
+.sos-segmented-field { grid-template-columns: 1fr 1fr; gap: 3px; }
+.sos-segmented-field legend { grid-column: 1 / -1; }
+.sos-segmented-field label { position: relative; cursor: pointer; }
+.sos-segmented-field input { position: absolute; opacity: 0; }
+.sos-segmented-field span { display: flex; justify-content: center; align-items: center; height: 33px; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; background: #102b47; color: var(--text-muted); font-size: .66rem; font-weight: 750; }
+.sos-segmented-field input:checked + span { border-color: rgba(255,203,5,.62); background: rgba(255,203,5,.12); color: #ffe173; }
+.sos-quote-plate-preview { display: grid; grid-template-columns: 124px minmax(0,1fr); align-items: center; width: 100%; gap: 7px; margin-top: 7px; padding: 4px 6px; border: 1px solid rgba(255,203,5,.26); border-radius: 7px; appearance: none; background: rgba(255,203,5,.055); color: inherit; font: inherit; text-align: left; cursor: zoom-in; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
+.sos-quote-plate-preview:hover { border-color: rgba(255,203,5,.62); background: rgba(255,203,5,.1); }
+.sos-quote-plate-preview:active { transform: translateY(1px); }
+.sos-quote-plate-preview:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .sos-quote-plate-preview[hidden] { display: none; }
-.sos-quote-plate-preview img { display: block; width: 126px; max-height: 58px; object-fit: contain; border-radius: 5px; background: #fff; }
-.sos-quote-plate-preview p { margin: 0; color: var(--text-secondary); font-size: 0.7rem; line-height: 1.4; }
-.sos-quote-actions, .sos-manual-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.sos-quote-actions .btn-sm { flex: 1 1 135px; justify-content: center; }
-.sos-manual-entry { margin-top: 12px; color: var(--text-secondary); font-size: 0.77rem; }
-.sos-manual-entry summary { cursor: pointer; color: var(--gold); font-weight: 650; }
-.sos-manual-entry p { margin: 8px 0 0; color: var(--text-muted); font-size: 0.7rem; line-height: 1.42; }
-.sos-manual-entry .form-row { margin-top: 12px; }
-.sos-manual-entry .form-group { min-width: 0; }
-.sos-manual-entry .form-group label { font-size: 0.72rem; }
-.sos-manual-entry input { width: 100%; }
-.sos-quote-privacy { margin: 12px 0 0; color: var(--text-muted); font-size: 0.7rem; line-height: 1.45; }
+.sos-plate-art { overflow: hidden; height: 56px; border-radius: 4px; background: transparent; box-shadow: 0 3px 9px rgba(0,0,0,.3); }
+.sos-quote-plate-preview img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.2); }
+.sos-quote-plate-preview strong, .sos-quote-plate-preview small { display: block; }
+.sos-quote-plate-preview strong { margin-top: 1px; color: #fff; font-size: .73rem; line-height: 1.2; }
+.sos-quote-plate-preview small { margin-top: 2px; color: var(--text-muted); font-size: .58rem; line-height: 1.3; }
+.sos-preview-kicker { color: var(--gold); font-size: .54rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.sos-timing-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 7px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.sos-purchase-date > label { color: #fff; }
+.sos-purchase-date > label span { display: block; margin-top: 1px; color: var(--gold); font-size: .52rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.sos-purchase-date input { border-color: rgba(255,203,5,.38); }
+.sos-workspace-status { min-height: 16px; margin: 8px 1px 0; color: var(--text-muted); font-size: .66rem; line-height: 1.35; }
+.sos-workspace-status.is-error { color: #fecaca; }
+.sos-workspace-status.is-busy { color: #7dd3fc; }
+.sos-handoff { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 8px; border: 1px solid rgba(245,158,11,.42); border-radius: 7px; background: rgba(245,158,11,.09); }
+.sos-handoff[hidden] { display: none; }
+.sos-handoff strong { color: #fde68a; font-size: .68rem; }
+.sos-handoff p { margin: 2px 0 0; color: #e5c98e; font-size: .61rem; line-height: 1.3; }
+.sos-handoff .btn-sm { flex: 0 0 auto; max-width: 124px; line-height: 1.2; }
+.sos-primary-actions { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; margin-top: 8px; }
+.sos-primary-actions .btn-primary { grid-column: 1 / -1; }
+.sos-primary-actions .btn-sm { min-height: 34px; justify-content: center; padding: 6px 8px; font-size: .67rem; }
+.sos-quote-status { margin: 8px 0 0; padding: 7px 8px; border-radius: 6px; background: #0e2640; color: var(--text-secondary); font-size: .64rem; line-height: 1.35; }
+.sos-quote-privacy { margin: 7px 1px 0; color: #8198ae; font-size: .57rem; line-height: 1.35; }
 
 /* "Scan license with phone" button + QR pairing modal. */
 .scan-license-btn { width: 100%; justify-content: center; }

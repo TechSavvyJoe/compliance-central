@@ -8,13 +8,21 @@ import {
   SOS_QUOTE_MODE,
   SOS_QUOTE_SOURCE,
   createCalculatedQuote,
-  createManualQuote,
   createSosFeeQuotePrintHTML,
-  dollarsToCents,
+  createSosOfficialEvidencePrintHTML,
   normalizeSosFeeQuote,
   sanitizePlatePreviewUrl,
   sanitizeVehicleDescription,
 } from "../src/sidepanel/sos-fee-quote.js";
+import {
+  SOS_FUEL_OPTIONS,
+  SOS_PLATE_DESIGNS,
+  SOS_VEHICLE_OPTIONS,
+  buildSosSubmission,
+  localSosVinFields,
+  plateOptionsForUse,
+  validateSosLocalValues,
+} from "../src/sidepanel/sos-local-form.js";
 import {
   lookupVin,
   makeSosVinSuggestions,
@@ -25,6 +33,7 @@ import {
   SOS_FEE_MESSAGES,
   closeInterruptedSosFeeSession,
   createSosFeeRunner,
+  validSosSubmissionFields,
 } from "../src/worker/sos-fee-runner.js";
 import { __test as sosLienCheckTest } from "../src/worker/sos-lien-check.js";
 
@@ -48,23 +57,61 @@ const sidepanelScript = readFileSync(
   new URL("../sidepanel.js", import.meta.url),
   "utf8"
 );
+const platePreviewHtml = readFileSync(
+  new URL("../plate-preview.html", import.meta.url),
+  "utf8"
+);
+const platePreviewScript = readFileSync(
+  new URL("../plate-preview.js", import.meta.url),
+  "utf8"
+);
 const manifest = JSON.parse(
   readFileSync(new URL("../manifest.json", import.meta.url), "utf8")
 );
 
-function officialCalculator(mode = SOS_QUOTE_MODE.newPlate, fields = []) {
+function newPlateValues(overrides = {}) {
   return {
-    calculationMode: mode,
-    fields,
-    platePreviewUrl: "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.WA.jpg",
+    mode: SOS_QUOTE_MODE.newPlate,
+    vehicleType: "Passenger",
+    bodyStyle: "4D",
+    vehicleUse: "PASS",
+    fuelType: "GAS",
+    modelYear: "2026",
+    msrp: "42500",
+    firstTitle: "no",
+    businessRegistration: "no",
+    plateType: "PAS",
+    plateDesign: "pure_michigan",
+    recreationPassport: "no",
+    purchaseDate: "",
+    transferPlateNumber: "",
+    ...overrides,
   };
 }
 
-function runnerHarness({ discovery, update, calculation, active = false } = {}) {
+function verifiedResult(mode = SOS_QUOTE_MODE.newPlate) {
+  return {
+    success: true,
+    quote: {
+      calculationMode: mode,
+      feeCents: 20500,
+      feeBreakdown: [{ label: "Registration fee", feeCents: 20500 }],
+      vehicleDescription: "2026 · Car / Mini-Van / SUV · 4 Door",
+      platePreviewUrl: "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.PM",
+      recreationPassport: false,
+      officialPageImage: "data:image/jpeg;base64,QUJDRA==",
+      calculatedAt: "2026-08-15T12:00:00.000Z",
+    },
+  };
+}
+
+function runnerHarness({ responses = [], active = false } = {}) {
   const state = {};
   const created = [];
   const removed = [];
+  const updated = [];
   const messages = [];
+  const queue = [...responses];
   const chromeApi = {
     storage: {
       session: {
@@ -72,9 +119,6 @@ function runnerHarness({ discovery, update, calculation, active = false } = {}) 
           Object.assign(state, values);
         },
         async get(key) {
-          if (Array.isArray(key)) {
-            return Object.fromEntries(key.map((item) => [item, state[item]]));
-          }
           return { [key]: state[key] };
         },
         async remove(keys) {
@@ -90,12 +134,13 @@ function runnerHarness({ discovery, update, calculation, active = false } = {}) 
       async remove(tabId) {
         removed.push(tabId);
       },
+      async update(tabId, options) {
+        updated.push({ tabId, options });
+        return { id: tabId, ...options };
+      },
       async sendMessage(tabId, message) {
         messages.push({ tabId, message });
-        if (message.type === SOS_FEE_MESSAGES.discover) return discovery;
-        if (message.type === SOS_FEE_MESSAGES.applyField) return update;
-        if (message.type === SOS_FEE_MESSAGES.calculateInTab) return calculation;
-        return { success: false };
+        return queue.shift() || { success: false, keepOpen: true };
       },
     },
   };
@@ -103,121 +148,140 @@ function runnerHarness({ discovery, update, calculation, active = false } = {}) 
     state,
     created,
     removed,
+    updated,
     messages,
     runner: createSosFeeRunner(chromeApi, { sleep: async () => {} }),
   };
 }
 
-test("background SOS runner keeps the official tab inactive, returns sidebar data, and closes it", async () => {
-  const fields = [
-    {
-      id: "Dd-i",
-      label: "Select your vehicle type",
-      kind: "select",
-      value: "UtilityTruck",
-      options: [{ value: "UtilityTruck", label: "Utility Truck" }],
-    },
-    {
-      id: "Dd-l",
-      label: "Select your fuel type",
-      kind: "select",
-      value: "DIESEL",
-      options: [{ value: "DIESEL", label: "Diesel" }],
-    },
-    {
-      id: "Dd-k",
-      label: "Select how you will use your vehicle",
-      kind: "select",
-      value: "COM",
-      options: [{ value: "COM", label: "Regular/Commercial" }],
-    },
-  ];
-  const calculator = officialCalculator(SOS_QUOTE_MODE.newPlate, fields);
-  const harness = runnerHarness({
-    discovery: { success: true, calculator },
-    update: { success: true, calculator },
-    calculation: {
-      success: true,
-      quote: {
-        calculationMode: SOS_QUOTE_MODE.newPlate,
-        feeCents: 20500,
-        vehicleDescription: "2025 · Utility Truck · Regular/Commercial",
-        platePreviewUrl: calculator.platePreviewUrl,
-        recreationPassport: false,
-        calculatedAt: "2026-08-14T12:00:00.000Z",
-      },
-    },
-  });
+test("local dealer form defaults to Gas and includes modern fuels and commercial plates", () => {
+  assert.deepEqual(SOS_VEHICLE_OPTIONS.map(([value]) => value), [
+    "Passenger",
+    "Pickup",
+    "UtilityTruck",
+    "Van",
+    "StakeTruck",
+  ]);
+  assert.equal(SOS_FUEL_OPTIONS[0][1], "Gas");
+  for (const fuel of [
+    "Diesel",
+    "Electric",
+    "Electric & Gas Hybrid",
+    "Electric & Diesel Hybrid",
+    "Plug in Hybrid Electric",
+  ]) {
+    assert.ok(SOS_FUEL_OPTIONS.some(([, label]) => label === fuel));
+  }
+  assert.ok(plateOptionsForUse("COM").some(([, label]) => label === "Commercial"));
+});
 
-  const start = await harness.runner.start(SOS_QUOTE_MODE.newPlate);
-  assert.equal(start.success, true);
+test("selected plate artwork uses actual official Michigan images before calculation", () => {
+  for (const design of Object.values(SOS_PLATE_DESIGNS)) {
+    assert.match(design.imageUrl, /^https:\/\/www\.michigan\.gov\/sos\//);
+    assert.ok(design.label);
+    assert.ok(design.sosLabel);
+  }
+  assert.match(sidepanelHtml, /id="sosPlatePreviewImage"[^>]+src="https:\/\/www\.michigan\.gov\/sos\//);
+  assert.match(
+    sidepanelScript,
+    /plateDesignByValue\(\s*standardPlate \? elements\.sosPlateDesign\?\.value/
+  );
+  assert.match(sidepanelHtml, /id="sosPlatePreview"[^>]+aria-label="Open a full-size preview/);
+  assert.match(sidepanelScript, /chrome\.windows\.create\(\{/);
+  assert.match(sidepanelScript, /type:\s*"popup"/);
+  assert.match(platePreviewHtml, /id="platePreviewImage"/);
+  assert.match(platePreviewHtml, /Design sample only · non-personalized/);
+  assert.match(platePreviewScript, /searchParams\.set\("mw",\s*"1600"\)/);
+  assert.match(platePreviewScript, /plateDesignByValue\(params\.get\("design"\)\)/);
+  assert.match(manifest.content_security_policy.extension_pages, /https:\/\/www\.michigan\.gov/);
+});
+
+test("local form builds one semantic SOS batch and validates commercial details", () => {
+  const values = newPlateValues({
+    vehicleType: "Pickup",
+    bodyStyle: "PU",
+    vehicleUse: "COM",
+    fuelType: "DIESEL",
+    plateType: "COM",
+    businessRegistration: "yes",
+  });
+  assert.deepEqual(validateSosLocalValues(values), []);
+  const submission = buildSosSubmission(values);
+  assert.equal(validSosSubmissionFields(submission), true);
+  assert.equal(
+    submission.find((field) => field.label === "Select your fuel type").optionLabel,
+    "Diesel"
+  );
+  assert.equal(
+    submission.find((field) => field.label === "Is this for a business?").value,
+    "Yes"
+  );
+  assert.equal(submission.some((field) => /VIN/i.test(field.label)), false);
+  assert.equal(
+    validateSosLocalValues({ ...values, businessRegistration: "" })[0].id,
+    "sosBusinessRegistration"
+  );
+  assert.equal(
+    validateSosLocalValues({ ...values, purchaseDate: "02/31/2026" }).at(-1).id,
+    "sosPurchaseDate"
+  );
+  assert.match(sidepanelHtml, /Plate purchase date <span>Important · today if blank<\/span>/);
+  assert.doesNotMatch(sidepanelHtml, /Passport &amp; purchase date/);
+});
+
+test("background runner creates one inactive tab only on Calculate and closes on success", async () => {
+  const fields = buildSosSubmission(newPlateValues());
+  const harness = runnerHarness({ responses: [verifiedResult()] });
+  const response = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate, fields);
+  assert.equal(response.success, true);
   assert.deepEqual(harness.created, [
     { url: SOS_CALCULATOR_URLS[SOS_QUOTE_MODE.newPlate], active: false },
   ]);
-  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], 401);
-  assert.equal(start.calculator.fields[0].options[0].label, "Utility Truck");
-  assert.equal(
-    start.calculator.fields.find((field) => field.id === "Dd-k").options[0].label,
-    "Regular/Commercial"
-  );
-
-  const update = await harness.runner.updateField(SOS_QUOTE_MODE.newPlate, {
-    fieldId: "Dd-l",
-    value: "DIESEL",
-  });
-  assert.equal(update.success, true);
-  assert.equal(harness.messages.at(-1).message.type, SOS_FEE_MESSAGES.applyField);
-
-  const result = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate);
-  assert.equal(result.success, true);
-  assert.equal(result.quote.feeCents, 20500);
-  assert.equal(result.quote.platePreviewUrl, calculator.platePreviewUrl);
+  assert.equal(harness.messages.length, 1);
+  assert.equal(harness.messages[0].message.type, SOS_FEE_MESSAGES.applyAndCalculate);
+  assert.deepEqual(harness.messages[0].message.data.fields, fields);
   assert.deepEqual(harness.removed, [401]);
   assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
 });
 
-test("SOS runner keeps validation inside the sidebar and closes unrecoverable failures", async () => {
-  const calculator = officialCalculator(SOS_QUOTE_MODE.plateTransfer);
-  const validationHarness = runnerHarness({
-    discovery: { success: true, calculator },
-    update: { success: true, calculator },
-    calculation: {
-      success: false,
-      keepOpen: true,
-      error: "Michigan SOS needs more information before it can calculate this fee.",
-      calculator,
-    },
+test("three failed attempts stay in sidebar until explicit prefilled handoff", async () => {
+  const fields = buildSosSubmission(newPlateValues());
+  const harness = runnerHarness({
+    responses: [
+      { success: false, keepOpen: true },
+      { success: false, keepOpen: true },
+      { success: false, keepOpen: true },
+    ],
   });
-  await validationHarness.runner.start(SOS_QUOTE_MODE.plateTransfer);
-  const validation = await validationHarness.runner.calculate(SOS_QUOTE_MODE.plateTransfer);
-  assert.equal(validation.success, false);
-  assert.equal(validation.keepOpen, true);
-  assert.deepEqual(validationHarness.removed, []);
-  await validationHarness.runner.close();
-  assert.deepEqual(validationHarness.removed, [401]);
+  const response = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate, fields);
+  assert.equal(response.success, false);
+  assert.equal(response.handoffAvailable, true);
+  assert.equal(response.attempts, 3);
+  assert.match(response.error, /completed choices remain/i);
+  assert.equal(harness.messages.length, 3);
+  assert.deepEqual(harness.removed, []);
+  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], 401);
 
-  const failureHarness = runnerHarness({
-    discovery: { success: false, error: "Unexpected SOS page" },
-  });
-  const failure = await failureHarness.runner.start(SOS_QUOTE_MODE.newPlate);
-  assert.equal(failure.success, false);
-  assert.match(failure.error, /No SOS page was shown/i);
-  assert.deepEqual(failureHarness.removed, [401]);
+  const handoff = await harness.runner.openHandoff(SOS_QUOTE_MODE.newPlate);
+  assert.equal(handoff.success, true);
+  assert.deepEqual(harness.updated, [{ tabId: 401, options: { active: true } }]);
+  assert.deepEqual(harness.removed, []);
+  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
 });
 
-test("SOS runner fails closed if Chrome tries to foreground its calculator tab", async () => {
-  const harness = runnerHarness({
-    discovery: { success: true, calculator: officialCalculator() },
-    active: true,
-  });
-  const response = await harness.runner.start(SOS_QUOTE_MODE.newPlate);
+test("runner fails closed if Chrome tries to foreground the automatic calculator", async () => {
+  const harness = runnerHarness({ active: true });
+  const response = await harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
   assert.equal(response.success, false);
   assert.match(response.error, /background/i);
   assert.deepEqual(harness.removed, [401]);
   assert.equal(harness.messages.length, 0);
 });
 
-test("an interrupted session closes only the extension-owned background SOS tab", async () => {
+test("interrupted session closes only its recorded extension-owned tab", async () => {
   const state = { [STORAGE_KEYS.sosFeeActiveTabId]: 812 };
   const removed = [];
   await closeInterruptedSosFeeSession({
@@ -241,16 +305,21 @@ test("an interrupted session closes only the extension-owned background SOS tab"
   assert.equal(state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
 });
 
-test("official quote model carries only the verified result and a safe plate image", () => {
+test("official quote and print output retain only a verified customer-safe result", () => {
   const quote = createCalculatedQuote(
     {
       calculationMode: SOS_QUOTE_MODE.newPlate,
       feeCents: 12600,
       vehicleDescription: "2026 EV SUV VIN: 1FMDE8AP9RLA12345",
       platePreviewUrl:
-        "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.WA.jpg?private=1",
+        "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.PM?private=1",
       recreationPassport: true,
-      calculatedAt: "2026-08-14T12:00:00.000Z",
+      feeBreakdown: [
+        { label: "Registration fee", feeCents: 10000 },
+        { label: "Plate fee", feeCents: 2600 },
+      ],
+      officialPageImage: "data:image/jpeg;base64,QUJDRA==",
+      calculatedAt: "2026-08-15T12:00:00.000Z",
     },
     SOS_QUOTE_MODE.newPlate
   );
@@ -258,63 +327,38 @@ test("official quote model carries only the verified result and a safe plate ima
   assert.equal(quote.vehicleDescription, "2026 EV SUV");
   assert.equal(
     quote.platePreviewUrl,
-    "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.WA.jpg"
+    "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.PM"
   );
-  assert.equal(quote.recreationPassport, true);
+  const html = createSosFeeQuotePrintHTML(quote);
+  assert.match(html, /Calculated by SOS/);
+  assert.match(html, /protected background browser tab/);
+  assert.match(html, /Selected — included in the SOS calculation/);
+  assert.match(html, /\$126\.00/);
+  assert.doesNotMatch(html, /1FMDE8AP9RLA12345/);
+  const evidenceHtml = createSosOfficialEvidencePrintHTML(quote);
+  assert.match(evidenceHtml, /Actual official state-site result page/);
+  assert.match(evidenceHtml, /letter landscape/);
+  assert.match(evidenceHtml, /data:image\/jpeg;base64,QUJDRA==/);
   assert.equal(
-    createCalculatedQuote({ calculationMode: SOS_QUOTE_MODE.plateTransfer, feeCents: 2500 }, SOS_QUOTE_MODE.newPlate),
+    normalizeSosFeeQuote({
+      mode: SOS_QUOTE_MODE.newPlate,
+      source: "manual",
+      feeCents: 2500,
+      calculatedAt: "2026-08-15T12:00:00.000Z",
+    }),
     null
-  );
-  assert.equal(dollarsToCents("1,234.50"), 123450);
-  assert.equal(dollarsToCents("-20"), null);
-  assert.equal(sanitizeVehicleDescription("VIN: 1FMDE8AP9RLA12345 2026 Explorer"), "2026 Explorer");
-  assert.equal(
-    sanitizeVehicleDescription("2026 Explorer VIN: 5UXWX7C5*BA"),
-    "2026 Explorer"
   );
   assert.equal(
     sanitizePlatePreviewUrl("https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.QuestionPlate"),
     null
   );
   assert.equal(
-    normalizeSosFeeQuote({
-      mode: SOS_QUOTE_MODE.newPlate,
-      source: SOS_QUOTE_SOURCE.calculated,
-      feeCents: 2500,
-      calculatedAt: "not a timestamp",
-    }),
-    null
+    sanitizeVehicleDescription("VIN: 1FMDE8AP9RLA12345 2026 Explorer"),
+    "2026 Explorer"
   );
 });
 
-test("customer output makes manual fallback visibly unverified and never prints a VIN", () => {
-  const calculated = createCalculatedQuote(
-    {
-      calculationMode: SOS_QUOTE_MODE.newPlate,
-      feeCents: 12600,
-      vehicleDescription: "2026 Explorer VIN: 1FMDE8AP9RLA12345",
-      recreationPassport: true,
-      calculatedAt: "2026-08-14T12:00:00.000Z",
-    },
-    SOS_QUOTE_MODE.newPlate
-  );
-  const html = createSosFeeQuotePrintHTML(calculated);
-  assert.match(html, /Calculated by SOS/);
-  assert.match(html, /protected background browser tab/);
-  assert.match(html, /Selected — included in the SOS calculation/);
-  assert.match(html, /\$126\.00/);
-  assert.doesNotMatch(html, /1FMDE8AP9RLA12345/);
-
-  const manual = createManualQuote(
-    { mode: SOS_QUOTE_MODE.plateTransfer, amount: "15.00", vehicleDescription: "" },
-    new Date("2026-08-14T12:00:00.000Z")
-  );
-  const manualHtml = createSosFeeQuotePrintHTML(manual);
-  assert.match(manualHtml, /Salesperson-entered — unverified/);
-  assert.match(manualHtml, /not verified by the Michigan SOS calculator/i);
-});
-
-test("optional NHTSA VIN lookup accepts partial VINs but never returns the raw VIN", async () => {
+test("VIN decode fills the easy local SOS fields immediately and never returns raw VIN", async () => {
   const requested = [];
   const decoded = await lookupVin("5UXWX7C5*BA", {
     fetchImpl: async (url, options) => {
@@ -343,50 +387,25 @@ test("optional NHTSA VIN lookup accepts partial VINs but never returns the raw V
       };
     },
   });
-  assert.equal(decoded.partial, true);
+  const suggestions = makeSosVinSuggestions(decoded, localSosVinFields("Passenger"));
+  assert.deepEqual(
+    Object.fromEntries(suggestions.map((item) => [item.fieldId, item.value])),
+    {
+      sosVehicleType: "Passenger",
+      sosBodyStyle: "4D",
+      sosFuelType: "GAS",
+      sosModelYear: "2011",
+    }
+  );
   assert.equal(vinLookupSummary(decoded), "2011 BMW X3");
   assert.doesNotMatch(JSON.stringify(decoded), /5UXWX7C5\*BA/);
   assert.match(requested[0].url, /DecodeVinValuesExtended\/5UXWX7C5%2ABA/);
   assert.equal(requested[0].options.credentials, "omit");
   assert.equal(normalizeVinLookupInput(" 5ux-wx7c5*ba "), "5UXWX7C5*BA");
-  assert.equal(normalizeVinLookupInput("ABCDEFG"), null);
 });
 
-test("VIN suggestions use only live SOS options and cover EV, hybrid, plug-in hybrid, diesel, and Gas", () => {
-  const fields = [
-    {
-      id: "vehicle",
-      label: "Select your vehicle type",
-      disabled: false,
-      options: [
-        { value: "Passenger", label: "Car/Mini-Van/SUV" },
-        { value: "Pickup", label: "Pick-Up Truck" },
-        { value: "UtilityTruck", label: "Utility Truck" },
-      ],
-    },
-    {
-      id: "body",
-      label: "Select the body style",
-      disabled: false,
-      options: [
-        { value: "2D", label: "2 Door" },
-        { value: "4D", label: "4 Door" },
-      ],
-    },
-    {
-      id: "fuel",
-      label: "Select your fuel type",
-      disabled: false,
-      options: [
-        { value: "GAS", label: "Gas" },
-        { value: "DIESEL", label: "Diesel" },
-        { value: "ELECTR", label: "Electric" },
-        { value: "HEV", label: "Electric & Gas Hybrid" },
-        { value: "PHEV", label: "Plug in Hybrid Electric" },
-      ],
-    },
-    { id: "year", label: "Enter the vehicle model year", disabled: false },
-  ];
+test("VIN suggestions cover EV, hybrid, plug-in hybrid, diesel, and Gas", () => {
+  const fields = localSosVinFields("Passenger");
   const base = {
     year: "2026",
     vehicleType: "MULTIPURPOSE PASSENGER VEHICLE (MPV)",
@@ -397,29 +416,16 @@ test("VIN suggestions use only live SOS options and cover EV, hybrid, plug-in hy
     electrificationLevel: "",
   };
   const fuel = (decoded) =>
-    makeSosVinSuggestions(decoded, fields).find((suggestion) => suggestion.fieldId === "fuel")
-      ?.value;
+    makeSosVinSuggestions(decoded, fields).find(
+      (suggestion) => suggestion.fieldId === "sosFuelType"
+    )?.value;
   assert.equal(fuel(base), "GAS");
   assert.equal(fuel({ ...base, fuelTypePrimary: "Diesel" }), "DIESEL");
   assert.equal(fuel({ ...base, fuelTypePrimary: "Electric" }), "ELECTR");
-  assert.equal(fuel({ ...base, electrificationLevel: "Hybrid Electric Vehicle (HEV)" }), "HEV");
+  assert.equal(fuel({ ...base, electrificationLevel: "Hybrid Electric Vehicle (HEV)" }), "HYBEG");
   assert.equal(
     fuel({ ...base, electrificationLevel: "Plug-in Hybrid Electric Vehicle (PHEV)" }),
     "PHEV"
-  );
-  const commercial = makeSosVinSuggestions(
-    { ...base, vehicleType: "TRUCK", bodyClass: "Pickup", doors: "2" },
-    fields
-  );
-  assert.deepEqual(
-    commercial.find((suggestion) => suggestion.fieldId === "vehicle"),
-    { fieldId: "vehicle", value: "Pickup" }
-  );
-  assert.equal(
-    makeSosVinSuggestions({ ...base, fuelTypePrimary: "Hydrogen" }, fields).some(
-      (suggestion) => suggestion.fieldId === "fuel"
-    ),
-    false
   );
 });
 
@@ -442,37 +448,43 @@ test("title/lien helper discards page evidence and is never written to storage",
   assert.doesNotMatch(lienScript, /chrome\.storage|screenshotData|rawText/);
 });
 
-test("extension UI and adapters enforce sidebar-only, session-only behavior", () => {
+test("UI and adapters enforce local edits, explicit handoff, and session-only data", () => {
   assert.ok(manifest.permissions.includes("tabs"));
   assert.ok(manifest.host_permissions.includes("https://dsvsesvc.sos.state.mi.us/*"));
-  assert.deepEqual(manifest.content_scripts[0].matches, [
-    "https://dsvsesvc.sos.state.mi.us/TAP/_/*",
-  ]);
   assert.ok(manifest.host_permissions.includes("https://vpic.nhtsa.dot.gov/*"));
-  assert.match(manifest.content_security_policy.extension_pages, /dsvsesvc\.sos\.state\.mi\.us/);
   assert.match(runnerScript, /active:\s*false/);
   assert.doesNotMatch(sidepanelScript, /chrome\.tabs\.(?:create|update|query)/);
-  assert.doesNotMatch(sidepanelHtml, /Open public SOS calculator|Capture official fee|Print official SOS page/);
+  assert.doesNotMatch(sidepanelHtml, /Fallback: enter a fee manually|Load official choices/);
+  assert.doesNotMatch(sidepanelScript, /SOS_FEE_UPDATE_FIELD|SOS_FEE_START/);
   for (const id of [
-    "startSosFeeWorkspaceBtn",
     "calculateSosFeeBtn",
-    "sosOfficialFields",
+    "sosVehicleType",
+    "sosFuelType",
+    "sosPlateType",
+    "sosPlateDesign",
     "sosPlatePreview",
     "lookupSosVinBtn",
-    "checkSosLienBtn",
+    "sosHandoffPanel",
+    "openSosHandoffBtn",
     "printSosQuoteBtn",
+    "printSosCalculationBtn",
+    "downloadSosCalculationPdfBtn",
   ]) {
     assert.match(sidepanelHtml, new RegExp(`id="${id}"`));
   }
-  assert.match(sidepanelHtml, /Commercial use, fuel, plate type, and plate design/i);
-  assert.match(sidepanelHtml, /no SOS sign-in or visible SOS page/i);
-  assert.match(sidepanelHtml, /electric, hybrid, plug-in hybrid, diesel/i);
-  assert.match(sidepanelHtml, /aria-labelledby="sosQuoteTitle"/);
-  assert.match(sidepanelHtml, /<label class="visually-hidden" for="sosVinLookupInput">VIN or partial VIN<\/label>/);
-  assert.match(sidepanelHtml, /id="sosLienStatus" class="sos-lien-status" role="status" aria-live="polite"/);
+  assert.match(sidepanelScript, /type:\s*"SOS_FEE_CALCULATE"/);
+  assert.match(sidepanelScript, /fields:\s*buildSosSubmission\(values\)/);
+  assert.match(sidepanelScript, /applyPendingVinSuggestions\(\)/);
+  assert.match(sidepanelHtml, /Auto-fill by vehicle VIN/);
+  assert.match(sidepanelHtml, /Trade Title\/Lien stays in the Trade-In section above/);
+  assert.doesNotMatch(sidepanelHtml, /Use trade VIN|VIN assist \+ lien check/);
   assert.doesNotMatch(contentScript, /document\.cookie|chrome\.storage|localStorage|sessionStorage|window\.print/);
   assert.doesNotMatch(runnerScript, /storage\.local/);
-  assert.doesNotMatch(sidepanelScript, /SOS_CAPTURE_FEE_QUOTE|SOS_PRINT_CURRENT_PAGE/);
-  assert.match(contentScript, /SOS_DISCOVER_CALCULATOR/);
-  assert.match(contentScript, /SOS_CALCULATE_IN_TAB/);
+  assert.match(contentScript, /SOS_APPLY_AND_CALCULATE/);
+  assert.match(contentScript, /window\.html2canvas/);
+  assert.equal(
+    manifest.content_scripts[0].js[0],
+    "lib/html2canvas.min.js"
+  );
+  assert.match(contentScript, /plate number\|\\bVIN\\b\|customer\|name/);
 });

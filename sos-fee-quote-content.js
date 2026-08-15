@@ -10,7 +10,7 @@
 (() => {
   const MAX_FEE_CENTS = 9_999_999;
   const SETTLE_DELAY_MS = 450;
-  const RESULT_TIMEOUT_MS = 15_000;
+  const RESULT_TIMEOUT_MS = 10_000;
   const CALCULATION_MODE = Object.freeze({
     newPlate: "new_plate",
     plateTransfer: "plate_transfer",
@@ -124,12 +124,18 @@
         }
 
         if (element.type === "text") {
+          const label = labelFor(element);
           return {
             id: element.id || element.name,
-            label: labelFor(element),
+            label,
             section: sectionFor(element),
             kind: "text",
-            value: String(element.value || ""),
+            // Never echo a plate number, VIN, or identity value back across
+            // the extension message boundary. It may remain in the page DOM
+            // only long enough for calculation or explicit handoff.
+            value: /plate number|\bVIN\b|customer|name/i.test(label)
+              ? ""
+              : String(element.value || ""),
             disabled: Boolean(element.disabled || element.readOnly),
             required:
               element.required ||
@@ -279,18 +285,21 @@
       .filter((cells) => cells.some(Boolean));
     if (!rows.length) return null;
 
-    const amounts = rows.map((cells) => {
+    const breakdown = rows.map((cells) => {
       if (cells.length !== 2 || !/\b(?:fee|registration|plate)\b/i.test(cells[0])) {
         return null;
       }
-      return cents(cells[1]);
+      const feeCents = cents(cells[1]);
+      return feeCents == null
+        ? null
+        : { label: cells[0].slice(0, 80), feeCents };
     });
-    if (amounts.some((amount) => amount == null)) return null;
+    if (breakdown.some((row) => row == null) || breakdown.length > 12) return null;
 
     const totalCells = [...candidates[0].querySelectorAll("tfoot .TableTotalsRow td")];
     const total = cents(text(totalCells.at(-1)));
-    return total != null && amounts.reduce((sum, amount) => sum + amount, 0) === total
-      ? total
+    return total != null && breakdown.reduce((sum, row) => sum + row.feeCents, 0) === total
+      ? { feeCents: total, feeBreakdown: breakdown }
       : null;
   }
 
@@ -381,14 +390,138 @@
     return { success: true, calculator };
   }
 
+  function normalized(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function submissionField(data) {
+    const expectedLabel = normalized(data?.label);
+    const labelIncludes = normalized(data?.labelIncludes);
+    return dynamicFields().find((candidate) => {
+      const candidateLabel = normalized(candidate.label);
+      return labelIncludes
+        ? candidateLabel.includes(labelIncludes)
+        : candidateLabel === expectedLabel;
+    });
+  }
+
+  function optionForSubmission(field, data) {
+    const expectedValue = String(data?.optionValue || "");
+    const expectedLabel = normalized(data?.optionLabel);
+    return field.options?.find((option) => {
+      if (expectedValue && option.value === expectedValue) return true;
+      return expectedLabel && normalized(option.label) === expectedLabel;
+    });
+  }
+
+  async function applySubmissionField(data) {
+    const field = submissionField(data);
+    if (!field) {
+      return data?.optional
+        ? { success: true, skipped: true }
+        : { success: false, error: `Michigan SOS no longer shows “${String(data?.label || "this field").slice(0, 80)}”.` };
+    }
+    if (field.disabled) {
+      return { success: false, error: `Michigan SOS has not enabled “${field.label}”.` };
+    }
+
+    let value = String(data?.value || "");
+    if (field.kind === "select") {
+      const option = optionForSubmission(field, data);
+      if (!option) {
+        return { success: false, error: `The selected “${field.label}” option is not available on Michigan SOS.` };
+      }
+      value = option.value;
+    } else if (field.kind === "radio") {
+      const expected = normalized(value);
+      const option = field.options?.find(
+        (candidate) =>
+          normalized(candidate.label) === expected || normalized(candidate.value) === expected
+      );
+      if (!option) {
+        return { success: false, error: `Michigan SOS did not offer the expected “${field.label}” choice.` };
+      }
+      value = option.value;
+    }
+
+    const result = await applyField({ fieldId: field.id, value });
+    return result?.success
+      ? { success: true }
+      : { success: false, error: result?.error || `Michigan SOS could not apply “${field.label}”.` };
+  }
+
+  async function applyAndCalculate(data) {
+    const mode = calculatorMode();
+    if (mode !== data?.mode || !Array.isArray(data?.fields) || !data.fields.length) {
+      return { success: false, error: "Michigan SOS did not open the requested calculator." };
+    }
+    for (const field of data.fields) {
+      const result = await applySubmissionField(field);
+      if (!result.success) {
+        return {
+          success: false,
+          keepOpen: true,
+          error: result.error,
+          calculator: calculatorSnapshot(),
+        };
+      }
+    }
+    return calculateFee();
+  }
+
   function visibleCalculateButton() {
     return [...document.querySelectorAll("button")]
       .filter(isVisible)
       .find((button) => /^Calculate Fees$/i.test(text(button)) && !button.disabled);
   }
 
+  async function captureOfficialResultPage() {
+    if (typeof window.html2canvas !== "function") return null;
+    const root = document.querySelector("main") || currentForm();
+    if (!root) return null;
+    try {
+      const width = Math.max(root.scrollWidth, root.clientWidth, 720);
+      const height = Math.max(root.scrollHeight, root.clientHeight, 480);
+      const scale = Math.min(1.5, Math.sqrt(8_000_000 / (width * height)));
+      const canvas = await window.html2canvas(root, {
+        backgroundColor: "#ffffff",
+        logging: false,
+        scale: Math.max(1, scale),
+        useCORS: true,
+        windowWidth: width,
+        windowHeight: height,
+      });
+      const image = canvas.toDataURL("image/jpeg", 0.9);
+      return /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(image) && image.length <= 8_000_000
+        ? image
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function verifiedQuoteResult(mode, fee) {
+    return {
+      success: true,
+      quote: {
+        calculationMode: mode,
+        feeCents: fee.feeCents,
+        feeBreakdown: fee.feeBreakdown,
+        vehicleDescription: safeVehicleDescription(mode),
+        platePreviewUrl: safePlatePreviewUrl(mode),
+        recreationPassport: recreationPassportSelected(),
+        officialPageImage: await captureOfficialResultPage(),
+        calculatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
   async function calculateFee() {
     const mode = calculatorMode();
+    const existingFee = feeTable();
+    if (mode && existingFee != null) {
+      return verifiedQuoteResult(mode, existingFee);
+    }
     const button = visibleCalculateButton();
     if (!mode || !button) {
       return {
@@ -402,19 +535,9 @@
     const deadline = Date.now() + RESULT_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await settleCalculator();
-      const feeCents = feeTable();
-      if (feeCents != null) {
-        return {
-          success: true,
-          quote: {
-            calculationMode: mode,
-            feeCents,
-            vehicleDescription: safeVehicleDescription(mode),
-            platePreviewUrl: safePlatePreviewUrl(mode),
-            recreationPassport: recreationPassportSelected(),
-            calculatedAt: new Date().toISOString(),
-          },
-        };
+      const fee = feeTable();
+      if (fee != null) {
+        return verifiedQuoteResult(mode, fee);
       }
       if (hasVisibleValidationMessage()) {
         return {
@@ -433,36 +556,25 @@
     };
   }
 
-  function discoverCalculator() {
-    const calculator = calculatorSnapshot();
-    if (!calculator) {
-      return {
-        success: false,
-        error: "Michigan SOS did not load a recognized public fee calculator.",
-      };
-    }
-    return { success: true, calculator };
-  }
-
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     let task = null;
-    if (message?.type === "SOS_DISCOVER_CALCULATOR") {
-      task = Promise.resolve(discoverCalculator());
-    } else if (message?.type === "SOS_APPLY_CALCULATOR_FIELD") {
-      task = applyField(message.data);
+    if (message?.type === "SOS_APPLY_AND_CALCULATE") {
+      task = applyAndCalculate(message.data);
     } else if (message?.type === "SOS_CALCULATE_IN_TAB") {
       task = calculateFee();
     }
     if (!task) return;
 
-    task
-      .then(sendResponse)
-      .catch(() =>
+    (async () => {
+      try {
+        sendResponse(await task);
+      } catch {
         sendResponse({
           success: false,
           error: "Michigan SOS could not complete the calculator request.",
-        })
-      );
+        });
+      }
+    })();
     return true;
   });
 })();

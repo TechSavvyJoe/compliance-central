@@ -2088,6 +2088,66 @@ export function finalDecisionSection(currentResults) {
 
 // ---------- Public downloaders ----------
 
+/** Download the actual captured SOS result page as one readable letter page. */
+export async function downloadSosOfficialEvidencePDF(quote) {
+  const image = ensureDataUrl(quote?.officialPageImage);
+  if (!image) {
+    showToast("The official SOS page capture is unavailable. Calculate again.", "info");
+    return false;
+  }
+  let ctx;
+  try {
+    ctx = await createPdfContext("landscape");
+  } catch (err) {
+    console.error("jsPDF load error:", err);
+    showToast("Could not load the PDF library. Try Print SOS instead.", "error");
+    return false;
+  }
+
+  const { doc, pageWidth, pageHeight } = ctx;
+  const margin = 24;
+  doc.setTextColor(...PALETTE.navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("Michigan SOS Registration Fee Calculation", margin, 28);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...PALETTE.muted);
+  doc.text(
+    "Actual official state-site result page captured during the calculation",
+    margin,
+    39
+  );
+  doc.setDrawColor(...PALETTE.navy);
+  doc.setLineWidth(2);
+  doc.line(margin, 46, pageWidth - margin, 46);
+
+  const props = doc.getImageProperties(image);
+  const availableWidth = pageWidth - margin * 2;
+  const availableHeight = pageHeight - 78;
+  const ratio = Math.min(
+    availableWidth / props.width,
+    availableHeight / props.height
+  );
+  const width = props.width * ratio;
+  const height = props.height * ratio;
+  const x = (pageWidth - width) / 2;
+  const y = 52 + (availableHeight - height) / 2;
+  doc.addImage(image, imageDataUrlExtension(image), x, y, width, height);
+
+  doc.setFontSize(7);
+  doc.setTextColor(...PALETTE.muted);
+  doc.text("Source: dsvsesvc.sos.state.mi.us", margin, pageHeight - 10);
+  doc.text(
+    "Verify before final paperwork",
+    pageWidth - margin,
+    pageHeight - 10,
+    { align: "right" }
+  );
+  doc.save(`Michigan_SOS_Fee_Calculation_${Date.now()}.pdf`);
+  return true;
+}
+
 export async function downloadOfacReportPDF(currentResults) {
   if (!currentResults?.checks?.ofac) {
     showToast("No OFAC results to download.", "info");

@@ -18,6 +18,7 @@ zip -r -X "$OUT" \
   service-worker.js \
   sos-fee-quote-content.js \
   sidepanel.html sidepanel.js sidepanel.css \
+  plate-preview.html plate-preview.js plate-preview.css \
   print-runner.html print-runner.js \
   src lib ofac \
   icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png \

@@ -1,11 +1,10 @@
 /**
  * Public Michigan SOS fee-calculator runner.
  *
- * The calculator is always opened as an inactive, extension-owned tab. The
- * side panel receives only the official calculator schema, an approved plate
- * design URL, and a verified final fee. The tab is closed after calculation,
- * on cancellation, or when the worker restarts; it is never shown to the
- * salesperson or customer.
+ * Sidebar edits are entirely local. Only an explicit Calculate action creates
+ * an inactive tab and sends one bounded batch of completed choices. A verified
+ * result closes the tab. After bounded failures, the same prefilled tab can be
+ * foregrounded only by a second explicit salesperson action.
  */
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
@@ -15,16 +14,16 @@ import {
 } from "../sidepanel/sos-fee-quote.js";
 
 const VALID_MODES = new Set(Object.values(SOS_QUOTE_MODE));
+const VALID_FIELD_KINDS = new Set(["select", "text", "radio"]);
 const RECEIVER_RETRY_DELAY_MS = 200;
 const RECEIVER_RETRY_COUNT = 75;
+const CALCULATION_ATTEMPTS = 3;
 
 export const SOS_FEE_MESSAGES = Object.freeze({
-  start: "SOS_FEE_START",
-  updateField: "SOS_FEE_UPDATE_FIELD",
   calculate: "SOS_FEE_CALCULATE",
+  openHandoff: "SOS_FEE_OPEN_HANDOFF",
   close: "SOS_FEE_CLOSE",
-  discover: "SOS_DISCOVER_CALCULATOR",
-  applyField: "SOS_APPLY_CALCULATOR_FIELD",
+  applyAndCalculate: "SOS_APPLY_AND_CALCULATE",
   calculateInTab: "SOS_CALCULATE_IN_TAB",
 });
 
@@ -38,29 +37,52 @@ function receiverNotReady(error) {
   );
 }
 
-function safeError(message) {
+function safeError(message, extra = {}) {
   return {
     success: false,
     error:
       message ||
       "Michigan SOS could not complete this fee calculation. Please try again.",
+    ...extra,
   };
 }
 
-function validFieldPayload(data) {
-  return (
-    data &&
-    typeof data.fieldId === "string" &&
-    /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(data.fieldId) &&
-    typeof data.value === "string" &&
-    data.value.length <= 128
+export function validSosSubmissionFields(fields) {
+  if (!Array.isArray(fields) || fields.length < 1 || fields.length > 20) return false;
+  return fields.every((field) => {
+    if (!field || typeof field !== "object" || !VALID_FIELD_KINDS.has(field.kind)) {
+      return false;
+    }
+    if (typeof field.label !== "string" || field.label.length < 2 || field.label.length > 160) {
+      return false;
+    }
+    if (
+      field.labelIncludes !== undefined &&
+      (typeof field.labelIncludes !== "string" || field.labelIncludes.length > 80)
+    ) {
+      return false;
+    }
+    if (field.optional !== undefined && typeof field.optional !== "boolean") return false;
+    for (const key of ["value", "optionValue", "optionLabel"]) {
+      if (field[key] !== undefined && (typeof field[key] !== "string" || field[key].length > 128)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function verifiedQuote(response, mode) {
+  return Boolean(
+    response?.success &&
+      response?.quote?.calculationMode === mode &&
+      Number.isInteger(response?.quote?.feeCents) &&
+      /^data:image\/(?:png|jpe?g|webp);base64,/i.test(
+        String(response?.quote?.officialPageImage || "")
+      )
   );
 }
 
-/**
- * Create an independently testable runner. `chromeApi` is injected in tests;
- * production uses the extension's Chrome APIs when the singleton is requested.
- */
 export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
   let session = null;
 
@@ -73,7 +95,7 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
     try {
       await chromeApi.tabs.remove(tabId);
     } catch {
-      // A tab closed by the browser is already safely gone.
+      // A browser-closed tab is already safely gone.
     }
   }
 
@@ -99,8 +121,10 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
     throw lastError || new Error("The public SOS calculator did not become ready.");
   }
 
-  async function start(mode) {
-    if (!VALID_MODES.has(mode)) return safeError("Choose a valid SOS fee quote type.");
+  async function calculate(mode, fields) {
+    if (!VALID_MODES.has(mode) || !validSosSubmissionFields(fields)) {
+      return safeError("Complete the required SOS fee fields before calculating.");
+    }
 
     await close();
     try {
@@ -111,13 +135,10 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
       if (!Number.isInteger(createdTab?.id)) {
         return safeError("Michigan SOS could not start the public fee calculator.");
       }
-
-      // Never continue if Chrome did not honor inactive creation. Removing the
-      // tab immediately is safer than risking the state page becoming visible.
       if (createdTab.active) {
         await removeTab(createdTab.id);
         return safeError(
-          "Michigan SOS could not be opened in the background. No calculator was shown; please try again."
+          "Chrome could not keep the SOS calculator in the background. Nothing was submitted."
         );
       }
 
@@ -126,102 +147,64 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
         [STORAGE_KEYS.sosFeeActiveTabId]: createdTab.id,
       });
 
-      const response = await sendToCalculator(createdTab.id, {
-        type: SOS_FEE_MESSAGES.discover,
+      let response = await sendToCalculator(createdTab.id, {
+        type: SOS_FEE_MESSAGES.applyAndCalculate,
+        data: { mode, fields },
       });
-      if (!response?.success || response?.calculator?.calculationMode !== mode) {
-        await close();
-        return safeError(
-          "Michigan SOS did not open the requested public calculator. No SOS page was shown; try again shortly."
-        );
-      }
-      return response;
-    } catch (error) {
-      await close();
-      console.error("[SOS fee] could not start calculator:", error);
-      return safeError(
-        "Michigan SOS could not open the public fee calculator. Check the connection and try again."
-      );
-    }
-  }
-
-  function activeSessionFor(mode) {
-    return session && session.mode === mode && Number.isInteger(session.tabId);
-  }
-
-  async function updateField(mode, data) {
-    if (!VALID_MODES.has(mode) || !validFieldPayload(data)) {
-      return safeError("The SOS calculator choice was incomplete.");
-    }
-    if (!activeSessionFor(mode)) {
-      return safeError("Start the official SOS quote before changing calculator choices.");
-    }
-
-    try {
-      const response = await sendToCalculator(session.tabId, {
-        type: SOS_FEE_MESSAGES.applyField,
-        data,
-      });
-      if (!response?.success || response?.calculator?.calculationMode !== mode) {
-        return safeError(
-          "Michigan SOS could not apply that choice. The official calculator remains in the sidebar only."
-        );
-      }
-      return response;
-    } catch (error) {
-      console.error("[SOS fee] could not apply calculator field:", error);
-      await close();
-      return safeError(
-        "Michigan SOS lost the calculator session. No SOS page was shown; start the quote again."
-      );
-    }
-  }
-
-  async function calculate(mode) {
-    if (!VALID_MODES.has(mode)) return safeError("Choose a valid SOS fee quote type.");
-    if (!activeSessionFor(mode)) {
-      return safeError("Start the official SOS quote before calculating the fee.");
-    }
-
-    try {
-      const response = await sendToCalculator(session.tabId, {
-        type: SOS_FEE_MESSAGES.calculateInTab,
-      });
-      if (
-        response?.success &&
-        response?.quote?.calculationMode === mode &&
-        Number.isInteger(response?.quote?.feeCents)
-      ) {
+      if (verifiedQuote(response, mode)) {
         await close();
         return response;
       }
 
-      // The state calculator can ask for an omitted field. Keep the private
-      // background tab alive only for that recoverable form-validation state;
-      // all other failures close it immediately.
-      if (response?.keepOpen && response?.calculator?.calculationMode === mode) {
-        return response;
+      for (let attempt = 1; attempt < CALCULATION_ATTEMPTS; attempt += 1) {
+        response = await sendToCalculator(createdTab.id, {
+          type: SOS_FEE_MESSAGES.calculateInTab,
+        });
+        if (verifiedQuote(response, mode)) {
+          await close();
+          return response;
+        }
       }
 
-      await close();
       return safeError(
-        "Michigan SOS did not return a verified fee. No quote was created; use the unverified manual fallback only if you have a confirmed amount."
+        `Michigan SOS did not return a verified total after ${CALCULATION_ATTEMPTS} attempts. Your completed choices remain on the official form for review.`,
+        { handoffAvailable: true, attempts: CALCULATION_ATTEMPTS }
       );
     } catch (error) {
-      console.error("[SOS fee] calculation failed:", error);
+      console.error("[SOS fee] background calculation failed:", error);
+      if (session?.tabId) {
+        return safeError(
+          "Michigan SOS could not finish automatically. The partially completed official form is available for review.",
+          { handoffAvailable: true }
+        );
+      }
+      await clearTabMetadata();
+      return safeError("Michigan SOS could not open the public fee calculator.");
+    }
+  }
+
+  async function openHandoff(mode) {
+    if (!VALID_MODES.has(mode) || session?.mode !== mode || !Number.isInteger(session?.tabId)) {
+      return safeError("The completed SOS form is no longer available. Calculate again.");
+    }
+    const tabId = session.tabId;
+    try {
+      await chromeApi.tabs.update(tabId, { active: true });
+      session = null;
+      await clearTabMetadata();
+      return { success: true };
+    } catch {
       await close();
-      return safeError(
-        "Michigan SOS could not calculate the fee. No SOS page was shown; try again or use the unverified manual fallback."
-      );
+      return safeError("Chrome could not open the completed SOS form. Calculate again.");
     }
   }
 
   return {
-    start,
-    updateField,
     calculate,
+    openHandoff,
     close,
-    hasActiveSession: (mode) => activeSessionFor(mode),
+    hasActiveSession: (mode) =>
+      session?.mode === mode && Number.isInteger(session?.tabId),
   };
 }
 
@@ -232,11 +215,7 @@ export function getSosFeeRunner() {
   return singleton;
 }
 
-/**
- * Worker restarts are a privacy boundary: close only the tab ID that this
- * extension recorded as its own, then discard the metadata. No field values
- * are ever stored in extension storage.
- */
+/** Close only an extension-owned inactive tab recorded before worker restart. */
 export async function closeInterruptedSosFeeSession(chromeApi = chrome) {
   const stored = await chromeApi.storage.session.get(STORAGE_KEYS.sosFeeActiveTabId);
   const tabId = stored[STORAGE_KEYS.sosFeeActiveTabId];
@@ -244,7 +223,7 @@ export async function closeInterruptedSosFeeSession(chromeApi = chrome) {
     try {
       await chromeApi.tabs.remove(tabId);
     } catch {
-      // It may already have been closed.
+      // Already closed by Chrome.
     }
   }
   await chromeApi.storage.session.remove(STORAGE_KEYS.sosFeeActiveTabId);

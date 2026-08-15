@@ -69,6 +69,7 @@ import {
   downloadCoBuyerRepeatOffenderPDF,
   downloadTitleReportPDF,
   downloadAllReportsPDF,
+  downloadSosOfficialEvidencePDF,
   printHtmlDocument,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
@@ -91,13 +92,23 @@ import {
   SOS_QUOTE_SOURCE,
   clearSosFeeQuote,
   createCalculatedQuote,
-  createManualQuote,
   createSosFeeQuotePrintHTML,
+  createSosOfficialEvidencePrintHTML,
   loadSosFeeQuote,
   quoteStatusText,
   saveSosFeeQuote,
   sourceLabel,
 } from "./src/sidepanel/sos-fee-quote.js";
+import {
+  bodyOptionsForVehicle,
+  buildSosSubmission,
+  isCommercialUse,
+  localSosVinFields,
+  plateDesignByValue,
+  plateOptionsForUse,
+  useOptionsForVehicle,
+  validateSosLocalValues,
+} from "./src/sidepanel/sos-local-form.js";
 import {
   lookupVin,
   makeSosVinSuggestions,
@@ -136,23 +147,39 @@ const elements = {
   runTitleBtn: $("runTitleBtn"),
 
   // Session-only SOS registration fee quote
-  startSosFeeWorkspaceBtn: $("startSosFeeWorkspaceBtn"),
   calculateSosFeeBtn: $("calculateSosFeeBtn"),
   printSosQuoteBtn: $("printSosQuoteBtn"),
-  saveManualSosQuoteBtn: $("saveManualSosQuoteBtn"),
+  printSosCalculationBtn: $("printSosCalculationBtn"),
+  downloadSosCalculationPdfBtn: $("downloadSosCalculationPdfBtn"),
   clearSosQuoteBtn: $("clearSosQuoteBtn"),
-  sosManualAmount: $("sosManualAmount"),
   sosVinLookupInput: $("sosVinLookupInput"),
   lookupSosVinBtn: $("lookupSosVinBtn"),
   checkSosLienBtn: $("checkSosLienBtn"),
   sosVinLookupStatus: $("sosVinLookupStatus"),
   sosLienStatus: $("sosLienStatus"),
   sosWorkspaceStatus: $("sosWorkspaceStatus"),
-  sosOfficialFields: $("sosOfficialFields"),
   sosQuoteStatus: $("sosQuoteStatus"),
   sosQuoteSource: $("sosQuoteSource"),
+  sosNewPlateFields: $("sosNewPlateFields"),
+  sosTransferFields: $("sosTransferFields"),
+  sosVehicleType: $("sosVehicleType"),
+  sosBodyStyle: $("sosBodyStyle"),
+  sosVehicleUse: $("sosVehicleUse"),
+  sosFuelType: $("sosFuelType"),
+  sosModelYear: $("sosModelYear"),
+  sosMsrp: $("sosMsrp"),
+  sosBusinessRegistration: $("sosBusinessRegistration"),
+  sosPlateType: $("sosPlateType"),
+  sosPlateDesign: $("sosPlateDesign"),
+  sosPlateDesignControl: $("sosPlateDesignControl"),
+  sosPurchaseDate: $("sosPurchaseDate"),
+  sosTransferPlateNumber: $("sosTransferPlateNumber"),
   sosPlatePreview: $("sosPlatePreview"),
   sosPlatePreviewImage: $("sosPlatePreviewImage"),
+  sosPlatePreviewLabel: $("sosPlatePreviewLabel"),
+  sosHandoffPanel: $("sosHandoffPanel"),
+  sosHandoffMessage: $("sosHandoffMessage"),
+  openSosHandoffBtn: $("openSosHandoffBtn"),
 
   viewHistoryBtn: $("viewHistoryBtn"),
 
@@ -424,10 +451,10 @@ async function applyPersistedResults() {
 // ---------- SOS fee quote ----------
 
 let currentSosFeeQuote = null;
-let sosCalculator = null;
 let pendingVinDecode = null;
 let sosWorkspaceBusy = false;
 let sosLienCheckBusy = false;
+let sosHandoffAvailable = false;
 
 function selectedSosQuoteMode() {
   return (
@@ -448,6 +475,59 @@ function setSosWorkspaceStatus(message, tone = "") {
   elements.sosWorkspaceStatus.textContent = message;
   elements.sosWorkspaceStatus.classList.toggle("is-error", tone === "error");
   elements.sosWorkspaceStatus.classList.toggle("is-busy", tone === "busy");
+}
+
+function selectedRadioValue(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || "";
+}
+
+function replaceSosOptions(select, options, preferredValue = "") {
+  if (!select) return;
+  const current = preferredValue || select.value;
+  select.replaceChildren(
+    ...options.map(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      return option;
+    })
+  );
+  const available = options.some(([value]) => value === current);
+  if (available) select.value = current;
+}
+
+function localSosValues() {
+  return {
+    mode: selectedSosQuoteMode(),
+    vehicleType: elements.sosVehicleType?.value || "",
+    bodyStyle: elements.sosBodyStyle?.value || "",
+    vehicleUse: elements.sosVehicleUse?.value || "",
+    fuelType: elements.sosFuelType?.value || "",
+    modelYear: elements.sosModelYear?.value.trim() || "",
+    msrp: elements.sosMsrp?.value.trim() || "",
+    firstTitle: selectedRadioValue("sosFirstTitle"),
+    businessRegistration: selectedRadioValue("sosBusinessRegistration"),
+    plateType: elements.sosPlateType?.value || "",
+    plateDesign: elements.sosPlateDesign?.value || "",
+    recreationPassport: selectedRadioValue("sosRecreationPassport"),
+    purchaseDate: elements.sosPurchaseDate?.value.trim() || "",
+    transferPlateNumber: elements.sosTransferPlateNumber?.value.trim() || "",
+  };
+}
+
+function clearSosValidation() {
+  document
+    .querySelectorAll("#sosNewPlateFields [aria-invalid], #sosTransferFields [aria-invalid]")
+    .forEach((control) => control.removeAttribute("aria-invalid"));
+}
+
+function showSosValidation(errors) {
+  clearSosValidation();
+  for (const error of errors) {
+    const control = document.getElementById(error.id);
+    control?.setAttribute("aria-invalid", "true");
+  }
+  document.getElementById(errors[0]?.id)?.focus?.();
 }
 
 function canCheckSosLien(value = elements.sosVinLookupInput?.value || "") {
@@ -479,14 +559,79 @@ function renderSosPlatePreview() {
     currentSosFeeQuote?.source === SOS_QUOTE_SOURCE.calculated
       ? currentSosFeeQuote.platePreviewUrl
       : null;
-  const previewUrl = quotePreview || sosCalculator?.platePreviewUrl || null;
-  if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = !previewUrl;
+  const standardPlate = elements.sosPlateType?.value === "PAS";
+  const localDesign = plateDesignByValue(
+    standardPlate ? elements.sosPlateDesign?.value : "pure_michigan"
+  );
+  const previewUrl = quotePreview || localDesign?.imageUrl || null;
+  const shouldShow =
+    selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
+    Boolean(previewUrl);
+  if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = !shouldShow;
   if (elements.sosPlatePreviewImage) {
-    if (previewUrl) {
+    if (shouldShow) {
       elements.sosPlatePreviewImage.src = previewUrl;
+      elements.sosPlatePreviewImage.alt = `${localDesign?.label || "Michigan"} official plate design artwork`;
     } else {
       elements.sosPlatePreviewImage.removeAttribute("src");
     }
+  }
+  if (elements.sosPlatePreviewLabel) {
+    const plateTypeLabel = elements.sosPlateType?.selectedOptions?.[0]?.textContent?.trim();
+    elements.sosPlatePreviewLabel.textContent = standardPlate
+      ? localDesign?.label || "Official plate artwork"
+      : `${plateTypeLabel || "Plate"} · ${localDesign?.label || "Pure Michigan"} base`;
+  }
+  if (elements.sosPlatePreview) {
+    const label = elements.sosPlatePreviewLabel?.textContent || "selected Michigan plate";
+    elements.sosPlatePreview.setAttribute(
+      "aria-label",
+      `Open a full-size preview of ${label}`
+    );
+  }
+}
+
+async function openSosPlatePreview() {
+  const standardPlate = elements.sosPlateType?.value === "PAS";
+  const design = plateDesignByValue(
+    standardPlate ? elements.sosPlateDesign?.value : "pure_michigan"
+  );
+  if (!design) {
+    showToast("Plate artwork is not available for this selection.", "error");
+    return;
+  }
+
+  try {
+    const currentWindow = await chrome.windows.getCurrent();
+    const availableWidth = Number.isInteger(currentWindow?.width)
+      ? currentWindow.width
+      : 1100;
+    const availableHeight = Number.isInteger(currentWindow?.height)
+      ? currentWindow.height
+      : 760;
+    const width = Math.max(680, Math.min(1100, availableWidth - 80));
+    const height = Math.max(500, Math.min(760, availableHeight - 80));
+    const left = Number.isInteger(currentWindow?.left)
+      ? currentWindow.left + Math.max(20, Math.round((availableWidth - width) / 2))
+      : undefined;
+    const top = Number.isInteger(currentWindow?.top)
+      ? currentWindow.top + Math.max(20, Math.round((availableHeight - height) / 2))
+      : undefined;
+    const url = chrome.runtime.getURL(
+      `plate-preview.html?design=${encodeURIComponent(design.value)}`
+    );
+
+    await chrome.windows.create({
+      url,
+      type: "popup",
+      focused: true,
+      width,
+      height,
+      ...(left === undefined ? {} : { left }),
+      ...(top === undefined ? {} : { top }),
+    });
+  } catch {
+    showToast("The full-size plate preview could not be opened.", "error");
   }
 }
 
@@ -494,17 +639,33 @@ function renderSosFeeQuote() {
   const quote = currentSosFeeQuote;
   if (elements.sosQuoteStatus) elements.sosQuoteStatus.textContent = quoteStatusText(quote);
   if (elements.sosQuoteSource) {
-    elements.sosQuoteSource.textContent = sourceLabel(quote?.source);
+    elements.sosQuoteSource.textContent = quote
+      ? sourceLabel(quote.source)
+      : sosWorkspaceBusy
+        ? "Checking SOS"
+        : sosHandoffAvailable
+          ? "Finish on SOS"
+          : "Ready locally";
     elements.sosQuoteSource.classList.toggle(
       "is-calculated",
       quote?.source === SOS_QUOTE_SOURCE.calculated
     );
     elements.sosQuoteSource.classList.toggle(
-      "is-manual",
-      quote?.source === SOS_QUOTE_SOURCE.manual
+      "is-busy",
+      sosWorkspaceBusy
+    );
+    elements.sosQuoteSource.classList.toggle(
+      "is-handoff",
+      sosHandoffAvailable
     );
   }
   if (elements.printSosQuoteBtn) elements.printSosQuoteBtn.disabled = !quote;
+  if (elements.printSosCalculationBtn) {
+    elements.printSosCalculationBtn.disabled = !quote?.officialPageImage;
+  }
+  if (elements.downloadSosCalculationPdfBtn) {
+    elements.downloadSosCalculationPdfBtn.disabled = !quote?.officialPageImage;
+  }
   if (quote) setSosQuoteMode(quote.mode);
   renderSosPlatePreview();
 }
@@ -518,114 +679,22 @@ async function restoreSosFeeQuote() {
   }
 }
 
-function createSosElement(tagName, className = "") {
-  const element = document.createElement(tagName);
-  if (className) element.className = className;
-  return element;
-}
-
-function renderSosOfficialFields() {
-  const root = elements.sosOfficialFields;
-  if (!root) return;
-  root.replaceChildren();
-  const fields = sosCalculator?.fields || [];
-  if (!fields.length) return;
-
-  const sections = new Map();
-  for (const field of fields) {
-    const key = field.section || "Official SOS choices";
-    if (!sections.has(key)) sections.set(key, []);
-    sections.get(key).push(field);
-  }
-
-  for (const [sectionName, sectionFields] of sections) {
-    const section = createSosElement("section", "sos-field-section");
-    const heading = createSosElement("h4", "sos-field-section-title");
-    heading.textContent = sectionName;
-    section.append(heading);
-    for (const field of sectionFields) {
-      section.append(createSosFieldControl(field));
-    }
-    root.append(section);
-  }
-}
-
-function createSosFieldControl(field) {
-  const wrapper = createSosElement("div", "sos-official-field");
-  const controlId = `sos-field-${field.id}`;
-  const disabled = sosWorkspaceBusy || Boolean(field.disabled);
-  const required = field.required ? " (required)" : "";
-
-  if (field.kind === "radio") {
-    const group = createSosElement("fieldset", "sos-official-radio");
-    const legend = document.createElement("legend");
-    legend.textContent = `${field.label}${required}`;
-    group.append(legend);
-    for (const [index, option] of (field.options || []).entries()) {
-      const optionId = `${controlId}-${index}`;
-      const label = document.createElement("label");
-      const input = document.createElement("input");
-      input.type = "radio";
-      input.id = optionId;
-      input.name = controlId;
-      input.value = option.value;
-      input.checked = option.value === field.value;
-      input.disabled = disabled;
-      input.dataset.sosFieldId = field.id;
-      input.addEventListener("change", handleSosOfficialFieldChange);
-      const labelText = document.createElement("span");
-      labelText.textContent = option.label;
-      label.append(input, labelText);
-      group.append(label);
-    }
-    wrapper.append(group);
-    return wrapper;
-  }
-
-  const label = document.createElement("label");
-  label.htmlFor = controlId;
-  label.textContent = `${field.label}${required}`;
-  let control;
-  if (field.kind === "select") {
-    control = document.createElement("select");
-    for (const option of field.options || []) {
-      const optionElement = document.createElement("option");
-      optionElement.value = option.value;
-      optionElement.textContent = option.label || "Select";
-      optionElement.selected = option.value === field.value;
-      control.append(optionElement);
-    }
-  } else {
-    control = document.createElement("input");
-    control.type = "text";
-    control.value = field.value || "";
-    control.inputMode = field.inputMode || "text";
-    control.autocomplete = "off";
-    control.spellcheck = false;
-  }
-  control.id = controlId;
-  control.disabled = disabled;
-  control.dataset.sosFieldId = field.id;
-  control.addEventListener("change", handleSosOfficialFieldChange);
-  wrapper.append(label, control);
-  return wrapper;
-}
-
 function renderSosWorkspace() {
-  if (elements.startSosFeeWorkspaceBtn) {
-    elements.startSosFeeWorkspaceBtn.disabled = sosWorkspaceBusy;
-    elements.startSosFeeWorkspaceBtn.textContent = sosCalculator
-      ? "Reload official choices"
-      : "Load official choices";
-  }
   if (elements.calculateSosFeeBtn) {
-    elements.calculateSosFeeBtn.disabled = sosWorkspaceBusy || !sosCalculator;
+    elements.calculateSosFeeBtn.disabled = sosWorkspaceBusy;
     elements.calculateSosFeeBtn.textContent = sosWorkspaceBusy
-      ? "Working with SOS…"
+      ? "Checking SOS…"
       : "Calculate SOS fee";
   }
-  renderSosOfficialFields();
+  if (elements.sosNewPlateFields) {
+    elements.sosNewPlateFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.newPlate;
+  }
+  if (elements.sosTransferFields) {
+    elements.sosTransferFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.plateTransfer;
+  }
+  if (elements.sosHandoffPanel) elements.sosHandoffPanel.hidden = !sosHandoffAvailable;
   renderSosPlatePreview();
+  renderSosFeeQuote();
 }
 
 async function closeSosBackgroundWorkspace() {
@@ -636,129 +705,116 @@ async function closeSosBackgroundWorkspace() {
   }
 }
 
+function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
+  const vehicleType = elements.sosVehicleType?.value || "Passenger";
+  const previousBody = resetDependentValues ? "" : elements.sosBodyStyle?.value;
+  const previousUse = resetDependentValues ? "" : elements.sosVehicleUse?.value;
+  replaceSosOptions(elements.sosBodyStyle, bodyOptionsForVehicle(vehicleType), previousBody);
+  replaceSosOptions(elements.sosVehicleUse, useOptionsForVehicle(vehicleType), previousUse);
+
+  const vehicleUse = elements.sosVehicleUse?.value || "PASS";
+  const previousPlate = elements.sosPlateType?.value;
+  replaceSosOptions(elements.sosPlateType, plateOptionsForUse(vehicleUse), previousPlate);
+
+  const commercial = isCommercialUse(vehicleUse);
+  if (elements.sosBusinessRegistration) {
+    elements.sosBusinessRegistration.hidden = !commercial;
+  }
+  const standardDesign = elements.sosPlateType?.value === "PAS";
+  if (elements.sosPlateDesignControl) {
+    elements.sosPlateDesignControl.hidden = !standardDesign;
+  }
+  if (elements.sosPlatePreview) {
+    elements.sosPlatePreview.hidden = !standardDesign;
+  }
+  clearSosValidation();
+  renderSosPlatePreview();
+}
+
 async function applyPendingVinSuggestions() {
-  if (!pendingVinDecode || !sosCalculator) return 0;
-  const labels = [
-    "Select your vehicle type",
-    "Select the body style",
-    "Select your fuel type",
-    "Enter the vehicle model year",
-  ];
+  if (!pendingVinDecode) return 0;
   let applied = 0;
-  for (const label of labels) {
-    const field = sosCalculator.fields.find((item) => item.label === label);
-    const suggestion = makeSosVinSuggestions(pendingVinDecode, sosCalculator.fields).find(
-      (item) => item.fieldId === field?.id
-    );
-    if (!field || !suggestion || field.value === suggestion.value) continue;
-    const response = await chrome.runtime.sendMessage({
-      type: "SOS_FEE_UPDATE_FIELD",
-      data: { mode: selectedSosQuoteMode(), ...suggestion },
-    });
-    if (!response?.success || !response.calculator) break;
-    sosCalculator = response.calculator;
+  const initialSuggestions = makeSosVinSuggestions(
+    pendingVinDecode,
+    localSosVinFields(elements.sosVehicleType?.value || "Passenger")
+  );
+  const vehicleSuggestion = initialSuggestions.find(
+    (suggestion) => suggestion.fieldId === "sosVehicleType"
+  );
+  if (vehicleSuggestion && elements.sosVehicleType) {
+    elements.sosVehicleType.value = vehicleSuggestion.value;
+    syncSosLocalDependencies({ resetDependentValues: true });
     applied += 1;
   }
+
+  const suggestions = makeSosVinSuggestions(
+    pendingVinDecode,
+    localSosVinFields(elements.sosVehicleType?.value || "Passenger")
+  );
+  for (const suggestion of suggestions) {
+    if (suggestion.fieldId === "sosVehicleType") continue;
+    const control = document.getElementById(suggestion.fieldId);
+    if (!control || control.value === suggestion.value) continue;
+    control.value = suggestion.value;
+    if (control.value === suggestion.value) applied += 1;
+  }
   pendingVinDecode = null;
+  syncSosLocalDependencies();
   return applied;
 }
 
-async function startSosFeeWorkspace() {
-  sosWorkspaceBusy = true;
-  renderSosWorkspace();
-  setSosWorkspaceStatus("Loading live official SOS choices in the background…", "busy");
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "SOS_FEE_START",
-      data: { mode: selectedSosQuoteMode() },
-    });
-    if (!response?.success || !response.calculator) {
-      throw new Error(response?.error || "Michigan SOS did not return official calculator choices.");
-    }
-    sosCalculator = response.calculator;
-    const applied = await applyPendingVinSuggestions();
-    setSosWorkspaceStatus(
-      applied
-        ? `Official SOS choices loaded. VIN details filled ${applied} matching field${applied === 1 ? "" : "s"}; review before calculating.`
-        : "Official SOS choices loaded in the sidebar. Choose any remaining required fields, then calculate.",
-      ""
-    );
-  } catch (error) {
-    sosCalculator = null;
-    setSosWorkspaceStatus(
-      error?.message || "Michigan SOS could not load the calculator. No SOS page was shown.",
-      "error"
-    );
-  } finally {
-    sosWorkspaceBusy = false;
-    renderSosWorkspace();
-  }
-}
-
 async function handleSosOfficialFieldChange(event) {
-  const fieldId = event.target?.dataset?.sosFieldId;
-  if (!fieldId || !sosCalculator || sosWorkspaceBusy) return;
-  sosWorkspaceBusy = true;
-  renderSosWorkspace();
-  setSosWorkspaceStatus("Updating the live official SOS choices…", "busy");
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "SOS_FEE_UPDATE_FIELD",
-      data: {
-        mode: selectedSosQuoteMode(),
-        fieldId,
-        value: String(event.target.value || ""),
-      },
-    });
-    if (!response?.success || !response.calculator) {
-      throw new Error(response?.error || "Michigan SOS could not apply that choice.");
-    }
-    sosCalculator = response.calculator;
-    setSosWorkspaceStatus("Official SOS choice updated. Continue with the remaining fields.");
-  } catch (error) {
-    setSosWorkspaceStatus(
-      error?.message || "Michigan SOS could not apply that choice. No SOS page was shown.",
-      "error"
-    );
-  } finally {
-    sosWorkspaceBusy = false;
-    renderSosWorkspace();
+  if (event?.target === elements.sosVehicleType) {
+    syncSosLocalDependencies({ resetDependentValues: true });
+  } else {
+    syncSosLocalDependencies();
   }
+  sosHandoffAvailable = false;
+  elements.sosHandoffPanel.hidden = true;
+  setSosWorkspaceStatus("Selections are ready locally. Calculate when complete.");
 }
 
 async function calculateSosFee() {
-  if (!sosCalculator || sosWorkspaceBusy) {
-    setSosWorkspaceStatus("Load the official SOS choices before calculating a fee.", "error");
+  if (sosWorkspaceBusy) return;
+  const values = localSosValues();
+  const errors = validateSosLocalValues(values);
+  if (errors.length) {
+    showSosValidation(errors);
+    setSosWorkspaceStatus(errors[0].message, "error");
     return;
   }
+  clearSosValidation();
   sosWorkspaceBusy = true;
+  sosHandoffAvailable = false;
   renderSosWorkspace();
-  setSosWorkspaceStatus("Calculating the official SOS fee in the background…", "busy");
+  setSosWorkspaceStatus("Sending all completed choices to the official calculator…", "busy");
   try {
     const response = await chrome.runtime.sendMessage({
       type: "SOS_FEE_CALCULATE",
-      data: { mode: selectedSosQuoteMode() },
+      data: {
+        mode: values.mode,
+        fields: buildSosSubmission(values),
+      },
     });
     if (!response?.success || !response.quote) {
-      if (response?.calculator) sosCalculator = response.calculator;
-      throw new Error(
-        response?.error || "Michigan SOS did not return a verified registration fee."
-      );
+      sosHandoffAvailable = Boolean(response?.handoffAvailable);
+      if (elements.sosHandoffMessage && response?.error) {
+        elements.sosHandoffMessage.textContent = response.error;
+      }
+      throw new Error(response?.error || "Michigan SOS did not return a verified registration fee.");
     }
     const quote = createCalculatedQuote(response.quote, selectedSosQuoteMode());
     if (!quote) {
       throw new Error("Michigan SOS returned an incomplete fee result. No quote was created.");
     }
     currentSosFeeQuote = await saveSosFeeQuote(quote);
-    sosCalculator = null; // Worker has already removed the background tab.
     pendingVinDecode = null;
-    if (elements.sosManualAmount) elements.sosManualAmount.value = "";
     renderSosFeeQuote();
     setSosWorkspaceStatus("Official SOS fee returned to the sidebar. The background SOS tab is closed.");
     showToast("Official SOS fee calculated for this browser session.", "success");
   } catch (error) {
     setSosWorkspaceStatus(
-      error?.message || "Michigan SOS could not calculate the fee. No SOS page was shown.",
+      error?.message || "Michigan SOS could not calculate the fee.",
       "error"
     );
   } finally {
@@ -785,23 +841,18 @@ async function handleSosVinLookup() {
     const decoded = await lookupVin(rawVin);
     pendingVinDecode = decoded;
     const summary = vinLookupSummary(decoded) || "vehicle details";
+    const applied = await applyPendingVinSuggestions();
     if (elements.sosVinLookupStatus) {
       elements.sosVinLookupStatus.textContent = decoded.partial
-        ? `NHTSA returned partial details for ${summary}. Review every SOS selection before calculating.`
-        : `NHTSA found ${summary}. Matching SOS fields will be filled when official choices are loaded.`;
+        ? `Partial decode: ${summary}. Filled ${applied} supported field${applied === 1 ? "" : "s"}; review all selections.`
+        : `${summary}: filled ${applied} supported field${applied === 1 ? "" : "s"}. Review before calculating.`;
     }
-    if (sosCalculator) {
-      sosWorkspaceBusy = true;
-      renderSosWorkspace();
-      setSosWorkspaceStatus("Applying matching VIN details to current official SOS choices…", "busy");
-      const applied = await applyPendingVinSuggestions();
-      setSosWorkspaceStatus(
-        applied
-          ? `Applied ${applied} VIN-based field suggestion${applied === 1 ? "" : "s"}. Review before calculating.`
-          : "VIN details are available, but no current SOS field could be filled automatically. Review the official choices.",
-        ""
-      );
-    }
+    setSosWorkspaceStatus(
+      applied
+        ? `VIN assist filled ${applied} easy field${applied === 1 ? "" : "s"} locally. Nothing was sent to SOS.`
+        : "NHTSA identified the vehicle, but did not provide a safe match for these SOS fields.",
+      applied ? "" : "error"
+    );
   } catch (error) {
     pendingVinDecode = null;
     if (elements.sosVinLookupStatus) {
@@ -858,40 +909,13 @@ async function handleSosLienCheck() {
   }
 }
 
-async function saveManualSosQuote() {
-  const quote = createManualQuote({
-    mode: selectedSosQuoteMode(),
-    amount: elements.sosManualAmount?.value,
-    vehicleDescription: "",
-  });
-  if (!quote) {
-    showToast("Enter a valid confirmed registration or plate fee, such as 125.00.", "warning");
-    elements.sosManualAmount?.focus();
-    return;
-  }
-  try {
-    currentSosFeeQuote = await saveSosFeeQuote(quote);
-    await closeSosBackgroundWorkspace();
-    sosCalculator = null;
-    pendingVinDecode = null;
-    renderSosFeeQuote();
-    renderSosWorkspace();
-    setSosWorkspaceStatus("Unverified manual fee saved. Verify it before final paperwork.");
-    showToast("Unverified salesperson-entered fee quote saved for this browser session.", "warning");
-  } catch (error) {
-    console.error("Could not save manual SOS fee quote:", error);
-    showToast("Could not save the fee quote.", "error");
-  }
-}
-
 async function clearCurrentSosFeeQuote() {
   try {
     await closeSosBackgroundWorkspace();
     await clearSosFeeQuote();
     currentSosFeeQuote = null;
-    sosCalculator = null;
     pendingVinDecode = null;
-    if (elements.sosManualAmount) elements.sosManualAmount.value = "";
+    sosHandoffAvailable = false;
     if (elements.sosVinLookupInput) elements.sosVinLookupInput.value = "";
     if (elements.sosVinLookupStatus) elements.sosVinLookupStatus.textContent = "";
     if (elements.sosLienStatus) {
@@ -899,9 +923,10 @@ async function clearCurrentSosFeeQuote() {
       elements.sosLienStatus.className = "sos-lien-status";
     }
     syncSosLienCheckButton();
+    clearSosValidation();
     renderSosFeeQuote();
     renderSosWorkspace();
-    setSosWorkspaceStatus("Quote cleared. Load official SOS choices to start another quote.");
+    setSosWorkspaceStatus("Quote cleared. Complete the fields, then calculate.");
     showToast("SOS fee quote cleared from this browser session.", "success");
   } catch (error) {
     console.error("Could not clear SOS fee quote:", error);
@@ -911,24 +936,55 @@ async function clearCurrentSosFeeQuote() {
 
 async function handleSosQuoteModeChange() {
   await closeSosBackgroundWorkspace();
-  sosCalculator = null;
   pendingVinDecode = null;
+  sosHandoffAvailable = false;
   if (currentSosFeeQuote && currentSosFeeQuote.mode !== selectedSosQuoteMode()) {
     await clearSosFeeQuote();
     currentSosFeeQuote = null;
   }
   renderSosFeeQuote();
   renderSosWorkspace();
-  setSosWorkspaceStatus("Registration choice changed. Load the matching official SOS choices to continue.");
+  setSosWorkspaceStatus("Registration choice changed. Complete the local fields, then calculate.");
+}
+
+async function openSosHandoff() {
+  if (!sosHandoffAvailable) return;
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "SOS_FEE_OPEN_HANDOFF",
+      data: { mode: selectedSosQuoteMode() },
+    });
+    if (!response?.success) {
+      throw new Error(response?.error || "The completed SOS form is no longer available.");
+    }
+    sosHandoffAvailable = false;
+    renderSosWorkspace();
+    setSosWorkspaceStatus("The prefilled Michigan SOS calculator is open for your final review.");
+  } catch (error) {
+    setSosWorkspaceStatus(error?.message || "Could not open the completed SOS form.", "error");
+  }
 }
 
 async function printSosFeeQuote() {
   const html = createSosFeeQuotePrintHTML(currentSosFeeQuote);
   if (!html) {
-    showToast("Capture or enter a fee before printing the customer summary.", "info");
+    showToast("Calculate an official fee before printing the customer summary.", "info");
     return;
   }
   await printHtmlDocument(html);
+}
+
+async function printSosOfficialCalculation() {
+  const html = createSosOfficialEvidencePrintHTML(currentSosFeeQuote);
+  if (!html) {
+    showToast("The official SOS page capture is unavailable. Calculate again.", "info");
+    return;
+  }
+  await printHtmlDocument(html, { waitForImages: true });
+}
+
+async function downloadSosOfficialCalculation() {
+  await downloadSosOfficialEvidencePDF(currentSosFeeQuote);
 }
 
 function applyInFlight(key) {
@@ -968,20 +1024,32 @@ function initEventListeners() {
   elements.runRepeatOffenderBtn.addEventListener("click", handleRunRepeatOffender);
   elements.runTitleBtn.addEventListener("click", handleRunTitle);
 
-  // SOS is sidebar-only: extension-owned calculator tabs are background-only
-  // and are closed after the official result or any unrecoverable error.
-  elements.startSosFeeWorkspaceBtn?.addEventListener("click", startSosFeeWorkspace);
+  // Local selections are instant. SOS is contacted once, only after the
+  // salesperson explicitly requests the final official calculation.
   elements.calculateSosFeeBtn?.addEventListener("click", calculateSosFee);
   elements.printSosQuoteBtn?.addEventListener("click", printSosFeeQuote);
-  elements.saveManualSosQuoteBtn?.addEventListener("click", saveManualSosQuote);
+  elements.printSosCalculationBtn?.addEventListener("click", printSosOfficialCalculation);
+  elements.downloadSosCalculationPdfBtn?.addEventListener("click", downloadSosOfficialCalculation);
   elements.clearSosQuoteBtn?.addEventListener("click", clearCurrentSosFeeQuote);
+  elements.openSosHandoffBtn?.addEventListener("click", openSosHandoff);
   elements.lookupSosVinBtn?.addEventListener("click", handleSosVinLookup);
+  elements.sosPlatePreview?.addEventListener("click", openSosPlatePreview);
   elements.checkSosLienBtn?.addEventListener("click", handleSosLienCheck);
   elements.sosVinLookupInput?.addEventListener("input", handleSosVinInput);
   syncSosLienCheckButton();
   document.querySelectorAll('input[name="sosQuoteMode"]').forEach((input) => {
     input.addEventListener("change", handleSosQuoteModeChange);
   });
+  [
+    elements.sosVehicleType,
+    elements.sosBodyStyle,
+    elements.sosVehicleUse,
+    elements.sosFuelType,
+    elements.sosPlateType,
+    elements.sosPlateDesign,
+  ].forEach((control) => control?.addEventListener("change", handleSosOfficialFieldChange));
+  syncSosLocalDependencies({ resetDependentValues: true });
+  renderSosWorkspace();
 
   window.addEventListener("pagehide", () => {
     // Do not await during teardown. The worker separately closes a recorded
@@ -991,6 +1059,7 @@ function initEventListeners() {
 
   elements.tradeVin.addEventListener("input", (e) => {
     elements.runTitleBtn.disabled = e.target.value.trim().length === 0;
+    syncSosLienCheckButton();
   });
 
   elements.viewHistoryBtn.addEventListener("click", openHistory);

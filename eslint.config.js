@@ -10,6 +10,7 @@ export default defineConfig([
       ".cursor/**",
       "lib/jspdf.umd.min.js",
       "lib/qrcode.min.js",
+      "lib/html2canvas.min.js",
       "docs/lib/zxing.min.js",
       "docs/lib/zxing-wasm/**",
     ],

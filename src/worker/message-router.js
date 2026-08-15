@@ -25,6 +25,7 @@ import {
 import {
   SOS_FEE_MESSAGES,
   getSosFeeRunner,
+  validSosSubmissionFields,
 } from "./sos-fee-runner.js";
 import {
   handleSosLienCheck,
@@ -95,17 +96,6 @@ function isValidSosMode(value) {
   return typeof value === "string" && SOS_QUOTE_MODES.has(value);
 }
 
-function isValidSosFieldUpdate(value) {
-  return (
-    isRecord(value) &&
-    isValidSosMode(value.mode) &&
-    typeof value.fieldId === "string" &&
-    /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(value.fieldId) &&
-    typeof value.value === "string" &&
-    value.value.length <= 128
-  );
-}
-
 function validatePayload(type, data) {
   switch (type) {
     case "RUN_ALL_CHECKS":
@@ -138,11 +128,14 @@ function validatePayload(type, data) {
         isBoundedString(data.vin, CONFIG.validation.vinLength, true) &&
         /^[A-HJ-NPR-Z0-9]{17}$/.test(data.vin)
       );
-    case SOS_FEE_MESSAGES.start:
     case SOS_FEE_MESSAGES.calculate:
+      return (
+        isRecord(data) &&
+        isValidSosMode(data.mode) &&
+        validSosSubmissionFields(data.fields)
+      );
+    case SOS_FEE_MESSAGES.openHandoff:
       return isRecord(data) && isValidSosMode(data.mode);
-    case SOS_FEE_MESSAGES.updateField:
-      return isValidSosFieldUpdate(data);
     case SOS_FEE_MESSAGES.close:
       return data === undefined || data === null || isRecord(data);
     case HISTORY_MESSAGES.append:
@@ -250,14 +243,11 @@ export async function handleMessage(message, sender) {
         }
         return handleSosLienCheck(message.data);
 
-      case SOS_FEE_MESSAGES.start:
-        return getSosFeeRunner().start(message.data.mode);
-
-      case SOS_FEE_MESSAGES.updateField:
-        return getSosFeeRunner().updateField(message.data.mode, message.data);
-
       case SOS_FEE_MESSAGES.calculate:
-        return getSosFeeRunner().calculate(message.data.mode);
+        return getSosFeeRunner().calculate(message.data.mode, message.data.fields);
+
+      case SOS_FEE_MESSAGES.openHandoff:
+        return getSosFeeRunner().openHandoff(message.data.mode);
 
       case SOS_FEE_MESSAGES.close:
         return getSosFeeRunner().close();

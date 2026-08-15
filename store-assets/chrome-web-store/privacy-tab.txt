@@ -5,7 +5,7 @@ PRIVACY TAB — copy each block into the matching field
 ==================================================
 SINGLE PURPOSE  (one text box)
 ==================================================
-Compliance Central lets Michigan automotive dealers screen buyers and co-buyers for OFAC sanctions, MDOS repeat-offender status, and vehicle title/lien status from a single browser side panel, and produce a printable record of the result.
+Compliance Central lets Michigan automotive dealers screen buyers and co-buyers for OFAC sanctions, MDOS repeat-offender status, and vehicle title/lien status, calculate an official SOS registration fee, and produce printable records from one browser side panel.
 
 
 ==================================================
@@ -24,6 +24,9 @@ Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bou
 alarms —
 Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 
+tabs —
+Creates an inactive, extension-owned public Michigan SOS calculator tab only after the user clicks Calculate SOS fee; closes it after a verified result; and foregrounds the same prefilled tab only if the user explicitly clicks Finish on Michigan SOS after automatic attempts fail.
+
 Host permission https://sanctionslistservice.ofac.treas.gov/ —
 Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
 
@@ -34,6 +37,12 @@ Host permission https://compliance-central-api.fly.dev/ —
 The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal. It also relays the optional phone license-scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read (deleted on pickup; the license image is never transmitted).
 
 The hosting service receives ordinary network request metadata. Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention; the app does not write them to a database or application log.
+
+Host permission https://dsvsesvc.sos.state.mi.us/ —
+Uses the public Michigan SOS registration-fee calculator after an explicit user action, verifies and applies the completed local choices, and returns the official fee plus a session-only image of the actual result page. The extension does not access SOS credentials or cookies.
+
+Host permission https://vpic.nhtsa.dot.gov/ —
+Sends a VIN or partial VIN directly to NHTSA's public vPIC decoder only after the user clicks Decode, then uses supported vehicle details to fill local fee fields for review. The raw VIN is not retained in the decoder response.
 
 Are you using remote code?  →  NO
 (All code is bundled in the package; nothing is fetched and executed remotely.)
@@ -46,7 +55,7 @@ DATA USAGE  (the checkbox form)
 
 Data types to mark as COLLECTED:
   • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
-  • Website content  (Michigan portal responses and screenshots returned for user-requested checks; session-only)
+  • Website content  (Michigan portal responses and screenshots, including SOS fee result-page captures, returned for user-requested actions; session-only)
   • Location  (the hosting service receives the request IP address; Compliance Central uses it transiently in memory for rate limiting and abuse prevention, and does not write it to a database or application log)
 
 Data types to leave UNCHECKED:

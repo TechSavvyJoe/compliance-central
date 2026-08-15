@@ -52,6 +52,23 @@
 
       <main id="main-content" class="hub-main" role="main">
         <div id="screeningWorkspace" class="workspace-pane" role="tabpanel" aria-labelledby="screeningTabBtn" data-workspace-panel="screening">
+        <section id="firstRunHero" class="first-run-hero" aria-labelledby="firstRunTitle">
+          <span class="first-run-eyebrow">Start a deal</span>
+          <h2 id="firstRunTitle">Scan the buyer's ID</h2>
+          <p>Fill the buyer fields from a license scan, then review the details and run the checks when you are ready.</p>
+          <div class="first-run-actions">
+            <button type="button"
+              id="scanLicenseBtn"
+              class="first-run-scan-btn"
+              aria-describedby="scanLicenseHint"
+            >
+              <span class="btn-icon icon icon-user" aria-hidden="true"></span>
+              Scan with phone
+            </button>
+            <kbd>&#8984;S</kbd>
+          </div>
+          <span id="scanLicenseHint" class="first-run-hint">Secure phone pairing opens only when you choose Scan.</span>
+        </section>
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 
         <button type="button"
@@ -69,25 +86,12 @@
         </button>
 
         <div id="inputPanel" class="deal-steps">
-        <section class="input-section">
+        <section class="input-section typed-buyer-card">
           <h2 class="section-title">
-            <span class="step-number" aria-hidden="true">1</span>
-            Buyer
-            <span class="required-label">Required</span>
+            <span class="typed-buyer-title">Or type it in</span>
+            <span class="required-label">4 required</span>
             <span id="buyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h2>
-
-          <button type="button"
-            id="scanLicenseBtn"
-            class="btn-secondary btn-ghost scan-license-btn"
-            aria-describedby="scanLicenseHint"
-          >
-            <span class="btn-icon icon icon-user" aria-hidden="true"></span>
-            Scan license with phone
-          </button>
-          <p id="scanLicenseHint" class="scan-license-hint">
-            Use your phone camera; the customer fields fill here automatically.
-          </p>
 
           <div class="form-row">
             <div class="form-group">
@@ -491,16 +495,21 @@
         </section>
 
         <section id="resultsSection" class="results-section hidden" aria-labelledby="resultsSectionTitle" data-workspace-panel="screening">
-          <div class="evidence-heading">
-            <div>
-              <span class="evidence-kicker">Evidence</span>
-              <h2 id="resultsSectionTitle">Compliance check results</h2>
-              <p>Print or download only the records completed in this run.</p>
-            </div>
-          </div>
           <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
+          <div id="reviewGuidancePanel" class="review-guidance-panel hidden" aria-live="polite"></div>
 
-          <div class="results-grid">
+          <div class="evidence-panel">
+            <div class="evidence-heading">
+              <div>
+                <span class="evidence-kicker">Evidence</span>
+                <h2 id="resultsSectionTitle">Compliance check results</h2>
+              </div>
+              <div class="evidence-heading-actions">
+                <button type="button" id="downloadEvidenceBtn" class="evidence-download-btn">PDF all</button>
+                <button type="button" id="printEvidenceBtn" class="evidence-download-btn">Print all</button>
+              </div>
+            </div>
+          <div class="results-grid evidence-rows">
             <div class="result-card" id="ofacResultCard">
               <div class="result-header">
                 <h3><span class="check-icon icon icon-globe" aria-hidden="true"></span>OFAC Screening</h3>
@@ -606,6 +615,25 @@
                 </div>
               </div>
             </div>
+          </div>
+          </div>
+
+          <div id="completedStepsPanel" class="completed-steps-panel" aria-label="Deal steps">
+            <button type="button" id="editCompletedBuyerBtn" class="completed-step-row">
+              <span class="completed-step-icon completed" aria-hidden="true">&#10003;</span>
+              <span class="completed-step-copy"><strong>Buyer</strong><small id="completedBuyerSummary">Customer details</small></span>
+              <span class="completed-step-action">Edit</span>
+            </button>
+            <button type="button" id="editCompletedCoBuyerBtn" class="completed-step-row">
+              <span class="completed-step-icon optional" aria-hidden="true">2</span>
+              <span class="completed-step-copy"><strong>Co-buyer</strong><small id="completedCoBuyerSummary">Optional</small></span>
+              <span class="completed-step-action">Add</span>
+            </button>
+            <button type="button" id="editCompletedTradeBtn" class="completed-step-row">
+              <span class="completed-step-icon optional" aria-hidden="true">3</span>
+              <span class="completed-step-copy"><strong>Trade-in</strong><small id="completedTradeSummary">Optional</small></span>
+              <span class="completed-step-action">Add</span>
+            </button>
           </div>
 
           <fieldset id="reportSelectionPanel" class="report-selection">

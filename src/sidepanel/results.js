@@ -4,7 +4,11 @@
 
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
-import { calculateFinalDecision } from "./checks.js";
+import {
+  calculateFinalDecision,
+  classifyOfacResult,
+  classifyRepeatOffenderResult,
+} from "./checks.js";
 import { MISSING_API_KEY } from "../../lib/api-client.js";
 import {
   formatTitleType,
@@ -260,13 +264,14 @@ function repeatOffenderDetail(result) {
 
 function showPartialNotice(elements, label) {
   if (!elements.finalDecision) return;
+  elements.finalDecision.className = "final-decision verdict-review";
   elements.finalDecision.innerHTML = `
-    <div class="decision-badge decision-review">
-      <span class="decision-icon">${ICONS.alertTriangle}</span>
-      PARTIAL CHECK
-    </div>
+    <div class="decision-eyebrow"><span class="decision-icon">${ICONS.alertTriangle}</span>Partial check</div>
+    <h2 class="decision-headline">One result is ready</h2>
     <p class="decision-text">${sanitizeHTML(label)} completed. Print or download this result for your records.</p>
   `;
+  elements.reviewGuidancePanel?.classList.add("hidden");
+  document.body.classList.add("has-screening-results");
 }
 
 function hideAllResultCards(elements) {
@@ -436,27 +441,70 @@ export function displayResults(elements, results) {
   }
   const decision = results.finalDecision;
 
-  let badgeClass, badgeIcon, badgeText;
+  const checks = results.checks || {};
+  const ofacStates = [
+    classifyOfacResult(checks.ofac),
+    checks.coBuyerOfac ? classifyOfacResult(checks.coBuyerOfac) : null,
+  ].filter(Boolean);
+  const repeatStates = [
+    classifyRepeatOffenderResult(checks.repeatOffender),
+    checks.coBuyerRepeatOffender
+      ? classifyRepeatOffenderResult(checks.coBuyerRepeatOffender)
+      : null,
+  ].filter(Boolean);
+  const hasPotentialMatch = ofacStates.some((item) => item.state === "potential_match");
+  const hasConfirmedMatch = ofacStates.some((item) => item.state === "confirmed_match");
+  const hasRepeatFlag = repeatStates.some((item) => item.state === "ineligible");
+  const buyerFirstName = String(results.customer?.firstName || "The buyer").trim();
+  const completedAt = new Date(results.timestamp || Date.now());
+  const timeLabel = Number.isNaN(completedAt.getTime())
+    ? "Completed"
+    : completedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const reference = Number.isNaN(completedAt.getTime())
+    ? "Compliance record"
+    : `CC-${completedAt.getFullYear()}${String(completedAt.getMonth() + 1).padStart(2, "0")}${String(completedAt.getDate()).padStart(2, "0")}-${String(completedAt.getHours()).padStart(2, "0")}${String(completedAt.getMinutes()).padStart(2, "0")}${String(completedAt.getSeconds()).padStart(2, "0")}`;
+
+  let tone = "verdict-review";
+  let eyebrow = "Review required";
+  let headline = "Review before delivery";
+  let summary = decision.reason;
+  let icon = ICONS.alertTriangle;
+  let action = "";
+
   if (decision.level === "APPROVED") {
-    badgeClass = "decision-approved";
-    badgeIcon = ICONS.shieldCheck;
-    badgeText = "APPROVED";
-  } else if (decision.level === "REVIEW" || decision.level === "PARTIAL") {
-    badgeClass = "decision-review";
-    badgeIcon = ICONS.alertTriangle;
-    badgeText = decision.level === "PARTIAL" ? "PARTIAL CHECK" : "REVIEW REQUIRED";
-  } else {
-    badgeClass = "decision-denied";
-    badgeIcon = ICONS.x;
-    badgeText = "DENIED";
+    tone = "verdict-approved";
+    eyebrow = "All checks passed";
+    headline = "Clear to deliver";
+    summary = `${buyerFirstName} cleared every check that applied.`;
+    icon = ICONS.shieldCheck;
+  } else if (hasPotentialMatch) {
+    tone = "verdict-action";
+    eyebrow = "Possible match · needs you";
+    headline = "Compare before you act";
+    summary = "A hit is not a finding. Work the four comparison checks.";
+    icon = ICONS.alertTriangle;
+    action = `<div class="decision-actions"><button type="button" class="decision-primary-action" data-open-ofac-comparison>Open the comparison</button><span class="decision-progress">0 of 4</span></div>`;
+  } else if (hasConfirmedMatch) {
+    tone = "verdict-denied";
+    eyebrow = "Confirmed match · stop";
+    headline = "Do not proceed";
+    summary = decision.reason;
+    icon = ICONS.x;
+  } else if (hasRepeatFlag) {
+    tone = "verdict-manager";
+    eyebrow = "Waiting on a manager";
+    headline = "Hold for review";
+    summary = "Repeat-offender status requires manager review before delivery.";
+    icon = ICONS.alertTriangle;
   }
 
+  elements.finalDecision.className = `final-decision ${tone}`;
   elements.finalDecision.innerHTML = `
-    <div class="decision-badge ${badgeClass}">
-      <span class="decision-icon">${badgeIcon}</span>
-      ${badgeText}
-    </div>
-    <p class="decision-text">${sanitizeHTML(decision.reason)}</p>
+    <div class="decision-eyebrow"><span class="decision-icon">${icon}</span>${sanitizeHTML(eyebrow)}</div>
+    <h2 class="decision-headline">${sanitizeHTML(headline)}</h2>
+    <p class="decision-text">${sanitizeHTML(summary)}</p>
+    ${action}
+    <div class="decision-meta"><span>${sanitizeHTML(reference)}</span><span aria-hidden="true">·</span><span>${sanitizeHTML(timeLabel)}</span></div>
     ${
       decision.warnings?.length
         ? '<p class="decision-warnings">' +
@@ -465,6 +513,42 @@ export function displayResults(elements, results) {
         : ""
     }
   `;
+  elements.finalDecision
+    .querySelector("[data-open-ofac-comparison]")
+    ?.addEventListener("click", () => {
+      const panel = !elements.ofacTriagePanel?.classList.contains("hidden")
+        ? elements.ofacTriagePanel
+        : elements.cbOfacTriagePanel;
+      panel?.scrollIntoView({ behavior: "smooth", block: "center" });
+      panel?.querySelector("button")?.focus({ preventScroll: true });
+    });
+
+  if (elements.reviewGuidancePanel) {
+    elements.reviewGuidancePanel.classList.toggle("hidden", !hasRepeatFlag);
+    elements.reviewGuidancePanel.innerHTML = hasRepeatFlag
+      ? `<section class="manager-review-card"><span>Waiting on a manager</span><h3>Hold for review</h3><p>Repeat-offender flag. Registration denial reaches any vehicle this person owns or leases.</p><strong>MCL 257.219</strong></section><section class="flag-restrictions"><span>Not allowed while flagged</span><p>No BFS-4 permit or dealer plate</p><p>No delivery before SOS processing</p><p>Eligibility Declaration must be signed</p></section>`
+      : "";
+  }
+
+  if (elements.completedBuyerSummary) {
+    const customer = results.customer || {};
+    const buyerName = [customer.firstName, customer.middleName, customer.lastName, customer.suffix]
+      .filter(Boolean)
+      .join(" ");
+    elements.completedBuyerSummary.textContent = buyerName || "Customer details";
+    const coBuyerName = [
+      customer.coBuyer?.firstName,
+      customer.coBuyer?.middleName,
+      customer.coBuyer?.lastName,
+      customer.coBuyer?.suffix,
+    ].filter(Boolean).join(" ");
+    elements.completedCoBuyerSummary.textContent = coBuyerName || "Optional";
+    elements.completedTradeSummary.textContent = customer.tradeVin
+      ? `VIN ${customer.tradeVin}`
+      : "Optional";
+  }
+  document.body.classList.add("has-screening-results");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 
   // Buyer OFAC.
   renderOfacResult(

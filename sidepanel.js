@@ -200,6 +200,7 @@ const elements = {
   viewHistoryBtn: $("viewHistoryBtn"),
 
   // Collapsible customer/vehicle input
+  firstRunHero: $("firstRunHero"),
   inputPanel: $("inputPanel"),
   inputSummaryBar: $("inputSummaryBar"),
   inputSummaryText: $("inputSummaryText"),
@@ -259,6 +260,15 @@ const elements = {
   downloadAllPdfsLabel: $("downloadAllPdfsLabel"),
   selectAllReports: $("selectAllReports"),
   reportSelectionStatus: $("reportSelectionStatus"),
+  reviewGuidancePanel: $("reviewGuidancePanel"),
+  downloadEvidenceBtn: $("downloadEvidenceBtn"),
+  printEvidenceBtn: $("printEvidenceBtn"),
+  completedBuyerSummary: $("completedBuyerSummary"),
+  completedCoBuyerSummary: $("completedCoBuyerSummary"),
+  completedTradeSummary: $("completedTradeSummary"),
+  editCompletedBuyerBtn: $("editCompletedBuyerBtn"),
+  editCompletedCoBuyerBtn: $("editCompletedCoBuyerBtn"),
+  editCompletedTradeBtn: $("editCompletedTradeBtn"),
 
   // Co-Buyer results
   coBuyerResultsSection: $("coBuyerResultsSection"),
@@ -564,6 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initDatePickers([elements.dob, elements.cbDob]);
   initEventListeners();
   renderSosWorkspace();
+  syncFirstRunPresentation();
 
   initSettings(elements, {
     onClearHistory: () =>
@@ -1773,6 +1784,20 @@ function initEventListeners() {
   elements.downloadPdfBtn?.addEventListener("click", () =>
     downloadAllReportsPDF(getCurrentResults(), getSelectedReportKeys())
   );
+  elements.downloadEvidenceBtn?.addEventListener("click", () => {
+    const results = getCurrentResults();
+    return downloadAllReportsPDF(
+      results,
+      availableReportItems(results).map((item) => item.key)
+    );
+  });
+  elements.printEvidenceBtn?.addEventListener("click", () => {
+    const results = getCurrentResults();
+    return printAllReports(
+      results,
+      availableReportItems(results).map((item) => item.key)
+    );
+  });
   elements.downloadAllPdfsBtn?.addEventListener("click", () =>
     downloadAllReportPDFs(getCurrentResults(), getSelectedReportKeys())
   );
@@ -1804,7 +1829,11 @@ function initEventListeners() {
     "cbFirstName", "cbMiddleName", "cbLastName", "cbSuffix", "cbDob", "cbDlnPid",
   ];
   for (const id of cacheableFields) {
-    elements[id]?.addEventListener("change", () => cacheCurrentFormData());
+    elements[id]?.addEventListener("change", () => {
+      cacheCurrentFormData();
+      syncFirstRunPresentation();
+    });
+    elements[id]?.addEventListener("input", syncFirstRunPresentation);
   }
 
   // Co-Buyer toggle
@@ -1831,6 +1860,40 @@ function initEventListeners() {
     const isOpen =
       elements.inputSummaryBar.getAttribute("aria-expanded") === "true";
     setInputCollapsed(isOpen);
+  });
+
+  const openCompletedStep = (step) => {
+    document.body.classList.remove("has-screening-results");
+    setInputCollapsed(false);
+    syncFirstRunPresentation();
+    if (step === "coBuyer") {
+      elements.hasCoBuyer.checked = true;
+      elements.coBuyerSection?.classList.remove("hidden");
+      elements.cbFirstName?.focus();
+      return;
+    }
+    if (step === "trade") {
+      const header = $("tradeSectionHeader");
+      const content = $("tradeSectionContent");
+      content?.classList.remove("collapsed");
+      header?.setAttribute("aria-expanded", "true");
+      header?.querySelector(".section-toggle")?.classList.add("rotated");
+      elements.tradeVin?.focus();
+      return;
+    }
+    elements.firstName?.focus();
+  };
+  elements.editCompletedBuyerBtn?.addEventListener("click", () => openCompletedStep("buyer"));
+  elements.editCompletedCoBuyerBtn?.addEventListener("click", () => openCompletedStep("coBuyer"));
+  elements.editCompletedTradeBtn?.addEventListener("click", () => openCompletedStep("trade"));
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      if (!elements.firstRunHero?.classList.contains("hidden")) {
+        event.preventDefault();
+        elements.scanLicenseBtn?.click();
+      }
+    }
   });
 
   // Phone license scan: open a pairing session, show the QR, autofill on receipt.
@@ -1872,6 +1935,7 @@ function initEventListeners() {
             closeScanPair();
             const co = result.payload?.coBuyer ? " + co-buyer" : "";
             showToast(`License scanned — buyer${co} filled.`, "success");
+            syncFirstRunPresentation();
           } else if (result.status === "expired") {
             if (elements.scanPairStatus)
               elements.scanPairStatus.textContent =
@@ -1984,12 +2048,26 @@ function setInputCollapsed(collapsed, summaryCustomer = null) {
   }
 }
 
+function syncFirstRunPresentation() {
+  if (!elements.firstRunHero) return;
+  const hasBuyerData = [
+    elements.firstName,
+    elements.middleName,
+    elements.lastName,
+    elements.dob,
+    elements.dlnPid,
+  ].some((field) => String(field?.value || "").trim());
+  const hasResult = Boolean(getCurrentResults()) || document.body.classList.contains("has-screening-results");
+  elements.firstRunHero.classList.toggle("hidden", hasBuyerData || hasResult);
+}
+
 // Returns the panel to its pristine first-use state: form open, no summary bar.
 function resetInputPanel() {
   if (!elements.inputPanel || !elements.inputSummaryBar) return;
   elements.inputPanel.classList.remove("hidden");
   elements.inputSummaryBar.classList.add("hidden");
   elements.inputSummaryBar.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("has-screening-results");
 }
 
 // Per-person issuing jurisdiction from a phone scan; null = manually entered
@@ -2036,11 +2114,15 @@ function cacheCurrentFormData() {
 
 async function restoreCachedForm() {
   const cached = await loadCachedFormData(elements);
-  if (!cached) return;
+  if (!cached) {
+    syncFirstRunPresentation();
+    return;
+  }
   const restored = extractScanJurisdiction(cached);
   scanJurisdiction.buyer = restored.buyer;
   scanJurisdiction.coBuyer = restored.coBuyer;
   updateJurisdictionTags();
+  syncFirstRunPresentation();
 }
 
 function recordScanJurisdiction(payload) {
@@ -2400,6 +2482,8 @@ async function handleClear() {
   ]);
 
   setCurrentResults(null);
+  document.body.classList.remove("has-screening-results");
+  syncFirstRunPresentation();
   await chrome.action.setBadgeText({ text: "" });
 
   elements.resultsSection.classList.add("hidden");

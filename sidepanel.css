@@ -2226,6 +2226,582 @@ body.modal-open {
   }
 }
 
+/* Claude Design handoff — final visual-refinements composition.
+ * These rules intentionally change layout structure, not only the palette. */
+.first-run-hero {
+  margin: -14px -12px 4px;
+  padding: 26px 20px 24px;
+  background: #0d2b4a;
+  color: #fff;
+}
+
+.first-run-eyebrow,
+.decision-eyebrow,
+.manager-review-card > span,
+.flag-restrictions > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.first-run-eyebrow {
+  color: #9fb8cf;
+}
+
+.first-run-hero h2 {
+  max-width: 330px;
+  margin: 8px 0 0;
+  color: #fff;
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+  font-size: clamp(1.75rem, 8vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.06;
+}
+
+.first-run-hero > p {
+  max-width: 310px;
+  margin: 9px 0 0;
+  color: #cfe0ef;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.first-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.first-run-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 11px;
+  background: #ffcb05;
+  color: #0d2b4a;
+  font: 800 15px/1 Archivo, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.first-run-scan-btn:hover {
+  background: #ffda4d;
+  transform: translateY(-1px);
+}
+
+.first-run-actions kbd {
+  border: 0;
+  background: transparent;
+  color: #9fb8cf;
+  box-shadow: none;
+  font: 500 11px/1 "JetBrains Mono", monospace;
+}
+
+.first-run-hint {
+  display: block;
+  margin-top: 9px;
+  color: #9fb8cf;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+#inputPanel > .typed-buyer-card {
+  padding: 15px;
+  border-color: #e3e8ef;
+  box-shadow: none;
+}
+
+.typed-buyer-card .section-title {
+  margin-bottom: 13px;
+}
+
+.typed-buyer-title {
+  flex: 1;
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.typed-buyer-card .required-label {
+  color: #a35c00;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+}
+
+.typed-buyer-card .form-row {
+  margin-bottom: 11px;
+}
+
+.typed-buyer-card .form-group input,
+.typed-buyer-card .form-group select {
+  min-height: 44px;
+}
+
+body.has-screening-results .hub-main {
+  padding-top: 0;
+}
+
+body.has-screening-results #resultsSection {
+  order: -20;
+}
+
+body.has-screening-results #screeningWorkspace,
+body.has-screening-results .action-section[data-workspace-panel="screening"] {
+  display: none !important;
+}
+
+.results-section {
+  overflow: hidden;
+  gap: 10px;
+  padding: 0 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.final-decision {
+  padding: 22px 20px 20px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  text-align: left;
+}
+
+.final-decision.verdict-approved {
+  border-bottom-color: #bfe3d4;
+  background: linear-gradient(160deg, #e2f4ec, #f2fbf7);
+  color: #0b5c42;
+}
+
+.final-decision.verdict-action,
+.final-decision.verdict-denied {
+  background: #7d2d00;
+  color: #fff;
+}
+
+.final-decision.verdict-manager,
+.final-decision.verdict-review {
+  border-bottom-color: #e3d2b1;
+  background: linear-gradient(160deg, #f7f2e8, #fffdf8);
+  color: #6f4d1f;
+}
+
+.decision-eyebrow {
+  color: currentColor;
+}
+
+.verdict-action .decision-eyebrow,
+.verdict-denied .decision-eyebrow {
+  color: #ffc79a;
+}
+
+.decision-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.decision-headline {
+  margin: 7px 0 0;
+  color: currentColor;
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+  font-size: clamp(1.85rem, 8.5vw, 2.125rem);
+  font-weight: 800;
+  letter-spacing: -0.042em;
+  line-height: 1.02;
+}
+
+.verdict-action .decision-headline,
+.verdict-denied .decision-headline {
+  color: #fff;
+}
+
+.final-decision .decision-text {
+  max-width: 340px;
+  margin: 10px 0 0;
+  color: #2f5c47;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.verdict-action .decision-text,
+.verdict-denied .decision-text {
+  color: #f6d5bd;
+}
+
+.verdict-manager .decision-text,
+.verdict-review .decision-text {
+  color: #5f5140;
+}
+
+.decision-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+  color: #4a7561;
+  font: 500 12px/1.3 "JetBrains Mono", monospace;
+}
+
+.verdict-action .decision-meta,
+.verdict-denied .decision-meta {
+  color: #ffc79a;
+}
+
+.decision-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.decision-primary-action,
+.decision-progress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 15px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.decision-primary-action {
+  border: 0;
+  background: #fff;
+  color: #7d2d00;
+  cursor: pointer;
+}
+
+.decision-progress {
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  color: #ffc79a;
+}
+
+.decision-warnings {
+  margin-top: 11px;
+  color: currentColor;
+  font-size: 13px;
+}
+
+.review-guidance-panel {
+  display: grid;
+  gap: 11px;
+  margin: 4px 14px 0;
+}
+
+.manager-review-card,
+.flag-restrictions {
+  padding: 16px 17px;
+  border: 1px solid #e3e8ef;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.manager-review-card {
+  border-left: 3px solid #b8843a;
+}
+
+.manager-review-card > span {
+  color: #8a5f22;
+}
+
+.manager-review-card h3 {
+  margin-top: 6px;
+  color: #101a26;
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.manager-review-card p,
+.flag-restrictions p {
+  color: #42536a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.manager-review-card p {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.manager-review-card strong {
+  display: inline-flex;
+  margin-top: 11px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #f4f0e6;
+  color: #8a5f22;
+  font: 600 11px/1 "JetBrains Mono", monospace;
+}
+
+.flag-restrictions > span {
+  margin-bottom: 8px;
+  color: #556a7d;
+}
+
+.flag-restrictions p + p {
+  margin-top: 6px;
+}
+
+.evidence-panel,
+.completed-steps-panel {
+  overflow: hidden;
+  margin: 4px 14px 0;
+  border: 1px solid #e3e8ef;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.evidence-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 15px 11px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.evidence-kicker {
+  margin: 0;
+  color: #556a7d;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.evidence-heading h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.evidence-download-btn {
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #1d5f9e;
+  font: 600 12px/1 Archivo, sans-serif;
+  cursor: pointer;
+}
+
+.evidence-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.evidence-rows,
+.cobuyer-results .results-grid {
+  gap: 0;
+}
+
+.evidence-panel .result-card {
+  padding: 11px 15px;
+  border: 0;
+  border-top: 1px solid #eef1f5;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.evidence-panel .result-card:hover {
+  border-color: #eef1f5;
+  background: #fbfcfd;
+}
+
+.evidence-panel .result-header {
+  margin: 0;
+}
+
+.evidence-panel .result-header h3 {
+  color: #101a26;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.evidence-panel .check-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #e7f6f0;
+  color: #0f6f50;
+}
+
+.evidence-panel .check-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.evidence-panel .result-detail,
+.evidence-panel .result-evidence-meta,
+.evidence-panel .result-actions {
+  margin-left: 37px;
+}
+
+.evidence-panel .result-detail {
+  margin-top: -2px;
+  color: #4d5d70;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.evidence-panel .result-evidence-meta {
+  color: #718194;
+  font: 500 10px/1.4 "JetBrains Mono", monospace;
+}
+
+.evidence-panel .result-status {
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
+.evidence-panel .result-actions {
+  margin-top: 7px;
+}
+
+.evidence-panel .result-actions button {
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.cobuyer-results {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cobuyer-results .section-subtitle {
+  margin: 0;
+  padding: 10px 15px 8px;
+  border-top: 1px solid #eef1f5;
+  color: #556a7d;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.completed-steps-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.completed-step-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 62px;
+  padding: 10px 15px;
+  border: 0;
+  border-top: 1px solid #eef1f5;
+  background: #fff;
+  color: #101a26;
+  text-align: left;
+  cursor: pointer;
+}
+
+.completed-step-row:first-child {
+  border-top: 0;
+}
+
+.completed-step-row:hover {
+  background: #f8fafc;
+}
+
+.completed-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font: 600 11px/1 "JetBrains Mono", monospace;
+}
+
+.completed-step-icon.completed {
+  background: #e7f6f0;
+  color: #0f6f50;
+}
+
+.completed-step-icon.optional {
+  border: 1px dashed #b6c2d0;
+  color: #5e6d7e;
+}
+
+.completed-step-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.completed-step-copy strong {
+  font-family: "Bricolage Grotesque", Archivo, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.completed-step-copy small {
+  overflow: hidden;
+  color: #4d5d70;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completed-step-action {
+  color: #1d5f9e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.results-section .report-selection,
+.results-section .all-actions {
+  margin-inline: 14px;
+}
+
+@media (max-width: 380px) {
+  .first-run-hero {
+    margin-inline: -9px;
+    padding-inline: 17px;
+  }
+
+  .final-decision {
+    padding-inline: 17px;
+  }
+
+  .evidence-panel,
+  .completed-steps-panel,
+  .review-guidance-panel,
+  .results-section .report-selection,
+  .results-section .all-actions {
+    margin-inline: 9px;
+  }
+}
+
+.first-run-hero.hidden,
+.review-guidance-panel.hidden {
+  display: none !important;
+}
+
 /* Print styles — used when the user prints the sidebar directly */
 @media print {
   body { background: #fff; color: #000; }
@@ -3337,4 +3913,126 @@ body {
   .sos-quote-plate-preview {
     transition: none !important;
   }
+}
+
+/* Keep the handoff composition authoritative over the earlier compatibility
+ * layer that precedes it in this stylesheet. */
+#inputPanel > .typed-buyer-card:first-child {
+  padding: 15px;
+  border-color: #e3e8ef;
+  box-shadow: none;
+}
+
+.results-section {
+  padding: 0 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.evidence-panel .evidence-heading {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.final-decision.verdict-approved {
+  border-width: 0 0 1px;
+  border-color: #bfe3d4;
+  background: linear-gradient(160deg, #e2f4ec, #f2fbf7);
+  color: #0b5c42;
+}
+
+.final-decision.verdict-action,
+.final-decision.verdict-denied {
+  border: 0;
+  background: #7d2d00;
+  color: #fff;
+}
+
+.final-decision.verdict-manager,
+.final-decision.verdict-review {
+  border-width: 0 0 1px;
+  border-color: #e3d2b1;
+  background: linear-gradient(160deg, #f7f2e8, #fffdf8);
+  color: #6f4d1f;
+}
+
+@media (max-width: 380px) {
+  .results-section {
+    padding: 0 0 18px;
+  }
+}
+
+.workspace-tabs {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr) minmax(0, 0.82fr);
+  gap: 0;
+  padding-inline: 8px;
+}
+
+.workspace-tabs button {
+  min-width: 0;
+  padding-inline: 3px;
+  font-size: 0.72rem;
+}
+
+.typed-buyer-card .form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.typed-buyer-card .form-row:nth-of-type(2) {
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 0.55fr);
+}
+
+.typed-buyer-card .form-group,
+.typed-buyer-card .form-group-small {
+  min-width: 0;
+  width: auto;
+}
+
+@media (max-width: 340px) {
+  .typed-buyer-card .form-row,
+  .typed-buyer-card .form-row:nth-of-type(2) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evidence-panel .result-card {
+  position: relative;
+  padding-right: 54px;
+}
+
+.evidence-panel .result-actions {
+  position: absolute;
+  right: 15px;
+  bottom: 12px;
+  margin: 0;
+}
+
+.evidence-panel .result-actions .btn-secondary:not(.btn-emphasis) {
+  display: none;
+}
+
+.evidence-panel .result-actions .btn-emphasis {
+  display: inline-flex;
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #5e6d7e;
+  font-size: 0;
+}
+
+.evidence-panel .result-actions .btn-emphasis:hover {
+  background: #eef3f7;
+  color: #0d2b4a;
+}
+
+.evidence-panel .result-actions .btn-emphasis .icon svg {
+  width: 16px;
+  height: 16px;
 }

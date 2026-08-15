@@ -438,12 +438,28 @@ export function ofacResultArgs(ofac) {
         "No potential match was found, but the SDN list could not be refreshed. Re-run when online.",
     };
   }
-  if (classification.state === "match") {
+  if (classification.state === "confirmed_match") {
+    return {
+      state: classification.state,
+      variant: "fail",
+      title: "CONFIRMED MATCH",
+      subtitle: "The dealership marked this potential match as confirmed.",
+    };
+  }
+  if (classification.state === "potential_match") {
     return {
       state: classification.state,
       variant: "fail",
       title: "POTENTIAL MATCH",
       subtitle: "REVIEW REQUIRED — Potential name match found",
+    };
+  }
+  if (classification.state === "false_positive") {
+    return {
+      state: classification.state,
+      variant: "pass",
+      title: "FALSE POSITIVE REVIEWED",
+      subtitle: "The dealership reviewed the potential match and marked it as a false positive.",
     };
   }
   return {
@@ -554,7 +570,7 @@ export function ofacReportHTML({
 }
 
 export function ofacMatchesHTML(ofac, outcome = ofacResultArgs(ofac)) {
-  if (outcome.state !== "match") return "";
+  if (!["potential_match", "confirmed_match"].includes(outcome.state)) return "";
   const matches = Array.isArray(ofac?.matches) ? ofac.matches : [];
   const shownMatches = matches.slice(0, 5);
   const totalMatches = Math.max(
@@ -782,6 +798,9 @@ function ofacReportRow(label, result) {
   const labels = {
     clear: "CLEAR",
     match: "POTENTIAL MATCH",
+    potential_match: "POTENTIAL MATCH",
+    confirmed_match: "CONFIRMED MATCH",
+    false_positive: "FALSE POSITIVE REVIEWED",
     stale: "REVIEW REQUIRED",
     unavailable: "UNAVAILABLE",
     missing: "NOT RUN",
@@ -791,7 +810,7 @@ function ofacReportRow(label, result) {
     label,
     labels[outcome.state] || "REVIEW REQUIRED",
     outcome.subtitle,
-    ["missing", "unavailable", "review", "stale"].includes(outcome.state)
+    ["missing", "unavailable", "review", "stale", "potential_match"].includes(outcome.state)
   );
 }
 
@@ -1834,7 +1853,7 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
     title: outcome.title,
     subtitle: outcome.subtitle,
     extraLines:
-      outcome.state === "match" && shownMatches.length
+      ["potential_match", "confirmed_match"].includes(outcome.state) && shownMatches.length
         ? [
             ...shownMatches
               .slice(0, 5)

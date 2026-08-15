@@ -23,8 +23,8 @@ Key Features:
 ✅ Printable Deal Jacket Screening Records — Print or download a timestamped summary of the current results. Reports record what the extension returned; they are not a legal certification. Downloaded files remain wherever you choose to save them.
 
 ✅ Privacy-Conscious by Design
-• Customer fields, full results, VINs, SOS fee choices, and portal screenshots are kept in the current browser session, not persistent extension history.
-• Persistent history contains only anonymous references, timestamps, overall decisions, check outcomes, and co-buyer/trade-in workflow flags. It is limited to 30 days / 50 records and can be cleared at any time.
+• Compliance History stores customer fields, results, trade VINs, and captured report evidence locally so dealership staff can reopen a record, re-screen, print, or download it later.
+• Local History is limited to 30 days / 50 records and can be cleared at any time. SOS fee choices remain session-only; credentials and authentication tokens are never stored in History.
 • The MDOS service processes requested fields in memory and does not maintain a database of searches.
 • The optional phone scan uses an encrypted, single-use package the relay service cannot read; the license image is not transmitted.
 • No advertising or analytics tracking. Customer data is not sold.

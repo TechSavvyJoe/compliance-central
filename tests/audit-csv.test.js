@@ -7,6 +7,9 @@ const SAMPLE = [
   {
     timestamp: "2026-06-16T14:30:00.000Z",
     reference: "CC-20260616-123456",
+    customerName: "Jamie Dealer",
+    coBuyerName: "Taylor Dealer",
+    tradeVin: "1HGBH41JXMN109186",
     decision: "APPROVED",
     runType: "full",
     runLabel: "Run All Checks",
@@ -33,19 +36,19 @@ const SAMPLE = [
   },
 ];
 
-test("buildAuditCsv emits anonymous, per-subject audit columns", () => {
+test("buildAuditCsv emits identified, per-subject audit columns", () => {
   const csv = buildAuditCsv(SAMPLE);
   const lines = csv.split("\r\n");
   assert.equal(lines.length, 3);
-  assert.match(lines[0], /^Timestamp,Audit Reference,Run,Buyer OFAC,/);
-  assert.doesNotMatch(csv, /Customer|Date of Birth|Trade VIN/);
+  assert.match(lines[0], /^Timestamp,Audit Reference,Customer,Co-Buyer,Trade VIN,Run,Buyer OFAC,/);
+  assert.match(csv, /Jamie Dealer,Taylor Dealer,1HGBH41JXMN109186/);
 });
 
 test("buildAuditCsv preserves typed outcomes without false clear or match labels", () => {
   const lines = buildAuditCsv(SAMPLE).split("\r\n");
   assert.match(
     lines[1],
-    /CC-20260616-123456,Run All Checks,Clear,Eligible,Clear,Eligible,Active lien,APPROVED$/
+    /CC-20260616-123456,Jamie Dealer,Taylor Dealer,1HGBH41JXMN109186,Run All Checks,Clear,Eligible,Clear,Eligible,Active lien,APPROVED$/
   );
   assert.match(
     lines[2],
@@ -73,7 +76,7 @@ test("buildAuditCsv neutralizes spreadsheet formulas and preserves columns", () 
   const row = csv.split("\r\n")[1];
   assert.ok(row.includes("'=HYPERLINK"));
   assert.ok(row.includes("'+SUM"));
-  assert.equal(csv.split("\r\n")[0].split(",").length, 9);
+  assert.equal(csv.split("\r\n")[0].split(",").length, 12);
 });
 
 test("buildAuditCsv handles empty history (header only)", () => {

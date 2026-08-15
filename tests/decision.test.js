@@ -28,7 +28,11 @@ test("OFAC errors require review instead of approval", () => {
 
 test("confirmed blockers remain denied when an unrelated check is unavailable", () => {
   const ofacBlocker = calculateFinalDecision({
-    ofac: { passed: false, matches: [{ name: "Confirmed candidate" }] },
+    ofac: {
+      passed: false,
+      disposition: "confirmed_match",
+      matches: [{ name: "Confirmed candidate" }],
+    },
     repeatOffender: {
       passed: false,
       status: "error",
@@ -71,10 +75,22 @@ test("missing required checks do not produce approval or false denial", () => {
   assert.match(decision.reason, /Repeat Offender/);
 });
 
-test("matches still deny and clean full checks still approve", () => {
+test("potential matches require review, confirmed matches deny, and clean checks approve", () => {
   assert.equal(
     calculateFinalDecision({
       ofac: { passed: false, matches: [{ name: "Match" }] },
+      repeatOffender: { passed: true, status: "eligible" },
+    }).level,
+    "REVIEW"
+  );
+
+  assert.equal(
+    calculateFinalDecision({
+      ofac: {
+        passed: false,
+        disposition: "confirmed_match",
+        matches: [{ name: "Match" }],
+      },
       repeatOffender: { passed: true, status: "eligible" },
     }).level,
     "DENIED"
@@ -127,13 +143,13 @@ test("out-of-state subject: Repeat Offender not_applicable is non-blocking (OFAC
     }).level,
     "APPROVED"
   );
-  // But an out-of-state subject who IS an OFAC match still denies.
+  // An unreviewed potential match requires human review.
   assert.equal(
     calculateFinalDecision({
       ofac: { passed: false, matches: [{ name: "Match" }] },
       repeatOffender: { passed: null, status: "not_applicable" },
     }).level,
-    "DENIED"
+    "REVIEW"
   );
   // Out-of-state co-buyer RO N/A is also non-blocking.
   assert.equal(
@@ -203,7 +219,7 @@ test("date picker normalizes typed DOB values for existing checks", () => {
   assert.equal(normalizeDateValue("1980-01-31"), "1980-01-31");
 });
 
-test("history persists only anonymous typed audit outcomes", async () => {
+test("history persists a restorable local customer and report record", async () => {
   const stored = {
     [STORAGE_KEYS.complianceHistory]: [],
   };
@@ -259,6 +275,7 @@ test("history persists only anonymous typed audit outcomes", async () => {
         status: "eligible",
         rawText: "official portal pass information",
         screenshotData: "data:image/png;base64,abc",
+        authToken: "must-not-persist",
       },
     },
   });
@@ -271,18 +288,18 @@ test("history persists only anonymous typed audit outcomes", async () => {
   assert.equal(archived.hasTrade, true);
   assert.equal(archived.checks.ofac, "clear");
   assert.equal(archived.checks.repeatOffender, "eligible");
+  assert.equal(archived.customerName, "Jane Doe");
+  assert.equal(archived.coBuyerName, "John Doe");
+  assert.equal(archived.tradeVin, "1HGBH41JXMN109186");
+  assert.equal(archived.savedResults.customer.dob, "1980-01-01");
+  assert.equal(archived.savedResults.customer.dlnPid, "S123456789012");
+  assert.equal(
+    archived.savedResults.checks.repeatOffender.screenshotData,
+    "data:image/png;base64,abc"
+  );
   const serialized = JSON.stringify(archived);
-  for (const privateValue of [
-    "Jane",
-    "Doe",
-    "1980-01-01",
-    "S123456789012",
-    "1HGBH41JXMN109186",
-    "official portal pass information",
-    "data:image/png",
-  ]) {
-    assert.doesNotMatch(serialized, new RegExp(privateValue));
-  }
+  assert.doesNotMatch(serialized, /must-not-persist/);
+  assert.match(serialized, /official portal pass information/);
 });
 
 test("history save reports storage failure to its caller", async () => {

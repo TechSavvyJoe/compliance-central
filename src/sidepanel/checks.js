@@ -194,7 +194,13 @@ export function classifyOfacResult(result) {
     };
   }
   if (result.passed === false) {
-    return { state: "match", blocker: true, complete: true };
+    if (result.disposition === "confirmed_match") {
+      return { state: "confirmed_match", blocker: true, complete: true };
+    }
+    if (result.disposition === "false_positive") {
+      return { state: "false_positive", blocker: false, complete: true };
+    }
+    return { state: "potential_match", blocker: false, complete: false };
   }
   return { state: "review", blocker: false, complete: false };
 }
@@ -241,7 +247,19 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "DENIED",
-      reason: "OFAC match found - cannot proceed with transaction",
+      reason: "OFAC match confirmed after comparison - do not proceed with the transaction",
+    };
+  }
+
+  if (
+    buyerOfac.state === "potential_match" ||
+    coBuyerOfac?.state === "potential_match"
+  ) {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason:
+        "Potential OFAC match found - compare the buyer with the SDN entry before deciding",
     };
   }
 

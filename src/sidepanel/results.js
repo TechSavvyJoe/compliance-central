@@ -166,13 +166,23 @@ function renderOfacMatchList(matches, totalCount = matches?.length || 0) {
     </details>`;
 }
 
-function renderOfacResult(statusEl, detailEl, timestampEl, printBtn, downloadBtn, ofac, fallbackTimestamp) {
+function renderOfacResult(
+  statusEl,
+  detailEl,
+  timestampEl,
+  printBtn,
+  downloadBtn,
+  triagePanel,
+  ofac,
+  fallbackTimestamp
+) {
   if (!ofac) {
     setResultStatus(statusEl, "skipped", "Not Run");
     if (detailEl) detailEl.textContent = "OFAC screening has not run";
     setActionVisibility(printBtn, false);
     setActionVisibility(downloadBtn, false);
     setResultTimestamp(timestampEl, null);
+    triagePanel?.classList.add("hidden");
     return;
   }
 
@@ -187,16 +197,33 @@ function renderOfacResult(statusEl, detailEl, timestampEl, printBtn, downloadBtn
     setActionVisibility(printBtn, false);
     setActionVisibility(downloadBtn, false);
     setResultTimestamp(timestampEl, ofac, fallbackTimestamp);
+    triagePanel?.classList.add("hidden");
     return;
   }
 
   // A stale screen (the SDN list could not be refreshed before screening) is a
   // weaker "Pass" — flag it on the row so a clean result isn't taken at face
   // value when the data might be out of date.
+  const falsePositive = ofac.disposition === "false_positive";
+  const confirmedMatch = ofac.disposition === "confirmed_match";
   setResultStatus(
     statusEl,
-    ofac.passed ? (ofac.stale ? "warning" : "pass") : "fail",
-    ofac.passed ? (ofac.stale ? "Pass (stale data)" : "Pass") : "Match"
+    ofac.passed || falsePositive
+      ? ofac.stale
+        ? "warning"
+        : "pass"
+      : confirmedMatch
+        ? "fail"
+        : "warning",
+    ofac.passed
+      ? ofac.stale
+        ? "Pass (stale data)"
+        : "Pass"
+      : falsePositive
+        ? "False positive cleared"
+        : confirmedMatch
+          ? "Confirmed match"
+          : "Potential match"
   );
   if (detailEl) {
     if (!ofac.passed) {
@@ -219,11 +246,15 @@ function renderOfacResult(statusEl, detailEl, timestampEl, printBtn, downloadBtn
   }
   setActionVisibility(printBtn, true);
   setActionVisibility(downloadBtn, true);
+  triagePanel?.classList.toggle("hidden", ofac.passed || falsePositive || confirmedMatch);
   setResultTimestamp(timestampEl, ofac, fallbackTimestamp);
 }
 
 function repeatOffenderDetail(result) {
   if (result?.passed) return REPEAT_ELIGIBLE_DETAIL;
+  if (result?.status === "ineligible") {
+    return "Registration denied by MDOS. Do not issue a BFS-4 temporary permit or dealer plate, and do not deliver before the transaction is processed with the Secretary of State.";
+  }
   return result?.message || result?.status || "Review MDOS repeat-offender response";
 }
 
@@ -442,6 +473,7 @@ export function displayResults(elements, results) {
     elements.ofacResultTimestamp,
     elements.printOfacBtn,
     elements.downloadOfacBtn,
+    elements.ofacTriagePanel,
     results.checks.ofac,
     results.timestamp
   );
@@ -577,6 +609,7 @@ export function displayResults(elements, results) {
       elements.cbOfacResultTimestamp,
       elements.printCbOfacBtn,
       elements.downloadCbOfacBtn,
+      elements.cbOfacTriagePanel,
       results.checks.coBuyerOfac,
       results.timestamp
     );
@@ -641,9 +674,10 @@ export function displayIndividualResult(elements, type, result) {
       elements.ofacResultStatus,
       elements.ofacResultDetail,
       elements.ofacResultTimestamp,
-      elements.printOfacBtn,
-      elements.downloadOfacBtn,
-      result,
+    elements.printOfacBtn,
+    elements.downloadOfacBtn,
+    elements.ofacTriagePanel,
+    result,
       result.timestamp
     );
   } else if (type === "repeatOffender") {

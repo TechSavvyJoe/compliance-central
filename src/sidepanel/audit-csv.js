@@ -8,6 +8,9 @@
 const HEADERS = [
   "Timestamp",
   "Audit Reference",
+  "Customer",
+  "Co-Buyer",
+  "Trade VIN",
   "Run",
   "Buyer OFAC",
   "Buyer Repeat Offender",
@@ -70,6 +73,9 @@ export function buildAuditCsv(history) {
     rows.push([
       item.timestamp || "",
       item.reference || "",
+      item.customerName || "",
+      item.coBuyerName || "",
+      item.tradeVin || "",
       item.runLabel || item.runType || "Run All Checks",
       stateLabel("ofac", checks.ofac),
       stateLabel("repeat", checks.repeatOffender),

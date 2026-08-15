@@ -49,8 +49,8 @@ Key Features:
 ✅ Printable Deal Jacket Screening Records — Print or download a timestamped summary of the current results. Reports record what the extension returned; they are not a legal certification. Downloaded files remain wherever you choose to save them.
 
 ✅ Privacy-Conscious by Design
-• Customer fields, full results, VINs, SOS fee choices, and portal screenshots are kept in the current browser session, not persistent extension history.
-• Persistent history contains only anonymous references, timestamps, overall decisions, check outcomes, and co-buyer/trade-in workflow flags. It is limited to 30 days / 50 records and can be cleared at any time.
+• Compliance History stores customer fields, results, trade VINs, and captured report evidence locally so dealership staff can reopen a record, re-screen, print, or download it later.
+• Local History is limited to 30 days / 50 records and can be cleared at any time. SOS fee choices remain session-only; credentials and authentication tokens are never stored in History.
 • The MDOS service processes requested fields in memory and does not maintain a database of searches.
 • The optional phone scan uses an encrypted, single-use package the relay service cannot read; the license image is not transmitted.
 • No advertising or analytics tracking. Customer data is not sold.
@@ -98,8 +98,8 @@ Compliance Central lets Michigan automotive dealers screen buyers and co-buyers 
 
 PERMISSION JUSTIFICATIONS (there is one box per permission — paste the matching text):
 - sidePanel: The entire user interface is a Chrome side panel; this permission opens and renders it.
-- storage: Saves preferences and bounded anonymous audit history (up to 30 days / 50 records). Persistent records contain an anonymous reference, timestamp, overall decision, check outcomes, and co-buyer/trade-in workflow flags; they exclude customer identity, VINs, screenshots, and full report payloads.
-- unlimitedStorage: Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded anonymous audit history. Customer identity, VINs, full results, and portal screenshots remain session-only.
+- storage: Saves preferences and bounded device-local customer/report history (up to 30 days / 50 records) so an authorized dealership user can reopen, re-screen, print, or download a prior record.
+- unlimitedStorage: Stores the downloaded OFAC SDN sanctions dataset and bounded device-local report history, including captured state-site evidence images. SOS credentials and authentication tokens are not stored in History.
 - alarms: Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 - tabs: Creates an inactive public SOS calculator tab only after Calculate SOS fee, closes it after a verified result, and foregrounds the same prefilled tab only after a separate Finish on Michigan SOS click.
 - Host permission https://sanctionslistservice.ofac.treas.gov/: Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
@@ -113,9 +113,9 @@ ARE YOU USING REMOTE CODE? → No. (All code is bundled in the package; nothing 
 DATA USAGE (the checkbox form):
 - "Does this item collect or use user data?" → Yes.
 - Check: Personally identifiable information — name, date of birth, and government ID (driver's license number / PID). These fields are transmitted only for user-requested MDOS checks.
-- Check: Website content — Michigan portal responses and screenshots returned for user-requested checks; session-only.
+- Check: Website content — Michigan Repeat Offender and title/lien responses and screenshots are saved in bounded device-local History; SOS fee result-page captures remain session-only.
 - Check: Location — the hosting service receives the request IP address, which is used transiently in memory for rate limiting and abuse prevention and is not written to a database or application log.
-- The trade-in VIN is sent only for the optional title check. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history contains only anonymous references, timestamps, overall decisions, check outcomes, and workflow flags. User-requested PDF or CSV files remain in the user's chosen download location.
+- The trade-in VIN is sent only for the optional title check. Customer fields, VINs, full results, and portal screenshots are retained in device-local History for up to 30 days / 50 records so dealership staff can reopen and reproduce a record. User-requested PDF or CSV files remain in the user's chosen download location.
 - Do NOT check: web history, authentication information, financial/payment information, health information, personal communications, or user activity.
 - Check all three required certifications (all are true for this extension):
    (1) I do not sell or transfer user data to third parties, outside of the approved use cases.

@@ -1,5 +1,5 @@
 /**
- * Compliance history persistence + history modal rendering.
+ * Compliance history persistence + history workspace rendering.
  *
  * Storage key: chrome.storage.local.complianceHistory (array, newest first).
  */
@@ -54,6 +54,9 @@ export function auditStateMeta(kind, value) {
     ofac: {
       clear: ["pass", "Clear"],
       match: ["fail", "Potential match"],
+      potential_match: ["review", "Potential match"],
+      confirmed_match: ["fail", "Confirmed match"],
+      false_positive: ["pass", "False positive"],
       stale: ["review", "Stale data"],
       error: ["review", "Unavailable"],
       review: ["review", "Review"],
@@ -190,10 +193,22 @@ export async function updateHistoryCount(historyCountEl) {
       }
     }).length;
 
-    historyCountEl.textContent =
-      history.length > todayCount
-        ? `${todayCount} today, ${history.length} total`
-        : `${todayCount} today`;
+    if (historyCountEl.classList?.contains?.("tab-count")) {
+      historyCountEl.textContent = String(history.length);
+      historyCountEl.title =
+        history.length > todayCount
+          ? `${todayCount} today, ${history.length} total`
+          : `${todayCount} today`;
+      historyCountEl.setAttribute(
+        "aria-label",
+        `${history.length} saved audit record${history.length === 1 ? "" : "s"}`
+      );
+    } else {
+      historyCountEl.textContent =
+        history.length > todayCount
+          ? `${todayCount} today, ${history.length} total`
+          : `${todayCount} today`;
+    }
   } catch (error) {
     console.error("Error updating history count:", error);
   }
@@ -211,9 +226,9 @@ export async function populateHistoryModal(historyListEl) {
     }
 
     const shown = history.slice(0, MAX_ENTRIES);
-    const summary = `<div class="history-summary">${history.length} audit record${
+    const summary = `<div class="history-summary">${history.length} local record${
       history.length === 1 ? "" : "s"
-    } · no customer identity saved</div>`;
+    } · retained up to ${CONFIG.limits.dataRetentionDays} days</div>`;
 
     historyListEl.innerHTML =
       summary +
@@ -284,6 +299,15 @@ export async function populateHistoryModal(historyListEl) {
           }
 
           const tradeText = item.hasTrade ? "Trade-in included" : "No trade-in";
+          const primaryLabel = item.customerName
+            ? sanitizeHTML(item.customerName)
+            : `Audit ${sanitizeHTML(item.reference)}`;
+          const coBuyerText = item.coBuyerName
+            ? ` · Co-buyer ${sanitizeHTML(item.coBuyerName)}`
+            : "";
+          const vehicleText = item.tradeVin
+            ? ` · ${sanitizeHTML(item.tradeVin)}`
+            : "";
           const runText =
             item.runType === "individual"
               ? ` · ${sanitizeHTML(item.runLabel || "Partial")}`
@@ -293,18 +317,20 @@ export async function populateHistoryModal(historyListEl) {
         <div class="history-item ${decisionItemCls}" data-index="${index}">
           <div class="history-item-header">
             <div class="history-id">
-              <span class="history-customer">Audit ${sanitizeHTML(item.reference)}</span>
+              <span class="history-customer">${primaryLabel}</span>
               <span class="history-meta">
                 <span>${dateStr} · ${timeStr}</span>
                 ${agoBadge}
-                <span class="history-meta-trade">${tradeText}${runText}</span>
+                <span class="history-meta-trade">${sanitizeHTML(item.reference)} · ${tradeText}${vehicleText}${coBuyerText}${runText}</span>
               </span>
             </div>
             <span class="history-decision ${dm.cls}">${dm.icon}<span>${dm.label}</span></span>
           </div>
           <div class="history-checks">${chips}</div>
           <div class="history-actions">
-            <button class="btn-hist btn-hist-primary history-new-btn" data-index="${index}" title="Start a new screening"><span class="btn-hist-ic">${ICONS.play}</span>Start new screening</button>
+            <button class="btn-hist btn-hist-primary history-open-btn" data-index="${index}" title="Restore this customer and the saved results"><span class="btn-hist-ic">${ICONS.play}</span>Open record</button>
+            <button class="btn-hist history-print-btn" data-index="${index}" title="Print the saved reports">Print</button>
+            <button class="btn-hist history-download-btn" data-index="${index}" title="Download the saved reports as one PDF">PDF</button>
           </div>
         </div>`;
         })

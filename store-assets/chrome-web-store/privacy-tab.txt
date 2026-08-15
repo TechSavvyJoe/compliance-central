@@ -16,10 +16,10 @@ sidePanel —
 The entire user interface is a Chrome side panel; this permission opens and renders it.
 
 storage —
-Saves preferences and bounded anonymous audit history (up to 30 days / 50 records). Persistent records contain an anonymous reference, timestamp, overall decision, check outcomes, and co-buyer/trade-in workflow flags; they exclude customer identity, VINs, screenshots, and full report payloads.
+Saves preferences and bounded device-local customer/report history (up to 30 days / 50 records) so an authorized dealership user can reopen, re-screen, print, or download a prior record.
 
 unlimitedStorage —
-Stores the downloaded OFAC SDN sanctions dataset for on-device screening and bounded anonymous audit history. Customer identity, VINs, full results, and portal screenshots remain session-only.
+Stores the downloaded OFAC SDN sanctions dataset and bounded device-local report history, including captured state-site evidence images. SOS credentials and authentication tokens are not stored in History.
 
 alarms —
 Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
@@ -55,13 +55,13 @@ DATA USAGE  (the checkbox form)
 
 Data types to mark as COLLECTED:
   • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
-  • Website content  (Michigan portal responses and screenshots, including SOS fee result-page captures, returned for user-requested actions; session-only)
+  • Website content  (Michigan Repeat Offender and title/lien responses and screenshots saved in bounded device-local History; SOS fee result-page captures remain session-only)
   • Location  (the hosting service receives the request IP address; Compliance Central uses it transiently in memory for rate limiting and abuse prevention, and does not write it to a database or application log)
 
 Data types to leave UNCHECKED:
   • Web history: NO
   • Financial, health, authentication, personal communications, user activity, etc.: NO
-  (The trade-in VIN is sent only for the optional title check — note under "other" if asked. Customer fields, VINs, full results, and portal screenshots remain in browser session storage; persistent audit history is anonymous. User-requested PDF or CSV downloads remain in the user's chosen location.)
+  (The trade-in VIN is sent only for the optional title check — note under "other" if asked. Customer fields, VINs, full results, and portal screenshots are retained in device-local History for up to 30 days / 50 records so dealership staff can reopen and reproduce a record. User-requested PDF or CSV downloads remain in the user's chosen location.)
 
 Check ALL THREE required certifications (they are all true for this extension):
   [x] I do not sell or transfer user data to third parties, outside of the approved use cases.
@@ -77,4 +77,4 @@ LIMITED USE DISCLOSURE
 ==================================================
 Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.
 
-Information is used only to provide the extension's user-requested compliance checks, phone-to-computer transfer, local preferences, and anonymous audit records. It is not used for advertising, market research, credit scoring, or unrelated purposes. Human access is limited to a user's explicit support request, security investigation, legal requirement, or aggregated operations that cannot identify a person.
+Information is used only to provide the extension's user-requested compliance checks, phone-to-computer transfer, local preferences, and device-local customer/report records. It is not used for advertising, market research, credit scoring, or unrelated purposes. Human access is limited to the authorized user of the local browser profile, a user's explicit support request, security investigation, or legal requirement.

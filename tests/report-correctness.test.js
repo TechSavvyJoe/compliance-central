@@ -116,6 +116,7 @@ test("combined report preserves a confirmed denial despite another unavailable c
   const results = resultFixture();
   results.checks.ofac = {
     passed: false,
+    disposition: "confirmed_match",
     matches: [{ name: "Confirmed candidate" }],
   };
   const summary = reportDecisionSummary(results);
@@ -123,7 +124,7 @@ test("combined report preserves a confirmed denial despite another unavailable c
 
   assert.equal(summary.decision.level, "DENIED");
   assert.match(html, /decision-denied/);
-  assert.match(html, /OFAC match found/);
+  assert.match(html, /OFAC match confirmed/);
   assert.match(html, /Title \/ Lien[\s\S]*UNAVAILABLE/);
 });
 

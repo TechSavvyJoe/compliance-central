@@ -58,7 +58,7 @@ test("purge keeps recent entries, drops expired and corrupt-timestamp entries", 
   assert.doesNotMatch(JSON.stringify(remaining[0]), /Recent Keep/);
 });
 
-test("legacy PII-bearing history is migrated to typed anonymous outcomes", () => {
+test("legacy full records migrate to restorable bounded local records", () => {
   const migrated = minimizeHistoryEntry({
     id: 123,
     timestamp: "2026-06-16T14:30:00.000Z",
@@ -87,23 +87,17 @@ test("legacy PII-bearing history is migrated to typed anonymous outcomes", () =>
   assert.deepEqual(migrated.checks, {
     ofac: "clear",
     repeatOffender: "error",
-    coBuyerOfac: "match",
+    coBuyerOfac: "potential_match",
     coBuyerRepeatOffender: "na",
     title: "lien",
   });
   assert.equal(migrated.hasCoBuyer, true);
   assert.equal(migrated.hasTrade, true);
-  const serialized = JSON.stringify(migrated);
-  for (const privateValue of [
-    "Jane",
-    "Doe",
-    "1980-01-01",
-    "S123456789012",
-    "1HGBH41JXMN109186",
-    "Unavailable",
-  ]) {
-    assert.doesNotMatch(serialized, new RegExp(privateValue));
-  }
+  assert.equal(migrated.customerName, "Jane Doe");
+  assert.equal(migrated.tradeVin, "1HGBH41JXMN109186");
+  assert.equal(migrated.savedResults.customer.dob, "1980-01-01");
+  assert.equal(migrated.savedResults.customer.dlnPid, "S123456789012");
+  assert.equal(migrated.savedResults.checks.repeatOffender.error, "Unavailable");
 });
 
 test("retention sorts newest first, caps entries, and rejects invalid timestamps", () => {

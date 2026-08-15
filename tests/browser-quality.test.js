@@ -26,7 +26,7 @@ test("generated date-picker month controls have unique form identifiers", () => 
 
 test("data-use disclosure ties remote checks to an affirmative user action", () => {
   assert.match(sidepanelHtml, /OFAC stays on this computer/);
-  assert.match(sidepanelHtml, /anonymous outcomes stay[\s\S]*?up to 30 days/);
+  assert.match(sidepanelHtml, /Submitted customer fields and completed reports[\s\S]*?up to 30 days/);
   assert.match(sidepanelHtml, /State checks send the name, birth date/);
   assert.match(sidepanelHtml, /license\/ID number,[\s\S]*?trade-in VIN when used/);
   assert.match(sidepanelHtml, /Compliance Central over HTTPS/);

@@ -21,6 +21,7 @@ import {
 } from "./lib/run-fence.js";
 import {
   getFormData,
+  applyCustomerData,
   validateCustomerFields,
   cacheFormData,
   loadCachedFormData,
@@ -31,6 +32,7 @@ import {
   setDateInputValue,
 } from "./src/sidepanel/date-picker.js";
 import {
+  calculateFinalDecision,
   runOfacCheck,
   runRepeatOffenderCheck,
   runTitleCheck,
@@ -233,6 +235,9 @@ const elements = {
   ofacResultStatus: $("ofacResultStatus"),
   ofacResultDetail: $("ofacResultDetail"),
   ofacResultTimestamp: $("ofacResultTimestamp"),
+  ofacTriagePanel: $("ofacTriagePanel"),
+  clearOfacFalsePositiveBtn: $("clearOfacFalsePositiveBtn"),
+  confirmOfacMatchBtn: $("confirmOfacMatchBtn"),
   repeatResultCard: $("repeatResultCard"),
   repeatResultStatus: $("repeatResultStatus"),
   repeatResultDetail: $("repeatResultDetail"),
@@ -261,6 +266,9 @@ const elements = {
   cbOfacResultStatus: $("cbOfacResultStatus"),
   cbOfacResultDetail: $("cbOfacResultDetail"),
   cbOfacResultTimestamp: $("cbOfacResultTimestamp"),
+  cbOfacTriagePanel: $("cbOfacTriagePanel"),
+  clearCbOfacFalsePositiveBtn: $("clearCbOfacFalsePositiveBtn"),
+  confirmCbOfacMatchBtn: $("confirmCbOfacMatchBtn"),
   cbRepeatResultCard: $("cbRepeatResultCard"),
   cbRepeatResultStatus: $("cbRepeatResultStatus"),
   cbRepeatResultDetail: $("cbRepeatResultDetail"),
@@ -295,6 +303,14 @@ const elements = {
   settingsPrivacyLink: $("settingsPrivacyLink"),
   settingsVersion: $("settingsVersion"),
   supportEmailLink: $("supportEmailLink"),
+
+  // Claude Design workspace navigation
+  screeningTabBtn: $("screeningTabBtn"),
+  sosTabBtn: $("sosTabBtn"),
+  commandBarBtn: $("commandBarBtn"),
+  commandMenu: $("commandMenu"),
+  historySearchInput: $("historySearchInput"),
+  historyAgingOnly: $("historyAgingOnly"),
 };
 
 const reportSelectionInputs = Array.from(
@@ -354,6 +370,28 @@ function syncReportSelection(currentResults) {
   updateReportSelectionState();
 }
 
+async function resolveOfacTriage(checkKey, disposition) {
+  const results = getCurrentResults();
+  const ofac = results?.checks?.[checkKey];
+  if (!ofac || ofac.passed !== false) return;
+
+  ofac.disposition = disposition;
+  ofac.reviewedAt = new Date().toISOString();
+  results.finalDecision = calculateFinalDecision(results.checks);
+  setCurrentResults(results);
+  await persistCurrentResults();
+  displayResults(elements, results);
+  syncReportSelection(results);
+  await saveToHistory(results);
+  await updateHistoryCount(elements.historyCount);
+  showToast(
+    disposition === "confirmed_match"
+      ? "OFAC match confirmed — delivery is blocked."
+      : "Potential OFAC match recorded as a false positive.",
+    disposition === "confirmed_match" ? "error" : "success"
+  );
+}
+
 // Maps IN_FLIGHT keys to their progress-row status indicators.
 const IN_FLIGHT_TO_STATUS_EL = {
   [IN_FLIGHT.ofac]: () => elements.ofacStatus,
@@ -403,11 +441,126 @@ function hideLoading() {
   elements.loadingOverlay?.classList.add("hidden");
 }
 
+// ---------- Workspace navigation ----------
+
+const WORKSPACES = new Set(["screening", "sos", "history"]);
+
+function closeCommandMenu({ restoreFocus = false } = {}) {
+  if (!elements.commandMenu || !elements.commandBarBtn) return;
+  elements.commandMenu.classList.add("hidden");
+  elements.commandBarBtn.setAttribute("aria-expanded", "false");
+  if (restoreFocus) elements.commandBarBtn.focus();
+}
+
+function openCommandMenu() {
+  if (!elements.commandMenu || !elements.commandBarBtn) return;
+  elements.commandMenu.classList.remove("hidden");
+  elements.commandBarBtn.setAttribute("aria-expanded", "true");
+  elements.commandMenu.querySelector('[role="menuitem"]')?.focus();
+}
+
+function activateWorkspace(name, { focusTab = false } = {}) {
+  if (!WORKSPACES.has(name)) return;
+
+  document.querySelectorAll("[data-workspace-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.workspacePanel !== name;
+  });
+
+  document.querySelectorAll('.workspace-tabs [role="tab"]').forEach((tab) => {
+    const active = tab.dataset.workspaceTarget === name;
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    if (active && focusTab) tab.focus();
+  });
+
+  closeCommandMenu();
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+function filterHistoryWorkspace(query = "") {
+  const normalized = query.trim().toLowerCase();
+  const agingOnly = Boolean(elements.historyAgingOnly?.checked);
+  const items = Array.from(elements.historyList?.querySelectorAll(".history-item") || []);
+  let visible = 0;
+  for (const item of items) {
+    const matchesQuery =
+      !normalized || item.textContent.toLowerCase().includes(normalized);
+    const matchesAge = !agingOnly || Boolean(item.querySelector(".history-age.is-aging"));
+    const matches = matchesQuery && matchesAge;
+    item.classList.toggle("hidden", !matches);
+    if (matches) visible += 1;
+  }
+  let empty = elements.historyList?.querySelector(".history-filter-empty");
+  if (normalized && items.length && visible === 0) {
+    if (!empty) {
+      empty = document.createElement("div");
+      empty.className = "history-empty history-filter-empty";
+      empty.innerHTML =
+        "<strong>No matching audit records</strong><span>Try a reference, outcome, check name, or date.</span>";
+      elements.historyList.append(empty);
+    }
+  } else {
+    empty?.remove();
+  }
+}
+
+function initWorkspaceNavigation() {
+  activateWorkspace("screening");
+
+  elements.screeningTabBtn?.addEventListener("click", () =>
+    activateWorkspace("screening")
+  );
+  elements.sosTabBtn?.addEventListener("click", () => activateWorkspace("sos"));
+
+  elements.commandBarBtn?.addEventListener("click", () => {
+    const open = elements.commandBarBtn.getAttribute("aria-expanded") === "true";
+    if (open) closeCommandMenu({ restoreFocus: true });
+    else openCommandMenu();
+  });
+  elements.commandMenu?.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-workspace-target]");
+    if (!item) return;
+    const target = item.dataset.workspaceTarget;
+    if (target === "history") await openHistory();
+    else activateWorkspace(target);
+    if (target === "screening") elements.firstName?.focus();
+    if (target === "sos") elements.sosVinLookupInput?.focus();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (elements.commandBarBtn?.getAttribute("aria-expanded") === "true") {
+        closeCommandMenu({ restoreFocus: true });
+      } else {
+        openCommandMenu();
+      }
+      return;
+    }
+    if (event.key === "Escape" && elements.commandBarBtn?.getAttribute("aria-expanded") === "true") {
+      event.preventDefault();
+      closeCommandMenu({ restoreFocus: true });
+    }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".command-shell")) closeCommandMenu();
+  });
+
+  elements.historySearchInput?.addEventListener("input", (event) =>
+    filterHistoryWorkspace(event.target.value)
+  );
+  elements.historyAgingOnly?.addEventListener("change", () =>
+    filterHistoryWorkspace(elements.historySearchInput?.value || "")
+  );
+}
+
 // ---------- Initialization ----------
 
 document.addEventListener("DOMContentLoaded", () => {
   // Critical path — must run synchronously so the UI is interactive.
   applyIcons();
+  initWorkspaceNavigation();
   initDatePickers([elements.dob, elements.cbDob]);
   initEventListeners();
   renderSosWorkspace();
@@ -1523,11 +1676,55 @@ function initEventListeners() {
     const { [STORAGE_KEYS.complianceHistory]: history = [] } =
       await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
     if (index < 0 || index >= history.length) return;
-    if (btn.classList.contains("history-new-btn")) {
-      hideModal(elements.historyModal);
+    const entry = history[index];
+    const results = entry?.savedResults;
+    if (!results?.customer || !results?.checks) {
+      showToast(
+        "This older audit entry does not include a restorable customer record.",
+        "warning"
+      );
+      return;
+    }
+
+    if (btn.classList.contains("history-print-btn")) {
+      const keys = availableReportItems(results).map((item) => item.key);
+      await printAllReports(results, keys);
+      return;
+    }
+    if (btn.classList.contains("history-download-btn")) {
+      const keys = availableReportItems(results).map((item) => item.key);
+      await downloadAllReportsPDF(results, keys);
+      return;
+    }
+    if (btn.classList.contains("history-open-btn")) {
       await handleClear();
-      elements.scanLicenseBtn?.focus();
-      showToast("Ready for a new screening — scan an ID or enter the details.", "info");
+      applyCustomerData(elements, results.customer);
+      scanJurisdiction.buyer =
+        typeof results.customer.buyerIsMichigan === "boolean"
+          ? results.customer.buyerIsMichigan
+          : null;
+      scanJurisdiction.coBuyer =
+        typeof results.customer.coBuyerIsMichigan === "boolean"
+          ? results.customer.coBuyerIsMichigan
+          : null;
+      updateJurisdictionTags();
+      setCurrentResults(results);
+      await persistCurrentResults();
+      if (results.runType === "individual") {
+        displayStoredIndividualResult(results);
+      } else {
+        displayResults(elements, results);
+      }
+      syncReportSelection(results);
+      setInputCollapsed(true, results.customer);
+      elements.resultsSection.classList.remove("hidden");
+      elements.progressSection.classList.add("hidden");
+      activateWorkspace("screening");
+      showToast(
+        "Saved customer and reports restored. You can print, download, or run fresh checks.",
+        "success",
+        6500
+      );
     }
   });
 
@@ -1578,6 +1775,18 @@ function initEventListeners() {
   );
   elements.downloadAllPdfsBtn?.addEventListener("click", () =>
     downloadAllReportPDFs(getCurrentResults(), getSelectedReportKeys())
+  );
+  elements.clearOfacFalsePositiveBtn?.addEventListener("click", () =>
+    resolveOfacTriage("ofac", "false_positive")
+  );
+  elements.confirmOfacMatchBtn?.addEventListener("click", () =>
+    resolveOfacTriage("ofac", "confirmed_match")
+  );
+  elements.clearCbOfacFalsePositiveBtn?.addEventListener("click", () =>
+    resolveOfacTriage("coBuyerOfac", "false_positive")
+  );
+  elements.confirmCbOfacMatchBtn?.addEventListener("click", () =>
+    resolveOfacTriage("coBuyerOfac", "confirmed_match")
   );
   elements.selectAllReports?.addEventListener("change", () => {
     for (const input of reportSelectionInputs) {
@@ -2206,7 +2415,8 @@ async function handleClear() {
 
 async function openHistory() {
   await populateHistoryModal(elements.historyList);
-  showModal(elements.historyModal);
+  activateWorkspace("history");
+  filterHistoryWorkspace(elements.historySearchInput?.value || "");
 
   // If the re-screen reminder is on, flag any aging full-run deals.
   try {

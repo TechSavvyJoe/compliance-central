@@ -258,7 +258,7 @@
             <li><strong>SOS Fee Quote stays in the side panel.</strong> Vehicle, fuel, commercial-use, plate, and plate-design edits happen locally. On an explicit Calculate SOS fee click, the extension applies the completed choices once in an inactive, extension-owned public SOS tab and returns the verified fee plus an actual image of the official result page. It does not access SOS credentials or cookies, and it does not file any SOS transaction.</li>
             <li><strong>VIN helper is optional and explicit.</strong> A sold-vehicle VIN or partial VIN is sent to NHTSA's public vPIC decoder only after you click Decode. Supported vehicle type, body, fuel, and model-year fields are filled locally for review. Trade Title/Lien stays in the existing Trade-In workflow and is not mixed into the fee workspace.</li>
             <li><strong>Phone scan images stay on the phone.</strong> Only the text fields you approve are sent to your computer in an encrypted, single-use package.</li>
-            <li><strong>Persistent history is anonymous and limited.</strong> Up to 50 outcome-only audit records are kept on your device for no more than 30 days. Customer identity, VINs, and portal screenshots are excluded from persistent history.</li>
+            <li><strong>Saved customer history is local and limited.</strong> Up to 50 working records are kept on your device for no more than 30 days so dealership staff can reopen a customer, re-screen, and reproduce prior reports. History can be cleared at any time.</li>
         </ul>
     </div>
 
@@ -271,9 +271,9 @@
         <h3>2. What Data the Extension Handles</h3>
         <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. The optional SOS Fee Quote workspace also handles only the vehicle and plate choices needed by the public calculator, a returned fee, an actual official result-page capture, and a non-personalized official plate-design preview. This information is used only to perform the checks and quote actions you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the extension.</p>
         <ul>
-            <li><strong>Current-run data stays in the browser session:</strong> customer fields, results, and portal screenshots are available only for the active working session and are not written to persistent extension storage.</li>
-            <li><strong>SOS quote data is session-only:</strong> calculator choices, returned fee, official result-page capture, plate preview, and any typed VIN stay only for the browser session. The extension never stores an SOS credential, cookie, plate number, customer name, or VIN in persistent storage or anonymous audit history. A user-requested print or PDF remains wherever the user chooses to save it.</li>
-            <li><strong>Persistent audit history is anonymous:</strong> each record contains an anonymous reference, timestamp, overall decision, individual check outcomes, and whether the run included a co-buyer or trade-in. It does not contain customer names, dates of birth, license/ID numbers, VINs, screenshots, or full report payloads. Audit history is limited to 50 records and 30 days and can be cleared at any time.</li>
+            <li><strong>Compliance records can be reopened:</strong> submitted buyer/co-buyer fields, trade VIN, results, and captured portal evidence are saved in local extension storage for up to 30 days so authorized dealership staff can re-screen or reproduce reports.</li>
+            <li><strong>SOS quote data is session-only:</strong> calculator choices, returned fee, official result-page capture, plate preview, and any typed VIN stay only for the browser session. The extension never stores an SOS credential, cookie, plate number, customer name, or SOS VIN in persistent Compliance History. A user-requested print or PDF remains wherever the user chooses to save it.</li>
+            <li><strong>Persistent working history is device-local:</strong> each record contains the submitted customer fields, timestamp, results, and report evidence needed to reopen and reproduce the record. History is limited to 50 records and 30 days and can be cleared at any time. SOS credentials, cookies, authentication tokens, and backend keys are not stored in History.</li>
             <li><strong>Files you choose to download:</strong> a PDF or CSV is saved only when you request it. Downloaded files may contain the details shown in the report and remain wherever you save them until you delete them.</li>
             <li><strong>No tracking or analytics:</strong> the extension does not track your browsing, and does not use Google Analytics or any third-party advertising or analytics network.</li>
         </ul>
@@ -284,7 +284,7 @@
         <p>The <strong>Repeat Offender</strong> and <strong>Title/Lien</strong> checks are performed by our secure backend service hosted on Fly.io, which queries the Michigan Department of State (MDOS) portal on your behalf using automated browsing.</p>
         <ul>
             <li>For these two checks only, the buyer/co-buyer <strong>name, date of birth, and DLN/PID</strong> (and the <strong>VIN</strong> for a title check) are transmitted to our backend over an encrypted HTTPS connection.</li>
-            <li>The backend processes this data <strong>in memory</strong> to request the MDOS portal response and current-run screenshot. Submitted customer data is not intentionally retained after the request completes and is not written to a database or application log. The returned portal screenshot is current-run evidence and is not added to persistent history.</li>
+            <li>The backend processes this data <strong>in memory</strong> to request the MDOS portal response and screenshot. Submitted customer data is not intentionally retained by the backend and is not written to its database or application log. The returned result and screenshot are saved only in the extension's device-local History so the dealership can reopen and reproduce the record.</li>
             <li>Like any hosted web service, Fly.io receives ordinary network request metadata. Compliance Central uses the request IP address transiently in memory for rate limiting and abuse prevention; the app does not write it to its database or application log.</li>
             <li>The extension includes built-in access to the backend, so these checks work without an account, API key, or setup.</li>
         </ul>
@@ -336,8 +336,8 @@
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
             <li><code>tabs</code> &mdash; to create and close the extension-owned inactive public SOS calculator tab used only for an explicit fee calculation, and to foreground the same prefilled tab only after the user clicks Finish on Michigan SOS.</li>
-            <li><code>storage</code> &mdash; to save preferences and bounded, anonymous audit history.</li>
-            <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded, anonymous audit history. Customer identity, VINs, and portal screenshots remain session-only.</li>
+            <li><code>storage</code> &mdash; to save preferences and bounded, device-local customer/report history.</li>
+            <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and up to 50 saved customer/report records, including state-site evidence images, for no more than 30 days.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
             <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (public Michigan SOS calculator and its live plate-result preview), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding). Official published plate-gallery images load from <code>www.michigan.gov</code> without a broad host permission.</li>
         </ul>

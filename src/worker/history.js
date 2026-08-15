@@ -28,6 +28,10 @@ const ENTRY_KEYS = new Set([
   "decision",
   "runType",
   "runLabel",
+  "customerName",
+  "coBuyerName",
+  "tradeVin",
+  "savedResults",
   "hasTrade",
   "hasCoBuyer",
   "checks",
@@ -40,7 +44,17 @@ const CHECK_KEYS = new Set([
   "title",
 ]);
 const DECISIONS = new Set(["APPROVED", "DENIED", "REVIEW", "PARTIAL"]);
-const OFAC_STATES = new Set(["clear", "match", "stale", "error", "review", "not_run"]);
+const OFAC_STATES = new Set([
+  "clear",
+  "match",
+  "potential_match",
+  "confirmed_match",
+  "false_positive",
+  "stale",
+  "error",
+  "review",
+  "not_run",
+]);
 const REPEAT_STATES = new Set(["eligible", "flagged", "error", "review", "na", "not_run"]);
 const TITLE_STATES = new Set(["clear", "lien", "branded", "review", "error", "not_run"]);
 
@@ -54,7 +68,7 @@ function hasOnlyKeys(value, allowed) {
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
-export function isAnonymousHistoryEntry(value) {
+export function isHistoryEntry(value) {
   if (!isRecord(value) || !hasOnlyKeys(value, ENTRY_KEYS)) return false;
   if (!Number.isFinite(value.id)) return false;
   if (!isValidHistoryAuditId(value.auditId)) return false;
@@ -65,6 +79,17 @@ export function isAnonymousHistoryEntry(value) {
   if (typeof value.runLabel !== "string" || value.runLabel.length > 32) {
     return false;
   }
+  if (
+    typeof value.customerName !== "string" ||
+    typeof value.coBuyerName !== "string" ||
+    typeof value.tradeVin !== "string" ||
+    value.customerName.length > 180 ||
+    value.coBuyerName.length > 180 ||
+    !/^(?:|[A-HJ-NPR-Z0-9]{17})$/.test(value.tradeVin)
+  ) {
+    return false;
+  }
+  if (value.savedResults !== null && !isRecord(value.savedResults)) return false;
   if (typeof value.hasTrade !== "boolean" || typeof value.hasCoBuyer !== "boolean") {
     return false;
   }
@@ -80,10 +105,13 @@ export function isAnonymousHistoryEntry(value) {
   );
 }
 
+// Retain the old export name for compatibility with older tests/integrations.
+export const isAnonymousHistoryEntry = isHistoryEntry;
+
 export function validateHistoryMessage(type, data) {
   switch (type) {
     case HISTORY_MESSAGES.append:
-      return isRecord(data) && isAnonymousHistoryEntry(data.entry);
+      return isRecord(data) && isHistoryEntry(data.entry);
     case HISTORY_MESSAGES.remove:
       return isRecord(data) && isValidHistoryAuditId(data.auditId);
     case HISTORY_MESSAGES.purge:
@@ -137,11 +165,11 @@ async function isCancelledAudit(auditId) {
 }
 
 export function appendHistoryEntry(candidate) {
-  if (!isAnonymousHistoryEntry(candidate)) {
+  if (!isHistoryEntry(candidate)) {
     return Promise.resolve({
       success: false,
       saved: false,
-      error: "Invalid anonymous history entry",
+      error: "Invalid local history entry",
     });
   }
 

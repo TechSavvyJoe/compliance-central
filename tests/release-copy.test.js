@@ -55,10 +55,10 @@ test("store description stays synchronized and within the dashboard limit", () =
   assert.ok([...description].length <= 4000, "description must fit the 4,000-character field");
 });
 
-test("release copy describes session data and anonymous persistent audit history", () => {
+test("release copy describes session data and persistent local customer history", () => {
   for (const source of [policy, description, listing, privacyTab, submissionPrompt]) {
-    assert.match(source, /anonymous/i);
-    assert.match(source, /session/i);
+    assert.match(source, /device-local|on your device|local History/i);
+    assert.match(source, /30 days/i);
     assert.doesNotMatch(source, /optional custom backend|custom backend API key/i);
     assert.doesNotMatch(source, /Check:\s*Authentication information/i);
   }
@@ -78,11 +78,10 @@ test("store copy avoids timing guarantees and legal-certification language", () 
   assert.match(description, /require human review/i);
 });
 
-test("generated scanner and history media are transparently instructional and anonymous", () => {
+test("generated scanner and history media are transparently instructional and local", () => {
   assert.match(assetBuilder, /Instructional composite · Phone scan/);
-  assert.match(assetBuilder, /Anonymous audit history/);
+  assert.match(assetBuilder, /Saved customer history/);
   assert.match(assetBuilder, /CC-20260722-091421/);
-  assert.doesNotMatch(assetBuilder, /John Anderson|Maria Gomez|VIN ···09186/);
 });
 
 test("OFAC records are clearly app-generated and do not imitate government letterhead", () => {
@@ -94,7 +93,7 @@ test("OFAC records are clearly app-generated and do not imitate government lette
 });
 
 test("Web Store declarations cover captured Michigan website content", () => {
-  assert.match(privacyTab, /Website content[\s\S]*Michigan portal responses and screenshots/);
+  assert.match(privacyTab, /Website content[\s\S]*Michigan Repeat Offender and title\/lien responses and screenshots/);
   assert.match(privacyTab, /Location[\s\S]*request IP address[\s\S]*transiently in memory/);
   assert.match(submissionPrompt, /Check: Website content/);
   assert.match(submissionPrompt, /Check: Location/);

@@ -306,10 +306,10 @@ const histItem = (name, decision, cls, meta) => `
 
 const screen05 = stage(
   copyBlock(
-    "Anonymous audit history",
-    `Recent outcomes,<br><span class="a">without customer identity.</span>`,
-    "Up to 50 outcome-only audit records stay on your device for no more than 30 days. Names, dates of birth, license numbers, VINs, and screenshots are excluded.",
-    ["Anonymous reference + timestamp", "Decision and check outcomes only", "Clear local history anytime"]
+    "Saved customer history",
+    `Reopen, re-screen,<br><span class="a">print or download.</span>`,
+    "Up to 50 customer and report records stay on your device for no more than 30 days and can be cleared at any time.",
+    ["Device-local working records", "Saved result and report evidence", "Clear local history anytime"]
   ),
   `
   <div class="sectitle">${I.history} Compliance History &nbsp;<span style="color:${C.muted};font-weight:500">· 3 today, 41 total</span></div>

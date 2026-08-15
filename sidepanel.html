@@ -23,9 +23,35 @@
             <span class="icon icon-settings" aria-hidden="true"></span>
           </button>
         </div>
+        <div class="command-shell">
+          <button
+            type="button"
+            id="commandBarBtn"
+            class="command-bar"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="commandMenu"
+          >
+            <span class="command-search" aria-hidden="true"></span>
+            <span>Find a deal, run a check, decode a VIN</span>
+            <kbd>&#8984;K</kbd>
+          </button>
+          <div id="commandMenu" class="command-menu hidden" role="menu" aria-label="Quick actions">
+            <button type="button" role="menuitem" data-workspace-target="screening">New screening <span>Buyer and trade</span></button>
+            <button type="button" role="menuitem" data-workspace-target="sos">Plate calculator <span>VIN, design and official fee</span></button>
+            <button type="button" role="menuitem" data-workspace-target="history">Saved customers <span>Reopen, re-screen and print</span></button>
+          </div>
+        </div>
       </header>
 
+      <nav class="workspace-tabs" role="tablist" aria-label="Compliance workspace">
+        <button type="button" id="screeningTabBtn" role="tab" aria-selected="true" aria-controls="screeningWorkspace" data-workspace-target="screening">Screening</button>
+        <button type="button" id="sosTabBtn" role="tab" aria-selected="false" aria-controls="sosWorkspace" data-workspace-target="sos">Plate Calculator</button>
+        <button type="button" id="viewHistoryBtn" role="tab" aria-selected="false" aria-controls="historyWorkspace" data-workspace-target="history">History <span id="historyCount" class="tab-count">0</span></button>
+      </nav>
+
       <main id="main-content" class="hub-main" role="main">
+        <div id="screeningWorkspace" class="workspace-pane" role="tabpanel" aria-labelledby="screeningTabBtn" data-workspace-panel="screening">
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 
         <button type="button"
@@ -42,11 +68,12 @@
           ></span>
         </button>
 
-        <div id="inputPanel">
+        <div id="inputPanel" class="deal-steps">
         <section class="input-section">
           <h2 class="section-title">
-            <span class="section-icon icon icon-user" aria-hidden="true"></span>
-            Customer Information
+            <span class="step-number" aria-hidden="true">1</span>
+            Buyer
+            <span class="required-label">Required</span>
             <span id="buyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h2>
 
@@ -118,17 +145,19 @@
           </div>
         </section>
 
-        <div class="cobuyer-toggle">
+        <div class="cobuyer-toggle input-section">
+          <span class="step-number step-number-muted" aria-hidden="true">2</span>
+          <span class="optional-step-copy"><strong>Co-buyer</strong><small>Optional — a second person on the deal</small></span>
           <label class="checkbox-label">
             <input type="checkbox" id="hasCoBuyer" />
-            <span class="checkbox-text">Add Co-Buyer</span>
+            <span class="checkbox-text">Add</span>
           </label>
         </div>
 
         <section id="coBuyerSection" class="input-section cobuyer-section hidden">
           <h2 class="section-title">
-            <span class="section-icon icon icon-users" aria-hidden="true"></span>
-            Co-Buyer Information
+            <span class="step-number" aria-hidden="true">2</span>
+            Co-buyer details
             <span id="coBuyerJurisdictionTag" class="jurisdiction-tag hidden" title="Out-of-state ID — the Michigan Repeat Offender check does not apply; OFAC still runs.">Out-of-state</span>
           </h2>
 
@@ -197,10 +226,10 @@
               aria-controls="tradeSectionContent"
             >
               <span class="trade-title-left">
-                <span class="section-icon icon icon-car" aria-hidden="true"></span>
-                Trade-In Vehicle
+                <span class="step-number step-number-muted" aria-hidden="true">3</span>
+                <span><strong>Trade-in</strong><small>Optional — leave blank to skip title &amp; lien</small></span>
               </span>
-              <span class="optional-label">(Optional)</span>
+              <span class="optional-label">Add</span>
               <span class="section-toggle icon icon-chevron" aria-hidden="true"></span>
             </button>
           </h2>
@@ -221,15 +250,15 @@
           </div>
         </section>
         </div>
+        </div>
 
-        <section class="input-section sos-quote-section" aria-labelledby="sosQuoteTitle">
+        <section id="sosWorkspace" class="input-section sos-quote-section workspace-pane" role="tabpanel" aria-labelledby="sosTabBtn" data-workspace-panel="sos" hidden>
           <div class="sos-quote-heading">
             <div>
-              <span class="sos-eyebrow">Michigan registration desk</span>
               <h2 id="sosQuoteTitle" class="section-title">
-                <span class="section-icon icon icon-file" aria-hidden="true"></span>
-                SOS Fee Quote
+                Plate fee calculator
               </h2>
+              <p class="sos-heading-copy">Registration and plate cost from the official Michigan SOS calculator.</p>
             </div>
             <span id="sosQuoteSource" class="sos-quote-source">Ready locally</span>
           </div>
@@ -384,11 +413,12 @@
           <p class="sos-quote-privacy">Session only. Nothing is filed; no SOS login, VIN, plate, customer, or quote data is kept after the browser session.</p>
         </section>
 
-        <section class="action-section">
+        <section class="action-section" data-workspace-panel="screening">
           <p id="dataUseNote" class="data-use-note">
             Privacy: OFAC stays on this computer. State checks send the name, birth date,
             license/ID number, and trade-in VIN when used to Compliance Central over HTTPS.
-            Details and screenshots stay this session; anonymous outcomes stay up to 30 days.
+            Submitted customer fields and completed reports, including captured state-site evidence,
+            stay locally in History for up to 30 days so the record can be reopened and printed.
             Running a check means you agree.
             <a href="https://techsavvyjoe.github.io/compliance-central/#privacy-policy" target="_blank" rel="noopener noreferrer">Details</a>
           </p>
@@ -404,23 +434,26 @@
             </button>
           </div>
 
-          <div class="individual-checks" role="group" aria-label="Run one compliance check">
-            <button type="button" id="runOfacBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
-              <span class="btn-icon icon icon-globe" aria-hidden="true"></span>
-              OFAC Only
-            </button>
-            <button type="button" id="runRepeatOffenderBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
-              <span class="btn-icon icon icon-ban" aria-hidden="true"></span>
-              Repeat Offender
-            </button>
-            <button type="button" id="runTitleBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote" disabled>
-              <span class="btn-icon icon icon-file" aria-hidden="true"></span>
-              Title/Lien
-            </button>
-          </div>
+          <details class="individual-check-menu">
+            <summary>More check options</summary>
+            <div class="individual-checks" role="group" aria-label="Run one compliance check">
+              <button type="button" id="runOfacBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
+                <span class="btn-icon icon icon-globe" aria-hidden="true"></span>
+                OFAC Only
+              </button>
+              <button type="button" id="runRepeatOffenderBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote">
+                <span class="btn-icon icon icon-ban" aria-hidden="true"></span>
+                Repeat Offender
+              </button>
+              <button type="button" id="runTitleBtn" class="btn-secondary btn-ghost" aria-describedby="dataUseNote" disabled>
+                <span class="btn-icon icon icon-file" aria-hidden="true"></span>
+                Title/Lien
+              </button>
+            </div>
+          </details>
         </section>
 
-        <section id="progressSection" class="progress-section hidden" aria-live="polite">
+        <section id="progressSection" class="progress-section hidden" aria-live="polite" data-workspace-panel="screening">
           <h2 id="progressSectionTitle" class="section-title">Check Progress</h2>
 
           <div class="check-items">
@@ -457,7 +490,7 @@
           </div>
         </section>
 
-        <section id="resultsSection" class="results-section hidden" aria-labelledby="resultsSectionTitle">
+        <section id="resultsSection" class="results-section hidden" aria-labelledby="resultsSectionTitle" data-workspace-panel="screening">
           <div class="evidence-heading">
             <div>
               <span class="evidence-kicker">Evidence</span>
@@ -474,6 +507,14 @@
                 <span class="result-status status-pass" id="ofacResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="ofacResultDetail">No matches in SDN list</p>
+              <div id="ofacTriagePanel" class="ofac-triage hidden">
+                <strong>Work the potential match before deciding</strong>
+                <p>Compare party type, date of birth, middle name or suffix, and how much of the full name corresponds. Any real discrepancy means this is not a valid match.</p>
+                <div class="ofac-triage-actions">
+                  <button type="button" id="clearOfacFalsePositiveBtn" class="btn-secondary btn-sm">Discrepancy found · clear</button>
+                  <button type="button" id="confirmOfacMatchBtn" class="btn-danger btn-sm">All details match · deny</button>
+                </div>
+              </div>
               <p class="result-evidence-meta" id="ofacResultTimestamp"></p>
               <div class="result-actions">
                 <button type="button" class="btn-secondary btn-sm" id="printOfacBtn">
@@ -529,6 +570,14 @@
                   <span class="result-status status-pass" id="cbOfacResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbOfacResultDetail">No matches in SDN list</p>
+                <div id="cbOfacTriagePanel" class="ofac-triage hidden">
+                  <strong>Work the co-buyer potential match</strong>
+                  <p>Compare party type, date of birth, middle name or suffix, and the full name before deciding.</p>
+                  <div class="ofac-triage-actions">
+                    <button type="button" id="clearCbOfacFalsePositiveBtn" class="btn-secondary btn-sm">Discrepancy found · clear</button>
+                    <button type="button" id="confirmCbOfacMatchBtn" class="btn-danger btn-sm">All details match · deny</button>
+                  </div>
+                </div>
                 <p class="result-evidence-meta" id="cbOfacResultTimestamp"></p>
                 <div class="result-actions">
                   <button type="button" class="btn-secondary btn-sm" id="printCbOfacBtn">
@@ -610,32 +659,36 @@
           </div>
         </section>
 
-        <section class="history-section">
-          <button type="button" id="viewHistoryBtn" class="btn-secondary btn-ghost btn-full">
-            <span class="btn-icon icon icon-history" aria-hidden="true"></span>
-            View History (<span id="historyCount">0 today</span>)
+        <section id="historyWorkspace" class="history-workspace workspace-pane" role="tabpanel" aria-labelledby="viewHistoryBtn" data-workspace-panel="history" hidden>
+          <div class="history-workspace-heading">
+            <div>
+              <span class="workspace-eyebrow">Audit trail</span>
+              <h2>History</h2>
+              <p>Reopen a saved customer to re-screen, print, or download the completed reports. Records stay on this device.</p>
+            </div>
+            <button type="button" id="exportAuditLogBtn" class="btn-secondary btn-sm" title="Export the local audit log as a CSV file">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
+              Export CSV
+            </button>
+          </div>
+          <div class="history-search-shell">
+            <span class="command-search" aria-hidden="true"></span>
+            <input id="historySearchInput" type="search" placeholder="Search customer, VIN, reference or outcome" autocomplete="off" />
+          </div>
+          <label class="history-aging-filter">
+            <input id="historyAgingOnly" type="checkbox" />
+            <span>Needs re-screen before delivery</span>
+          </label>
+          <div class="history-list-panel" id="historyList" aria-live="polite"></div>
+          <button type="button" id="clearAllHistoryBtn" class="btn-secondary btn-ghost btn-full" title="Permanently clear all compliance history">
+            <span class="btn-icon icon icon-trash" aria-hidden="true"></span>
+            Clear local history
           </button>
         </section>
       </main>
 
-      <div id="historyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 id="historyModalTitle">Audit History</h2>
-            <button type="button" class="modal-close" id="closeHistoryModal" aria-label="Close history modal">&times;</button>
-          </div>
-          <div class="modal-body" id="historyList" aria-live="polite"></div>
-          <div class="modal-footer">
-            <button type="button" id="exportAuditLogBtn" class="btn-hist" title="Export the full audit log as a CSV file">
-              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
-              Export CSV
-            </button>
-            <button type="button" id="clearAllHistoryBtn" class="btn-hist btn-hist-danger" title="Permanently clear all compliance history">
-              <span class="btn-icon icon icon-trash" aria-hidden="true"></span>
-              Clear All
-            </button>
-          </div>
-        </div>
+      <div id="historyModal" class="hidden" aria-hidden="true">
+        <button type="button" id="closeHistoryModal" tabindex="-1">Close</button>
       </div>
 
       <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
@@ -658,14 +711,13 @@
                 <span class="checkbox-text">Remind me to re-screen deals before delivery</span>
               </label>
               <p class="settings-help settings-help-muted">
-                When opening Audit History, flag records older than a week.
-                Re-enter or scan the customer details to run a fresh check before delivery.
+                When opening History, flag records older than a week. Open the saved customer and run fresh checks before delivery.
               </p>
             </div>
 
             <div class="settings-group">
               <h3 class="settings-heading"><span class="icon icon-trash" aria-hidden="true"></span>Privacy &amp; data</h3>
-              <p class="settings-help">Audit History saves only an anonymous reference, time, and outcomes—never names, birth dates, license numbers, VINs, screenshots, or backend keys.</p>
+              <p class="settings-help"><strong>Internal records are stored on this device.</strong> History keeps the submitted buyer/co-buyer fields and completed report evidence for up to 30 days so a deal can be reopened, re-screened, printed, or downloaded. SOS credentials and backend keys are never stored in History. Clear individual work by clearing History when it is no longer needed.</p>
               <div class="settings-actions">
                 <button type="button" id="settingsClearHistoryBtn" class="btn-secondary btn-sm">Clear audit history</button>
                 <a id="settingsPrivacyLink" class="btn-secondary btn-sm settings-link-button" href="#" target="_blank" rel="noopener noreferrer">Privacy details</a>

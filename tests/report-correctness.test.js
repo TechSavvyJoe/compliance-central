@@ -2,11 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  REPORT_KEYS,
+  availableReportItems,
+  buildStoredZipArchive,
+  combinedPdfFileName,
   combinedAllReportHTML,
   combinedPdfSections,
+  normalizeReportSelection,
   ofacReportHTML,
   ofacResultArgs,
+  reportPdfEntries,
   reportDecisionSummary,
+  separatePdfsZipFileName,
 } from "../src/sidepanel/export.js";
 
 function resultFixture() {
@@ -170,6 +177,90 @@ test("combined PDF assembly includes summary plus Repeat and Title non-success p
     titlePdf.calls.text.some((value) =>
       value.includes("Title service unavailable")
     )
+  );
+});
+
+test("bulk print and PDF selection resolve through one ordered report manifest", () => {
+  const results = resultFixture();
+  const available = availableReportItems(results).map((item) => item.key);
+  assert.deepEqual(available, [
+    REPORT_KEYS.decision,
+    REPORT_KEYS.buyerOfac,
+    REPORT_KEYS.buyerRepeat,
+    REPORT_KEYS.title,
+  ]);
+
+  const requested = [
+    REPORT_KEYS.title,
+    REPORT_KEYS.buyerOfac,
+    REPORT_KEYS.title,
+    "not-a-report",
+  ];
+  const normalized = normalizeReportSelection(results, requested);
+  assert.deepEqual(normalized, [REPORT_KEYS.buyerOfac, REPORT_KEYS.title]);
+
+  const entries = reportPdfEntries(results, requested, 12345);
+  assert.deepEqual(
+    entries.map((entry) => entry.key),
+    normalized
+  );
+  assert.equal(combinedPdfSections(results, requested).length, entries.length);
+  assert.match(entries[0].fileName, /^OFAC_Jamie_Dealer_12345\.pdf$/);
+  assert.match(entries[1].fileName, /^Title_1HGBH41JXMN109186_12345\.pdf$/);
+
+  const html = combinedAllReportHTML(results, requested);
+  assert.match(html, /Compliance Central OFAC Screening Record/);
+  assert.match(html, /Michigan Title & Lien Check/);
+  assert.doesNotMatch(html, /Overall Compliance Decision/);
+  assert.doesNotMatch(html, /Michigan Repeat Offender Check/);
+});
+
+test("an empty bulk selection produces no report pages", () => {
+  const results = resultFixture();
+  assert.deepEqual(normalizeReportSelection(results, []), []);
+  assert.deepEqual(reportPdfEntries(results, []), []);
+  assert.deepEqual(combinedPdfSections(results, []), []);
+  assert.doesNotMatch(combinedAllReportHTML(results, []), /class="page /);
+});
+
+test("separate PDF downloads form one valid ZIP archive", () => {
+  const archive = buildStoredZipArchive(
+    [
+      { name: "Buyer OFAC.pdf", data: new TextEncoder().encode("hello") },
+      { name: "Title.pdf", data: new Uint8Array([1, 2, 3, 4]) },
+    ],
+    new Date("2026-08-14T12:00:00")
+  );
+  const view = new DataView(archive.buffer);
+  const end = archive.length - 22;
+  assert.equal(view.getUint32(0, true), 0x04034b50);
+  assert.equal(view.getUint32(14, true), 0x3610a686);
+  assert.equal(view.getUint32(end, true), 0x06054b50);
+  assert.equal(view.getUint16(end + 10, true), 2);
+  const centralOffset = view.getUint32(end + 16, true);
+  assert.equal(view.getUint32(centralOffset, true), 0x02014b50);
+  const decoded = new TextDecoder().decode(archive);
+  assert.match(decoded, /Buyer OFAC\.pdf/);
+  assert.match(decoded, /Title\.pdf/);
+});
+
+test("bulk download filenames are safe, distinct, and never blank", () => {
+  const results = resultFixture();
+  results.customer.firstName = "Jamie / QA";
+  results.customer.lastName = "Dealer & Co.";
+
+  assert.equal(
+    combinedPdfFileName(results, 12345),
+    "Compliance_Jamie_QA_Dealer_Co_12345.pdf"
+  );
+  assert.equal(
+    separatePdfsZipFileName(results, 12345),
+    "Compliance_PDFs_Jamie_QA_Dealer_Co_12345.zip"
+  );
+  assert.equal(combinedPdfFileName({}, 12345), "Compliance_Record_12345.pdf");
+  assert.equal(
+    separatePdfsZipFileName({}, 12345),
+    "Compliance_PDFs_Record_12345.zip"
   );
 });
 

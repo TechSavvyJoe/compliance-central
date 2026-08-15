@@ -37,6 +37,78 @@ const OFAC_CONF_LABEL = {
   low: "DOB differs",
 };
 
+export const REPORT_KEYS = Object.freeze({
+  decision: "decision",
+  buyerOfac: "buyer-ofac",
+  buyerRepeat: "buyer-repeat",
+  title: "title",
+  coBuyerOfac: "co-buyer-ofac",
+  coBuyerRepeat: "co-buyer-repeat",
+});
+
+const REPORT_LABELS = Object.freeze({
+  [REPORT_KEYS.decision]: "Overall compliance decision",
+  [REPORT_KEYS.buyerOfac]: "Buyer OFAC screening",
+  [REPORT_KEYS.buyerRepeat]: "Buyer Repeat Offender",
+  [REPORT_KEYS.title]: "Title & Lien",
+  [REPORT_KEYS.coBuyerOfac]: "Co-buyer OFAC screening",
+  [REPORT_KEYS.coBuyerRepeat]: "Co-buyer Repeat Offender",
+});
+
+/**
+ * Return the reports that exist for this exact result set, in export order.
+ * A failed/unavailable check is still a document: its report states that the
+ * source was unavailable instead of silently disappearing from the record.
+ */
+export function availableReportItems(currentResults) {
+  if (!currentResults) return [];
+  const checks = currentResults.checks || {};
+  const coBuyer = currentResults.customer?.coBuyer;
+  const items = [
+    {
+      key: REPORT_KEYS.decision,
+      label: REPORT_LABELS[REPORT_KEYS.decision],
+    },
+  ];
+
+  if (checks.ofac) {
+    items.push({
+      key: REPORT_KEYS.buyerOfac,
+      label: REPORT_LABELS[REPORT_KEYS.buyerOfac],
+    });
+  }
+  if (checks.repeatOffender) {
+    items.push({
+      key: REPORT_KEYS.buyerRepeat,
+      label: REPORT_LABELS[REPORT_KEYS.buyerRepeat],
+    });
+  }
+  if (checks.title) {
+    items.push({ key: REPORT_KEYS.title, label: REPORT_LABELS[REPORT_KEYS.title] });
+  }
+  if (checks.coBuyerOfac && coBuyer) {
+    items.push({
+      key: REPORT_KEYS.coBuyerOfac,
+      label: REPORT_LABELS[REPORT_KEYS.coBuyerOfac],
+    });
+  }
+  if (checks.coBuyerRepeatOffender && coBuyer) {
+    items.push({
+      key: REPORT_KEYS.coBuyerRepeat,
+      label: REPORT_LABELS[REPORT_KEYS.coBuyerRepeat],
+    });
+  }
+  return items;
+}
+
+/** Keep only available, unique report keys. Omitted selection means select all. */
+export function normalizeReportSelection(currentResults, selectedKeys) {
+  const available = availableReportItems(currentResults).map((item) => item.key);
+  if (selectedKeys == null) return available;
+  const requested = new Set(Array.from(selectedKeys));
+  return available.filter((key) => requested.has(key));
+}
+
 /** MDOS portal-style DOB display (already MM/DD/YYYY from the form). */
 export function formatDobForMdos(dob) {
   return String(dob || "").trim();
@@ -60,6 +132,29 @@ function reportDate(value, fallback = "Not recorded") {
 
 export function stateEvidenceDataUrl(result) {
   return ensureDataUrl(result?.screenshotData);
+}
+
+/**
+ * A valid image alone is not enough to call it state-site evidence.  The
+ * response itself must also have reached one of the confirmed terminal states.
+ * Keeping this rule in one place prevents an ambiguous backend response from
+ * being exported as an authentic Michigan record on one output path but not
+ * another.
+ */
+function verifiedRepeatEvidence(result) {
+  const state = classifyRepeatOffenderResult(result).state;
+  return (
+    Boolean(stateEvidenceDataUrl(result)) &&
+    ["eligible", "ineligible"].includes(state)
+  );
+}
+
+function verifiedTitleEvidence(result) {
+  const state = titlePresentation(result).state;
+  return (
+    Boolean(stateEvidenceDataUrl(result)) &&
+    ["clear", "branded", "lien"].includes(state)
+  );
 }
 
 function evidenceImageHTML(result, label) {
@@ -499,11 +594,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
     ? currentResults.checks?.coBuyerRepeatOffender
     : currentResults.checks?.repeatOffender;
   const outcome = repeatOffenderResultArgs(result);
-  const repeatClassification = classifyRepeatOffenderResult(result);
-  if (
-    stateEvidenceDataUrl(result) &&
-    ["eligible", "ineligible"].includes(repeatClassification.state)
-  ) {
+  if (verifiedRepeatEvidence(result)) {
     return evidenceImageHTML(result, "Michigan Repeat Offender Check");
   }
   const screenedAt = reportDate(result?.timestamp || currentResults.timestamp);
@@ -591,7 +682,7 @@ export function getTitleReportPageHTML(currentResults) {
   if (!c) return "";
   const title = currentResults.checks?.title || {};
   const outcome = titlePresentation(title);
-  if (stateEvidenceDataUrl(title) && !title.error && title.status !== "error") {
+  if (verifiedTitleEvidence(title)) {
     return evidenceImageHTML(title, "Michigan Title & Lien Check");
   }
   const screenedAt = reportDate(title.timestamp || currentResults.timestamp);
@@ -834,17 +925,23 @@ export function getFinalDecisionReportPageHTML(currentResults) {
   </div>`;
 }
 
-export function combinedAllReportHTML(currentResults) {
-  const customer = currentResults.customer || {};
+export function combinedAllReportHTML(currentResults, selectedKeys) {
+  const customer = currentResults?.customer || {};
   const timestamp = reportDate(Date.now());
-  const ofac = currentResults.checks?.ofac;
-  const repeatOffender = currentResults.checks?.repeatOffender;
-  const title = currentResults.checks?.title;
-  const cbOfac = currentResults.checks?.coBuyerOfac;
-  const cbRepeat = currentResults.checks?.coBuyerRepeatOffender;
+  const ofac = currentResults?.checks?.ofac;
+  const repeatOffender = currentResults?.checks?.repeatOffender;
+  const title = currentResults?.checks?.title;
+  const cbOfac = currentResults?.checks?.coBuyerOfac;
+  const cbRepeat = currentResults?.checks?.coBuyerRepeatOffender;
   const coBuyer = customer.coBuyer;
+  const selected = new Set(
+    normalizeReportSelection(currentResults, selectedKeys)
+  );
 
-  const sections = [getFinalDecisionReportPageHTML(currentResults)];
+  const sections = [];
+  if (selected.has(REPORT_KEYS.decision)) {
+    sections.push(getFinalDecisionReportPageHTML(currentResults));
+  }
 
   const ofacBlock = (subjectHTML, ofacResult, label) => {
     const outcome = ofacResultArgs(ofacResult);
@@ -873,7 +970,7 @@ export function combinedAllReportHTML(currentResults) {
     </div>`;
   };
 
-  if (ofac) {
+  if (ofac && selected.has(REPORT_KEYS.buyerOfac)) {
     sections.push(
       ofacBlock(
         `<p><strong>Name:</strong> ${buildSanitizedName(customer)}</p>
@@ -886,7 +983,7 @@ export function combinedAllReportHTML(currentResults) {
     );
   }
 
-  if (cbOfac && coBuyer) {
+  if (cbOfac && coBuyer && selected.has(REPORT_KEYS.coBuyerOfac)) {
     sections.push(
       ofacBlock(
         `<p><strong>Name:</strong> ${buildSanitizedName(coBuyer)}</p>
@@ -898,15 +995,15 @@ export function combinedAllReportHTML(currentResults) {
     );
   }
 
-  if (repeatOffender) {
+  if (repeatOffender && selected.has(REPORT_KEYS.buyerRepeat)) {
     sections.push(getRepeatReportPageHTML(currentResults, false));
   }
 
-  if (cbRepeat && coBuyer) {
+  if (cbRepeat && coBuyer && selected.has(REPORT_KEYS.coBuyerRepeat)) {
     sections.push(getRepeatReportPageHTML(currentResults, true));
   }
 
-  if (title) {
+  if (title && selected.has(REPORT_KEYS.title)) {
     sections.push(getTitleReportPageHTML(currentResults));
   }
 
@@ -1122,12 +1219,12 @@ export function printTitleScreenshot(currentResults) {
   openAndPrint(titleReportHTML(currentResults));
 }
 
-export function printAllReports(currentResults) {
+export async function printAllReports(currentResults, selectedKeys) {
   if (!currentResults) {
     showToast("No results to print.", "info");
     return;
   }
-  openAndPrint(combinedAllReportHTML(currentResults), true);
+  await openReportsPdfForPrint(currentResults, selectedKeys);
 }
 
 
@@ -1659,7 +1756,30 @@ function safeFileName(parts) {
     .join("_")
     .replace(/\s+/g, "_")
     .replace(/[^A-Za-z0-9_-]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
     .slice(0, 80);
+}
+
+function safeFilePart(parts, fallback = "Record") {
+  return safeFileName(parts) || fallback;
+}
+
+/** Stable user-visible names for the two bulk download formats. */
+export function combinedPdfFileName(currentResults, timestamp = Date.now()) {
+  const customer = currentResults?.customer || {};
+  return `Compliance_${safeFilePart([
+    customer.firstName,
+    customer.lastName,
+  ])}_${timestamp}.pdf`;
+}
+
+export function separatePdfsZipFileName(currentResults, timestamp = Date.now()) {
+  const customer = currentResults?.customer || {};
+  return `Compliance_PDFs_${safeFilePart([
+    customer.firstName,
+    customer.lastName,
+  ])}_${timestamp}.zip`;
 }
 
 function nowStamp() {
@@ -1874,18 +1994,15 @@ function drawPortalCapture(ctx, opts) {
  * capture when a screenshot exists, else a labeled summary. */
 export function repeatSection(ro, person, title, subjectLabel) {
   const screenshot = stateEvidenceDataUrl(ro);
-  const classification = classifyRepeatOffenderResult(ro);
-  if (
-    screenshot &&
-    ["eligible", "ineligible"].includes(classification.state)
-  ) {
+  const verifiedScreenshot = verifiedRepeatEvidence(ro) ? screenshot : null;
+  if (verifiedScreenshot) {
     return {
       orientation: "portrait",
       render: (ctx) =>
         drawPortalCapture(ctx, {
           title,
           metaLine: `Customer: ${subjectFullName(person)}   ·   DLN/PID: ${person?.dlnPid || "—"}   ·   Captured: ${reportDate(ro?.timestamp)}`,
-          screenshot,
+          screenshot: verifiedScreenshot,
         }),
     };
   }
@@ -1904,7 +2021,7 @@ export function repeatSection(ro, person, title, subjectLabel) {
           ],
         },
         result: repeatOffenderResultArgs(ro),
-        screenshot,
+        screenshot: verifiedScreenshot,
       }),
   };
 }
@@ -1915,14 +2032,15 @@ export function titleSection(t, customer) {
   const vin = customer?.tradeVin || "N/A";
   const vehicle = [t?.year, t?.make, t?.model].filter(Boolean).join(" ");
   const screenshot = stateEvidenceDataUrl(t);
-  if (screenshot && !t?.error && t?.status !== "error") {
+  const verifiedScreenshot = verifiedTitleEvidence(t) ? screenshot : null;
+  if (verifiedScreenshot) {
     return {
       orientation: "portrait",
       render: (ctx) =>
         drawPortalCapture(ctx, {
           title: "Michigan Title & Lien Check",
           metaLine: `VIN: ${vin}${vehicle ? "   ·   " + vehicle : ""}   ·   Captured: ${reportDate(t?.timestamp)}`,
-          screenshot,
+          screenshot: verifiedScreenshot,
         }),
     };
   }
@@ -1934,7 +2052,7 @@ export function titleSection(t, customer) {
         meta: [{ label: "Screened", value: reportDate(t?.timestamp) }],
         subject: { title: "TRADE-IN VEHICLE", rows: titleSubjectRows(t, vin) },
         result: titleResultArgs(t),
-        screenshot,
+        screenshot: verifiedScreenshot,
       }),
   };
 }
@@ -2207,98 +2325,328 @@ export async function downloadTitleReportPDF(currentResults) {
   ctx.doc.save(fileName);
 }
 
-export function combinedPdfSections(currentResults) {
+/**
+ * One ordered manifest drives combined download, separate downloads, and print.
+ * Keeping the section object intact also guarantees each action uses the same
+ * jsPDF renderer and therefore the same letter-size geometry.
+ */
+export function reportPdfEntries(
+  currentResults,
+  selectedKeys,
+  timestamp = Date.now()
+) {
   const customer = currentResults?.customer || {};
   const checks = currentResults?.checks || {};
   const coBuyer = customer.coBuyer;
-  const sections = [finalDecisionSection(currentResults)];
-
-  if (checks.ofac) {
-    sections.push({
-      orientation: "portrait",
-      render: (ctx) => drawOfacSection(ctx, customer, checks.ofac),
-    });
-  }
-  if (checks.coBuyerOfac && coBuyer) {
-    sections.push({
-      orientation: "portrait",
-      render: (ctx) =>
-        drawOfacSection(ctx, coBuyer, checks.coBuyerOfac, {
-          subjectLabel: "CO-BUYER SUBJECT SCREENED",
-        }),
-    });
-  }
-
-  if (checks.repeatOffender) {
-    sections.push(
-      repeatSection(
+  const buyerName = safeFilePart([customer.firstName, customer.lastName]);
+  const coBuyerName = safeFilePart([coBuyer?.firstName, coBuyer?.lastName]);
+  const factories = {
+    [REPORT_KEYS.decision]: () => ({
+      fileName: `Compliance_Decision_${buyerName}_${timestamp}.pdf`,
+      section: finalDecisionSection(currentResults),
+    }),
+    [REPORT_KEYS.buyerOfac]: () => ({
+      fileName: `OFAC_${buyerName}_${timestamp}.pdf`,
+      section: {
+        orientation: "portrait",
+        render: (ctx) => drawOfacSection(ctx, customer, checks.ofac),
+      },
+    }),
+    [REPORT_KEYS.buyerRepeat]: () => ({
+      fileName: `RepeatOffender_${buyerName}_${timestamp}.pdf`,
+      section: repeatSection(
         checks.repeatOffender,
         customer,
         "Michigan Repeat Offender Check",
         "SUBJECT SCREENED"
-      )
-    );
-  }
-
-  if (checks.coBuyerRepeatOffender && coBuyer) {
-    sections.push(
-      repeatSection(
+      ),
+    }),
+    [REPORT_KEYS.title]: () => ({
+      fileName: `Title_${safeFilePart([customer.tradeVin || "N-A"])}_${timestamp}.pdf`,
+      section: titleSection(checks.title, customer),
+    }),
+    [REPORT_KEYS.coBuyerOfac]: () => ({
+      fileName: `OFAC_CoBuyer_${coBuyerName}_${timestamp}.pdf`,
+      section: {
+        orientation: "portrait",
+        render: (ctx) =>
+          drawOfacSection(ctx, coBuyer, checks.coBuyerOfac, {
+            subjectLabel: "CO-BUYER SUBJECT SCREENED",
+          }),
+      },
+    }),
+    [REPORT_KEYS.coBuyerRepeat]: () => ({
+      fileName: `RepeatOffender_CoBuyer_${coBuyerName}_${timestamp}.pdf`,
+      section: repeatSection(
         checks.coBuyerRepeatOffender,
         coBuyer,
         "Michigan Repeat Offender Check (Co-Buyer)",
         "CO-BUYER SCREENED"
-      )
-    );
+      ),
+    }),
+  };
+
+  return normalizeReportSelection(currentResults, selectedKeys).map((key) => {
+    const entry = factories[key]();
+    return { key, label: REPORT_LABELS[key], ...entry };
+  });
+}
+
+export function combinedPdfSections(currentResults, selectedKeys) {
+  return reportPdfEntries(currentResults, selectedKeys).map(
+    (entry) => entry.section
+  );
+}
+
+async function renderPdfSections(sections) {
+  const ctx = await createPdfContext(sections[0].orientation);
+  for (let i = 0; i < sections.length; i++) {
+    if (i > 0) addPageWithOrientation(ctx, sections[i].orientation);
+    await sections[i].render(ctx);
+  }
+  return ctx;
+}
+
+let zipCrcTable;
+
+function crc32(bytes) {
+  if (!zipCrcTable) {
+    zipCrcTable = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let value = i;
+      for (let bit = 0; bit < 8; bit++) {
+        value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+      }
+      zipCrcTable[i] = value >>> 0;
+    }
+  }
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = zipCrcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipTimestamp(value) {
+  const date = value instanceof Date && !Number.isNaN(value.getTime())
+    ? value
+    : new Date();
+  const year = Math.min(2107, Math.max(1980, date.getFullYear()));
+  return {
+    date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+    time:
+      (date.getHours() << 11) |
+      (date.getMinutes() << 5) |
+      Math.floor(date.getSeconds() / 2),
+  };
+}
+
+/** Build a standards-compatible, uncompressed ZIP without another dependency. */
+export function buildStoredZipArchive(files, modifiedAt = new Date()) {
+  const encoder = new TextEncoder();
+  const timestamp = zipTimestamp(modifiedAt);
+  let localSize = 0;
+  let centralSize = 0;
+  const entries = files.map((file) => {
+    const name = encoder.encode(String(file.name));
+    const data = file.data instanceof Uint8Array
+      ? file.data
+      : new Uint8Array(file.data);
+    const entry = {
+      name,
+      data,
+      crc: crc32(data),
+      localOffset: localSize,
+    };
+    localSize += 30 + name.length + data.length;
+    centralSize += 46 + name.length;
+    return entry;
+  });
+
+  const archive = new Uint8Array(localSize + centralSize + 22);
+  const view = new DataView(archive.buffer);
+  let offset = 0;
+  const u16 = (value) => {
+    view.setUint16(offset, value, true);
+    offset += 2;
+  };
+  const u32 = (value) => {
+    view.setUint32(offset, value, true);
+    offset += 4;
+  };
+
+  for (const entry of entries) {
+    u32(0x04034b50);
+    u16(20);
+    u16(0x0800);
+    u16(0);
+    u16(timestamp.time);
+    u16(timestamp.date);
+    u32(entry.crc);
+    u32(entry.data.length);
+    u32(entry.data.length);
+    u16(entry.name.length);
+    u16(0);
+    archive.set(entry.name, offset);
+    offset += entry.name.length;
+    archive.set(entry.data, offset);
+    offset += entry.data.length;
   }
 
-  if (checks.title) {
-    sections.push(titleSection(checks.title, customer));
+  const centralOffset = offset;
+  for (const entry of entries) {
+    u32(0x02014b50);
+    u16(20);
+    u16(20);
+    u16(0x0800);
+    u16(0);
+    u16(timestamp.time);
+    u16(timestamp.date);
+    u32(entry.crc);
+    u32(entry.data.length);
+    u32(entry.data.length);
+    u16(entry.name.length);
+    u16(0);
+    u16(0);
+    u16(0);
+    u16(0);
+    u32(0);
+    u32(entry.localOffset);
+    archive.set(entry.name, offset);
+    offset += entry.name.length;
   }
 
-  return sections;
+  u32(0x06054b50);
+  u16(0);
+  u16(0);
+  u16(entries.length);
+  u16(entries.length);
+  u32(offset - centralOffset);
+  u32(centralOffset);
+  u16(0);
+  return archive;
+}
+
+function downloadBlob(blob, fileName) {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 40 * 1000);
+}
+
+async function openReportsPdfForPrint(currentResults, selectedKeys) {
+  const entries = reportPdfEntries(currentResults, selectedKeys);
+  if (!entries.length) {
+    showToast("Select at least one document to print.", "info");
+    return;
+  }
+
+  // Reserve the tab synchronously while the click gesture is still active.
+  let printWindow;
+  try {
+    printWindow = window.open("", "_blank");
+  } catch {
+    printWindow = null;
+  }
+  if (!printWindow) {
+    showToast("Could not open print preview. Allow pop-ups and try again.", "warning");
+    return;
+  }
+
+  try {
+    printWindow.document.title = "Preparing Compliance Central print preview";
+    printWindow.document.body.textContent = "Preparing the selected PDF documents…";
+    const ctx = await renderPdfSections(entries.map((entry) => entry.section));
+    // jsPDF's OpenAction makes Chrome's PDF viewer open the print dialog. Even
+    // if a viewer ignores it, the exact generated PDF remains open for ⌘P/Ctrl+P.
+    ctx.doc.autoPrint?.({ variant: "non-conform" });
+    const blobUrl = URL.createObjectURL(ctx.doc.output("blob"));
+    printWindow.location.replace(blobUrl);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5 * 60 * 1000);
+  } catch (err) {
+    console.error("PDF print error:", err);
+    try {
+      printWindow.close();
+    } catch {
+      // ignore
+    }
+    showToast("Could not prepare the PDF print preview.", "error");
+  }
 }
 
 /**
  * Combined "Download PDF" — every check that ran, stitched into one PDF
  * with the same official styling as the per-check downloads.
  */
-export async function downloadAllReportsPDF(currentResults) {
+export async function downloadAllReportsPDF(currentResults, selectedKeys) {
   if (!currentResults) {
     showToast("No results to download.", "info");
     return;
   }
 
-  const customer = currentResults.customer;
   // Build the section list. OFAC renders its official letterhead; the MDOS/SOS
   // checks render the actual portal capture (the page the dealer would print).
   // All pages are portrait.
-  const sections = combinedPdfSections(currentResults);
+  const sections = combinedPdfSections(currentResults, selectedKeys);
 
   if (!sections.length) {
-    showToast("Nothing to include in the PDF yet.", "info");
+    showToast("Select at least one document to download.", "info");
     return;
   }
 
   let ctx;
   try {
-    ctx = await createPdfContext(sections[0].orientation);
+    ctx = await renderPdfSections(sections);
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
 
-  for (let i = 0; i < sections.length; i++) {
-    if (i > 0) addPageWithOrientation(ctx, sections[i].orientation);
-    await sections[i].render(ctx);
+  ctx.doc.save(combinedPdfFileName(currentResults));
+}
+
+/** Download each selected document as its own PDF file. */
+export async function downloadAllReportPDFs(currentResults, selectedKeys) {
+  if (!currentResults) {
+    showToast("No results to download.", "info");
+    return;
+  }
+  const timestamp = Date.now();
+  const entries = reportPdfEntries(currentResults, selectedKeys, timestamp);
+  if (!entries.length) {
+    showToast("Select at least one document to download.", "info");
+    return;
   }
 
-  ctx.doc.save(
-    `Compliance_${safeFileName([
-      customer?.firstName,
-      customer?.lastName,
-    ])}_${Date.now()}.pdf`
-  );
+  try {
+    if (entries.length === 1) {
+      const ctx = await renderPdfSections([entries[0].section]);
+      ctx.doc.save(entries[0].fileName);
+      return;
+    }
+    const files = [];
+    for (const entry of entries) {
+      const ctx = await renderPdfSections([entry.section]);
+      files.push({
+        name: entry.fileName,
+        data: new Uint8Array(ctx.doc.output("arraybuffer")),
+      });
+    }
+    const archive = buildStoredZipArchive(files);
+    const archiveName = separatePdfsZipFileName(currentResults, timestamp);
+    downloadBlob(new Blob([archive], { type: "application/zip" }), archiveName);
+    showToast(`${entries.length} PDFs downloaded in one ZIP file.`, "success");
+  } catch (err) {
+    console.error("PDF download error:", err);
+    showToast("One or more PDFs could not be downloaded.", "error");
+  }
 }
 
 

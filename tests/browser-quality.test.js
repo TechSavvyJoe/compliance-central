@@ -40,3 +40,22 @@ test("data-use disclosure ties remote checks to an affirmative user action", () 
     );
   }
 });
+
+test("bulk exports expose accessible per-document selection and all three actions", () => {
+  assert.match(sidepanelHtml, /<fieldset id="reportSelectionPanel"/);
+  assert.match(sidepanelHtml, /id="selectAllReports"/);
+  for (const key of [
+    "decision",
+    "buyer-ofac",
+    "buyer-repeat",
+    "title",
+    "co-buyer-ofac",
+    "co-buyer-repeat",
+  ]) {
+    assert.match(sidepanelHtml, new RegExp(`data-report-row="${key}"`));
+  }
+  assert.match(sidepanelHtml, /id="printAllBtn"/);
+  assert.match(sidepanelHtml, /id="downloadPdfBtn"/);
+  assert.match(sidepanelHtml, /id="downloadAllPdfsBtn"/);
+  assert.match(sidepanelHtml, /Download All PDFs/);
+});

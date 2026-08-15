@@ -8,36 +8,14 @@
  */
 
 import { SOS_QUOTE_MODE } from "./sos-fee-quote.js";
+import {
+  SOS_PLATE_DESIGNS,
+  plateDesignByValue,
+  plateDesignOptionsForType,
+  plateSubmissionFields,
+} from "./sos-plate-catalog.js";
 
-const SOS_PLATE_IMAGE_ROOT =
-  "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images";
-
-export const SOS_PLATE_DESIGNS = Object.freeze({
-  pureMichigan: Object.freeze({
-    value: "pure_michigan",
-    label: "Pure Michigan",
-    sosLabel: "Standard White",
-    imageUrl: `${SOS_PLATE_IMAGE_ROOT}/Standard_PureMichigan.jpg?mw=768&rev=7d34d742a2654b28a629235f959fa5e8&hash=0B2EA17F2FF650FC8464D07C074FA926`,
-  }),
-  mackinacBridge: Object.freeze({
-    value: "mackinac_bridge",
-    label: "Mackinac Bridge",
-    sosLabel: "Mackinac Bridge",
-    imageUrl: `${SOS_PLATE_IMAGE_ROOT}/Standard_MacBridge.jpg?mw=768&rev=a9a336275c954f098a45fa080180d621&hash=B11CBC4C18A16DE56BB94F218BA8164C`,
-  }),
-  waterWinterWonderland: Object.freeze({
-    value: "water_winter_wonderland",
-    label: "Water-Winter Wonderland",
-    sosLabel: "Water-Winter Wonderland",
-    imageUrl: `${SOS_PLATE_IMAGE_ROOT}/Standard_WaterWinterWonderland.png?mw=768&rev=4ec3441ac8154aee98632aadf2f31559&hash=9E5344E36B1789CBF14E14A664EDE4F5`,
-  }),
-  waterWonderland: Object.freeze({
-    value: "water_wonderland",
-    label: "Water Wonderland",
-    sosLabel: "Water Wonderland",
-    imageUrl: `${SOS_PLATE_IMAGE_ROOT}/Standard_WaterWonderland.png?mw=768&rev=5d1d477b24fe41079f081b68961d4015&hash=185FEA739A4F41E0A5DB594CF4013A86`,
-  }),
-});
+export { SOS_PLATE_DESIGNS, plateDesignByValue, plateDesignOptionsForType };
 
 export const SOS_FUEL_OPTIONS = Object.freeze([
   ["GAS", "Gas"],
@@ -133,7 +111,6 @@ const PASSENGER_PLATE_OPTIONS = Object.freeze([
 
 const COMMERCIAL_PLATE_OPTIONS = Object.freeze([
   ["COM", "Commercial"],
-  ["PAS", "Standard"],
   ["FLT", "Fleet"],
   ["RFL", "Rental Fleet"],
   ["LCY", "Legacy"],
@@ -150,7 +127,7 @@ export function useOptionsForVehicle(vehicleType) {
 }
 
 export function plateOptionsForUse(vehicleUse) {
-  return ["COM", "GVW", "COMT", "CARN", "LOG", "MILK"].includes(vehicleUse)
+  return ["COM", "GVW", "TRANS", "COMT", "CARN", "LOG", "MILK"].includes(vehicleUse)
     ? COMMERCIAL_PLATE_OPTIONS
     : PASSENGER_PLATE_OPTIONS;
 }
@@ -159,10 +136,6 @@ export function isCommercialUse(vehicleUse) {
   return ["COM", "GVW", "COMT", "CARN", "LOG", "MILK", "TRANS"].includes(
     vehicleUse
   );
-}
-
-export function plateDesignByValue(value) {
-  return Object.values(SOS_PLATE_DESIGNS).find((design) => design.value === value) || null;
 }
 
 export function localSosVinFields(vehicleType = "Passenger") {
@@ -243,10 +216,8 @@ export function buildSosSubmission(values) {
     }),
   ];
 
-  if (values.plateType === "PAS" && plateDesign) {
-    submission.push(
-      field("Plate Background", "select", { optionLabel: plateDesign.sosLabel })
-    );
+  if (plateDesign?.plateType === values.plateType) {
+    submission.push(...plateSubmissionFields(plateDesign));
   }
   if (isCommercialUse(values.vehicleUse)) {
     submission.push(
@@ -307,7 +278,14 @@ export function validateSosLocalValues(values, now = new Date()) {
   if (!/^\d{1,7}(?:\.\d{1,2})?$/.test(msrp) || Number(msrp) <= 0) {
     errors.push({ id: "sosMsrp", message: "Enter the vehicle MSRP." });
   }
-  if (values?.plateType === "PAS" && !plateDesignByValue(values?.plateDesign)) {
+  const plateTypeAllowed = plateOptionsForUse(values?.vehicleUse).some(
+    ([value]) => value === values?.plateType
+  );
+  if (values?.plateType && !plateTypeAllowed) {
+    errors.push({ id: "sosPlateType", message: "Select a plate type available for this use." });
+  }
+  const chosenDesign = plateDesignByValue(values?.plateDesign);
+  if (chosenDesign?.plateType !== values?.plateType) {
     errors.push({ id: "sosPlateDesign", message: "Select a plate design." });
   }
   if (isCommercialUse(values?.vehicleUse) && !values?.businessRegistration) {

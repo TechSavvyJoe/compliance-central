@@ -20,6 +20,7 @@ import {
   SOS_VEHICLE_OPTIONS,
   buildSosSubmission,
   localSosVinFields,
+  plateDesignOptionsForType,
   plateOptionsForUse,
   validateSosLocalValues,
 } from "../src/sidepanel/sos-local-form.js";
@@ -57,12 +58,12 @@ const sidepanelScript = readFileSync(
   new URL("../sidepanel.js", import.meta.url),
   "utf8"
 );
-const platePreviewHtml = readFileSync(
-  new URL("../plate-preview.html", import.meta.url),
+const sidepanelCss = readFileSync(
+  new URL("../sidepanel.css", import.meta.url),
   "utf8"
 );
-const platePreviewScript = readFileSync(
-  new URL("../plate-preview.js", import.meta.url),
+const packageScript = readFileSync(
+  new URL("../tools/package-extension.sh", import.meta.url),
   "utf8"
 );
 const manifest = JSON.parse(
@@ -173,26 +174,87 @@ test("local dealer form defaults to Gas and includes modern fuels and commercial
     assert.ok(SOS_FUEL_OPTIONS.some(([, label]) => label === fuel));
   }
   assert.ok(plateOptionsForUse("COM").some(([, label]) => label === "Commercial"));
+  assert.equal(plateOptionsForUse("COM").some(([value]) => value === "PAS"), false);
 });
 
-test("selected plate artwork uses actual official Michigan images before calculation", () => {
-  for (const design of Object.values(SOS_PLATE_DESIGNS)) {
-    assert.match(design.imageUrl, /^https:\/\/www\.michigan\.gov\/sos\//);
+test("selected plate artwork expands in a fast in-sidebar viewer", () => {
+  const designs = Object.values(SOS_PLATE_DESIGNS);
+  assert.equal(new Set(designs.map((design) => design.value)).size, designs.length);
+  assert.equal(designs.length, 89);
+  for (const design of designs) {
+    if (design.imageUrl) {
+      assert.match(
+        design.imageUrl,
+        /^https:\/\/(?:www\.michigan\.gov\/sos\/|dsvsesvc\.sos\.state\.mi\.us\/TAP\/Image\/)/
+      );
+      assert.match(
+        design.fullImageUrl,
+        /^https:\/\/(?:www\.michigan\.gov\/sos\/|dsvsesvc\.sos\.state\.mi\.us\/TAP\/Image\/)/
+      );
+      if (design.fullImageUrl.startsWith("https://www.michigan.gov/")) {
+        assert.match(design.fullImageUrl, /[?&]mw=1600(?:&|$)/);
+      }
+    } else {
+      assert.equal(design.fullImageUrl, null);
+    }
     assert.ok(design.label);
-    assert.ok(design.sosLabel);
+    assert.ok(design.plateType);
+    assert.ok(design.selection?.field);
+    assert.ok(design.selection?.optionValue);
+    assert.match(design.sourceUrl, /^https:\/\/www\.michigan\.gov\/sos\/vehicle\/license-plates(?:\/|$)/);
   }
+  assert.equal(designs.filter((design) => !design.imageUrl).length, 0);
+  assert.equal(plateDesignOptionsForType("PAS").length, 4);
+  assert.equal(plateDesignOptionsForType("LCY").length, 3);
+  assert.equal(plateDesignOptionsForType("SC").length, 18);
+  assert.equal(plateDesignOptionsForType("U").length, 15);
+  assert.equal(plateDesignOptionsForType("VT").length, 32);
+  assert.equal(plateDesignOptionsForType("PSO").length, 10);
+  assert.equal(plateDesignOptionsForType("GLD").length, 1);
+  assert.equal(plateDesignOptionsForType("ARO").length, 1);
+  assert.equal(plateDesignOptionsForType("COM").length, 2);
+  assert.equal(plateDesignOptionsForType("FLT").length, 1);
+  assert.equal(plateDesignOptionsForType("RFL").length, 1);
+  assert.equal(plateDesignOptionsForType("CONSUL").length, 1);
+  assert.equal(SOS_PLATE_DESIGNS.aro_amateur_radio.selection.optionValue, "PM");
+  assert.match(SOS_PLATE_DESIGNS.commercial_mackinac_bridge.imageUrl, /Standard_MacBridge\.jpg/);
   assert.match(sidepanelHtml, /id="sosPlatePreviewImage"[^>]+src="https:\/\/www\.michigan\.gov\/sos\//);
-  assert.match(
-    sidepanelScript,
-    /plateDesignByValue\(\s*standardPlate \? elements\.sosPlateDesign\?\.value/
-  );
-  assert.match(sidepanelHtml, /id="sosPlatePreview"[^>]+aria-label="Open a full-size preview/);
-  assert.match(sidepanelScript, /chrome\.windows\.create\(\{/);
-  assert.match(sidepanelScript, /type:\s*"popup"/);
-  assert.match(platePreviewHtml, /id="platePreviewImage"/);
-  assert.match(platePreviewHtml, /Design sample only · non-personalized/);
-  assert.match(platePreviewScript, /searchParams\.set\("mw",\s*"1600"\)/);
-  assert.match(platePreviewScript, /plateDesignByValue\(params\.get\("design"\)\)/);
+  for (const id of [
+    "sosPlateViewer",
+    "sosPlateViewerImage",
+    "closeSosPlateViewer",
+    "sosPlateZoomOut",
+    "sosPlateZoomReset",
+    "sosPlateZoomIn",
+  ]) {
+    assert.match(sidepanelHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(sidepanelHtml, /class="modal sos-plate-viewer hidden"[^>]+role="dialog"/);
+  assert.match(sidepanelHtml, /Design sample only · non-personalized/);
+  assert.match(sidepanelScript, /showModal\(elements\.sosPlateViewer/);
+  assert.match(sidepanelScript, /hideModal\(elements\.sosPlateViewer\)/);
+  assert.match(sidepanelScript, /SOS_PLATE_ZOOM_MIN\s*=\s*0\.75/);
+  assert.match(sidepanelScript, /SOS_PLATE_ZOOM_MAX\s*=\s*2\.5/);
+  assert.match(sidepanelScript, /Loading the largest official artwork/);
+  assert.match(sidepanelScript, /const fullImage = new Image\(\)/);
+  assert.match(sidepanelScript, /fullImage\.onerror/);
+  assert.match(sidepanelScript, /credentials:\s*"omit"/);
+  assert.match(sidepanelScript, /URL\.createObjectURL\(blob\)/);
+  assert.match(sidepanelScript, /URL\.revokeObjectURL/);
+  assert.match(sidepanelScript, /SOS_PLATE_IMAGE_MAX_BYTES/);
+  assert.match(sidepanelScript, /new AbortController\(\)/);
+  assert.match(sidepanelScript, /response\.body\.getReader\(\)/);
+  assert.match(sidepanelScript, /reader\.cancel\(/);
+  assert.match(sidepanelScript, /decodedImage\.onerror/);
+  assert.match(sidepanelScript, /addEventListener\("pagehide",\s*disposeSosPlateImages/);
+  assert.match(sidepanelScript, /addEventListener\("pointermove",\s*moveSosPlatePan\)/);
+  assert.match(sidepanelScript, /invalidateSosQuoteAfterEdit\(\)/);
+  assert.match(sidepanelCss, /\.sos-plate-viewer-stage/);
+  assert.match(sidepanelCss, /width:\s*var\(--sos-plate-zoom-width/);
+  assert.doesNotMatch(sidepanelScript, /chrome\.windows\./);
+  assert.doesNotMatch(sidepanelScript, /type:\s*"popup"/);
+  assert.doesNotMatch(sidepanelScript, /:\s*"pure_michigan"\s*\)/);
+  assert.doesNotMatch(packageScript, /plate-preview\.(?:html|js|css)/);
   assert.match(manifest.content_security_policy.extension_pages, /https:\/\/www\.michigan\.gov/);
 });
 
@@ -203,6 +265,7 @@ test("local form builds one semantic SOS batch and validates commercial details"
     vehicleUse: "COM",
     fuelType: "DIESEL",
     plateType: "COM",
+    plateDesign: "commercial_standard_white",
     businessRegistration: "yes",
   });
   assert.deepEqual(validateSosLocalValues(values), []);
@@ -227,6 +290,32 @@ test("local form builds one semantic SOS batch and validates commercial details"
   );
   assert.match(sidepanelHtml, /Plate purchase date <span>Important · today if blank<\/span>/);
   assert.doesNotMatch(sidepanelHtml, /Passport &amp; purchase date/);
+});
+
+test("specialty selections submit the exact live SOS subtype and background", () => {
+  const values = newPlateValues({
+    plateType: "SC",
+    plateDesign: "sc_detroit_lions",
+  });
+  assert.deepEqual(validateSosLocalValues(values), []);
+  const submission = buildSosSubmission(values);
+  assert.deepEqual(
+    submission
+      .filter((item) => item.label === "Plate Sub Type" || item.label === "Plate Background")
+      .map(({ label, optionValue, optionLabel }) => ({ label, optionValue, optionLabel })),
+    [
+      { label: "Plate Sub Type", optionValue: "LION", optionLabel: "Detroit Lions" },
+      { label: "Plate Background", optionValue: "PM", optionLabel: "Standard White" },
+    ]
+  );
+  assert.equal(
+    validateSosLocalValues({ ...values, plateDesign: "u_michigan" })[0].id,
+    "sosPlateDesign"
+  );
+  assert.equal(
+    validateSosLocalValues({ ...values, plateType: "COM", plateDesign: "commercial_standard_white" })[0].id,
+    "sosPlateType"
+  );
 });
 
 test("background runner creates one inactive tab only on Calculate and closes on success", async () => {

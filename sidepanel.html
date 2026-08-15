@@ -326,18 +326,23 @@
                   <option value="water_wonderland">Water Wonderland</option>
                 </select>
               </div>
+              <p id="sosPlateEligibility" class="sos-plate-eligibility" hidden></p>
             </div>
 
-            <button type="button" id="sosPlatePreview" class="sos-quote-plate-preview" aria-label="Open a full-size preview of the Pure Michigan plate" title="Open full-size official plate artwork">
+            <button type="button" id="sosPlatePreview" class="sos-quote-plate-preview" aria-label="Expand the Pure Michigan plate image" title="Expand official plate artwork">
               <div class="sos-plate-art">
                 <img id="sosPlatePreviewImage" src="https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard_PureMichigan.jpg?mw=768&amp;rev=7d34d742a2654b28a629235f959fa5e8&amp;hash=0B2EA17F2FF650FC8464D07C074FA926" alt="Pure Michigan official plate design artwork" referrerpolicy="no-referrer" decoding="async" />
               </div>
               <div>
                 <span class="sos-preview-kicker">Selected artwork</span>
                 <strong id="sosPlatePreviewLabel">Pure Michigan</strong>
-                <small>Click for full-size official image · non-personalized</small>
+                <small>Click to inspect · zoomable official image</small>
               </div>
             </button>
+            <div id="sosPlatePreviewUnavailable" class="sos-plate-preview-unavailable" hidden>
+              <strong>Official image after calculation</strong>
+              <span>SOS does not publish a separate gallery image for this exact choice. The live calculator image will appear here when available.</span>
+            </div>
 
             <div class="sos-timing-row">
               <div class="sos-control sos-purchase-date">
@@ -629,6 +634,34 @@
       <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-spinner" aria-hidden="true"></div>
         <p class="loading-text" id="loadingText">Processing...</p>
+      </div>
+    </div>
+
+    <div id="sosPlateViewer" class="modal sos-plate-viewer hidden" role="dialog" aria-modal="true" aria-labelledby="sosPlateViewerTitle" aria-describedby="sosPlateViewerNote" aria-hidden="true">
+      <div class="sos-plate-viewer-shell">
+        <header class="sos-plate-viewer-header">
+          <div>
+            <span class="sos-plate-viewer-eyebrow">Official Michigan SOS artwork</span>
+            <h2 id="sosPlateViewerTitle">Plate design</h2>
+          </div>
+          <button type="button" id="closeSosPlateViewer" class="modal-close sos-plate-viewer-close" aria-label="Close expanded plate image">&times;</button>
+        </header>
+
+        <div id="sosPlateViewerStage" class="sos-plate-viewer-stage" tabindex="0" aria-label="Zoomable selected plate artwork">
+          <img id="sosPlateViewerImage" alt="" referrerpolicy="no-referrer" decoding="async" />
+        </div>
+
+        <footer class="sos-plate-viewer-footer">
+          <div class="sos-plate-viewer-caption">
+            <strong id="sosPlateViewerName">Michigan plate</strong>
+            <span id="sosPlateViewerNote">Design sample only · non-personalized</span>
+          </div>
+          <div class="sos-plate-viewer-tools" role="group" aria-label="Plate image zoom controls">
+            <button type="button" id="sosPlateZoomOut" aria-label="Zoom out">&minus;</button>
+            <button type="button" id="sosPlateZoomReset" class="sos-plate-zoom-value" aria-label="Reset zoom">100%</button>
+            <button type="button" id="sosPlateZoomIn" aria-label="Zoom in">+</button>
+          </div>
+        </footer>
       </div>
     </div>
 

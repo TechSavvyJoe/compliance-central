@@ -105,6 +105,7 @@ import {
   isCommercialUse,
   localSosVinFields,
   plateDesignByValue,
+  plateDesignOptionsForType,
   plateOptionsForUse,
   useOptionsForVehicle,
   validateSosLocalValues,
@@ -172,11 +173,22 @@ const elements = {
   sosPlateType: $("sosPlateType"),
   sosPlateDesign: $("sosPlateDesign"),
   sosPlateDesignControl: $("sosPlateDesignControl"),
+  sosPlateEligibility: $("sosPlateEligibility"),
   sosPurchaseDate: $("sosPurchaseDate"),
   sosTransferPlateNumber: $("sosTransferPlateNumber"),
   sosPlatePreview: $("sosPlatePreview"),
   sosPlatePreviewImage: $("sosPlatePreviewImage"),
   sosPlatePreviewLabel: $("sosPlatePreviewLabel"),
+  sosPlatePreviewUnavailable: $("sosPlatePreviewUnavailable"),
+  sosPlateViewer: $("sosPlateViewer"),
+  sosPlateViewerImage: $("sosPlateViewerImage"),
+  sosPlateViewerName: $("sosPlateViewerName"),
+  sosPlateViewerNote: $("sosPlateViewerNote"),
+  sosPlateViewerStage: $("sosPlateViewerStage"),
+  closeSosPlateViewer: $("closeSosPlateViewer"),
+  sosPlateZoomOut: $("sosPlateZoomOut"),
+  sosPlateZoomReset: $("sosPlateZoomReset"),
+  sosPlateZoomIn: $("sosPlateZoomIn"),
   sosHandoffPanel: $("sosHandoffPanel"),
   sosHandoffMessage: $("sosHandoffMessage"),
   openSosHandoffBtn: $("openSosHandoffBtn"),
@@ -554,85 +566,352 @@ function handleSosVinInput() {
   syncSosLienCheckButton();
 }
 
+const SOS_CALCULATOR_IMAGE_HOST = "dsvsesvc.sos.state.mi.us";
+const SOS_PLATE_IMAGE_HOSTS = new Set(["www.michigan.gov", SOS_CALCULATOR_IMAGE_HOST]);
+const SOS_PLATE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+let sosPlatePreviewLoadToken = 0;
+let sosPlatePreviewObjectUrl = null;
+let sosPlateViewerObjectUrl = null;
+let sosPlatePreviewAbortController = null;
+let sosPlateViewerAbortController = null;
+
+function abortSosPlateLoad(kind) {
+  const controller =
+    kind === "preview" ? sosPlatePreviewAbortController : sosPlateViewerAbortController;
+  controller?.abort();
+  if (kind === "preview") sosPlatePreviewAbortController = null;
+  else sosPlateViewerAbortController = null;
+}
+
+function releaseSosPlateObjectUrl(kind) {
+  const current = kind === "preview" ? sosPlatePreviewObjectUrl : sosPlateViewerObjectUrl;
+  if (current) URL.revokeObjectURL(current);
+  if (kind === "preview") sosPlatePreviewObjectUrl = null;
+  else sosPlateViewerObjectUrl = null;
+}
+
+function disposeSosPlateImages() {
+  sosPlatePreviewLoadToken += 1;
+  sosPlateViewerLoadToken += 1;
+  abortSosPlateLoad("preview");
+  abortSosPlateLoad("viewer");
+  releaseSosPlateObjectUrl("preview");
+  releaseSosPlateObjectUrl("viewer");
+}
+
+async function materializeSosPlateImage(source, { signal } = {}) {
+  const url = new URL(source);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    !SOS_PLATE_IMAGE_HOSTS.has(url.hostname)
+  ) {
+    throw new Error("Unexpected plate image origin.");
+  }
+  if (url.hostname !== SOS_CALCULATOR_IMAGE_HOST) {
+    return { source: url.href, objectUrl: null };
+  }
+  if (
+    url.search ||
+    url.hash ||
+    !/^\/TAP\/Image\/ENG\/[A-Za-z0-9._-]+$/.test(url.pathname)
+  ) {
+    throw new Error("Unexpected SOS plate image URL.");
+  }
+
+  // Calculator images are same-site subresources. Fetch only this public,
+  // allowlisted asset without credentials, then keep its blob in memory.
+  const response = await fetch(url.href, {
+    cache: "force-cache",
+    credentials: "omit",
+    redirect: "error",
+    signal,
+  });
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  const contentLengthHeader = response.headers.get("content-length");
+  const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+  if (
+    !response.ok ||
+    !["image/jpeg", "image/png", "image/webp"].some((type) =>
+      contentType.startsWith(type)
+    ) ||
+    (contentLengthHeader && (!Number.isFinite(contentLength) || contentLength < 1)) ||
+    contentLength > SOS_PLATE_IMAGE_MAX_BYTES ||
+    !response.body
+  ) {
+    throw new Error("SOS plate image could not be verified.");
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let receivedBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > SOS_PLATE_IMAGE_MAX_BYTES) {
+        await reader.cancel("SOS plate image exceeded the safe in-memory limit.");
+        throw new Error("SOS plate image exceeded the safe in-memory limit.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (!receivedBytes) throw new Error("SOS plate image was empty.");
+  const blob = new Blob(chunks, { type: contentType.split(";", 1)[0] });
+  const objectUrl = URL.createObjectURL(blob);
+  return { source: objectUrl, objectUrl };
+}
+
 function renderSosPlatePreview() {
+  const loadToken = ++sosPlatePreviewLoadToken;
+  abortSosPlateLoad("preview");
+  releaseSosPlateObjectUrl("preview");
+  const localDesign = plateDesignByValue(elements.sosPlateDesign?.value);
   const quotePreview =
     currentSosFeeQuote?.source === SOS_QUOTE_SOURCE.calculated
       ? currentSosFeeQuote.platePreviewUrl
       : null;
-  const standardPlate = elements.sosPlateType?.value === "PAS";
-  const localDesign = plateDesignByValue(
-    standardPlate ? elements.sosPlateDesign?.value : "pure_michigan"
-  );
-  const previewUrl = quotePreview || localDesign?.imageUrl || null;
+  const previewUrl = localDesign?.imageUrl || quotePreview || null;
+  const fullPreviewUrl = quotePreview || localDesign?.fullImageUrl || previewUrl;
   const shouldShow =
     selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
     Boolean(previewUrl);
+  const shouldShowUnavailable =
+    selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
+    Boolean(localDesign) &&
+    !previewUrl;
   if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = !shouldShow;
+  if (elements.sosPlatePreviewUnavailable) {
+    elements.sosPlatePreviewUnavailable.hidden = !shouldShowUnavailable;
+  }
   if (elements.sosPlatePreviewImage) {
     if (shouldShow) {
-      elements.sosPlatePreviewImage.src = previewUrl;
       elements.sosPlatePreviewImage.alt = `${localDesign?.label || "Michigan"} official plate design artwork`;
+      if (new URL(previewUrl).hostname === SOS_CALCULATOR_IMAGE_HOST) {
+        const abortController = new AbortController();
+        sosPlatePreviewAbortController = abortController;
+        elements.sosPlatePreviewImage.removeAttribute("src");
+        elements.sosPlatePreview?.classList.add("is-loading");
+        void materializeSosPlateImage(previewUrl, { signal: abortController.signal })
+          .then(({ source, objectUrl }) => {
+            if (loadToken !== sosPlatePreviewLoadToken) {
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              return;
+            }
+            sosPlatePreviewAbortController = null;
+            const decodedImage = new Image();
+            decodedImage.referrerPolicy = "no-referrer";
+            decodedImage.onload = () => {
+              if (loadToken !== sosPlatePreviewLoadToken) {
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+                return;
+              }
+              sosPlatePreviewObjectUrl = objectUrl;
+              elements.sosPlatePreviewImage.src = source;
+              elements.sosPlatePreview?.classList.remove("is-loading");
+            };
+            decodedImage.onerror = () => {
+              if (objectUrl) URL.revokeObjectURL(objectUrl);
+              if (loadToken !== sosPlatePreviewLoadToken) return;
+              elements.sosPlatePreview?.classList.remove("is-loading");
+              if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = true;
+              if (elements.sosPlatePreviewUnavailable) {
+                elements.sosPlatePreviewUnavailable.hidden = false;
+              }
+            };
+            decodedImage.src = source;
+          })
+          .catch(() => {
+            if (loadToken !== sosPlatePreviewLoadToken) return;
+            sosPlatePreviewAbortController = null;
+            elements.sosPlatePreview?.classList.remove("is-loading");
+            if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = true;
+            if (elements.sosPlatePreviewUnavailable) {
+              elements.sosPlatePreviewUnavailable.hidden = false;
+            }
+          });
+      } else {
+        elements.sosPlatePreviewImage.src = previewUrl;
+        elements.sosPlatePreview?.classList.remove("is-loading");
+      }
     } else {
       elements.sosPlatePreviewImage.removeAttribute("src");
+      elements.sosPlatePreview?.classList.remove("is-loading");
     }
   }
   if (elements.sosPlatePreviewLabel) {
     const plateTypeLabel = elements.sosPlateType?.selectedOptions?.[0]?.textContent?.trim();
-    elements.sosPlatePreviewLabel.textContent = standardPlate
-      ? localDesign?.label || "Official plate artwork"
-      : `${plateTypeLabel || "Plate"} · ${localDesign?.label || "Pure Michigan"} base`;
+    elements.sosPlatePreviewLabel.textContent =
+      localDesign?.label || `${plateTypeLabel || "Plate"} official result`;
   }
   if (elements.sosPlatePreview) {
     const label = elements.sosPlatePreviewLabel?.textContent || "selected Michigan plate";
+    if (fullPreviewUrl) {
+      elements.sosPlatePreview.dataset.fullImageUrl = fullPreviewUrl;
+    } else {
+      delete elements.sosPlatePreview.dataset.fullImageUrl;
+    }
     elements.sosPlatePreview.setAttribute(
       "aria-label",
-      `Open a full-size preview of ${label}`
+      `Expand the official image for ${label}`
     );
   }
 }
 
-async function openSosPlatePreview() {
-  const standardPlate = elements.sosPlateType?.value === "PAS";
-  const design = plateDesignByValue(
-    standardPlate ? elements.sosPlateDesign?.value : "pure_michigan"
+const SOS_PLATE_ZOOM_MIN = 0.75;
+const SOS_PLATE_ZOOM_MAX = 2.5;
+const SOS_PLATE_ZOOM_STEP = 0.25;
+let sosPlateZoom = 1;
+let sosPlatePan = null;
+let sosPlateViewerLoadToken = 0;
+
+function setSosPlateZoom(nextZoom) {
+  sosPlateZoom = Math.min(
+    SOS_PLATE_ZOOM_MAX,
+    Math.max(SOS_PLATE_ZOOM_MIN, Number(nextZoom) || 1)
   );
-  if (!design) {
+  elements.sosPlateViewerImage?.style.setProperty(
+    "--sos-plate-zoom-width",
+    `${Math.round(sosPlateZoom * 100)}%`
+  );
+  if (elements.sosPlateZoomReset) {
+    elements.sosPlateZoomReset.textContent = `${Math.round(sosPlateZoom * 100)}%`;
+  }
+  if (elements.sosPlateZoomOut) {
+    elements.sosPlateZoomOut.disabled = sosPlateZoom <= SOS_PLATE_ZOOM_MIN;
+  }
+  if (elements.sosPlateZoomIn) {
+    elements.sosPlateZoomIn.disabled = sosPlateZoom >= SOS_PLATE_ZOOM_MAX;
+  }
+  elements.sosPlateViewerStage?.classList.toggle("is-zoomed", sosPlateZoom > 1);
+}
+
+function closeSosPlateViewer() {
+  hideModal(elements.sosPlateViewer);
+}
+
+function openSosPlatePreview() {
+  const source = elements.sosPlatePreviewImage?.getAttribute("src");
+  if (!source || !elements.sosPlateViewerImage) {
     showToast("Plate artwork is not available for this selection.", "error");
     return;
   }
 
-  try {
-    const currentWindow = await chrome.windows.getCurrent();
-    const availableWidth = Number.isInteger(currentWindow?.width)
-      ? currentWindow.width
-      : 1100;
-    const availableHeight = Number.isInteger(currentWindow?.height)
-      ? currentWindow.height
-      : 760;
-    const width = Math.max(680, Math.min(1100, availableWidth - 80));
-    const height = Math.max(500, Math.min(760, availableHeight - 80));
-    const left = Number.isInteger(currentWindow?.left)
-      ? currentWindow.left + Math.max(20, Math.round((availableWidth - width) / 2))
-      : undefined;
-    const top = Number.isInteger(currentWindow?.top)
-      ? currentWindow.top + Math.max(20, Math.round((availableHeight - height) / 2))
-      : undefined;
-    const url = chrome.runtime.getURL(
-      `plate-preview.html?design=${encodeURIComponent(design.value)}`
-    );
-
-    await chrome.windows.create({
-      url,
-      type: "popup",
-      focused: true,
-      width,
-      height,
-      ...(left === undefined ? {} : { left }),
-      ...(top === undefined ? {} : { top }),
-    });
-  } catch {
-    showToast("The full-size plate preview could not be opened.", "error");
+  const label = elements.sosPlatePreviewLabel?.textContent?.trim() || "Michigan plate";
+  const fullSource = elements.sosPlatePreview?.dataset.fullImageUrl || source;
+  const loadToken = ++sosPlateViewerLoadToken;
+  abortSosPlateLoad("viewer");
+  releaseSosPlateObjectUrl("viewer");
+  // Reuse the thumbnail's already-loaded official URL so expansion is
+  // immediate, then upgrade it in place to Michigan's verified larger
+  // rendition without opening a popup or delaying the viewer.
+  elements.sosPlateViewerImage.src = source;
+  elements.sosPlateViewerImage.alt = `${label} official Michigan SOS plate artwork`;
+  if (elements.sosPlateViewerName) elements.sosPlateViewerName.textContent = label;
+  if (elements.sosPlateViewerNote) {
+    elements.sosPlateViewerNote.textContent =
+      fullSource === source
+        ? "Official published resolution · non-personalized"
+        : "Loading the largest official artwork…";
   }
+  elements.sosPlateViewerStage?.scrollTo({ top: 0, left: 0 });
+  setSosPlateZoom(1);
+  showModal(elements.sosPlateViewer, {
+    focusEl: elements.closeSosPlateViewer,
+    onClose: () => {
+      sosPlateViewerLoadToken += 1;
+      abortSosPlateLoad("viewer");
+      releaseSosPlateObjectUrl("viewer");
+      sosPlatePan = null;
+      elements.sosPlateViewerStage?.classList.remove("is-panning");
+      setSosPlateZoom(1);
+    },
+  });
+
+  if (fullSource !== source) {
+    const abortController = new AbortController();
+    sosPlateViewerAbortController = abortController;
+    void materializeSosPlateImage(fullSource, { signal: abortController.signal })
+      .then(({ source: displaySource, objectUrl }) => {
+        if (
+          loadToken !== sosPlateViewerLoadToken ||
+          elements.sosPlateViewer?.classList.contains("hidden")
+        ) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        sosPlateViewerAbortController = null;
+        const fullImage = new Image();
+        fullImage.referrerPolicy = "no-referrer";
+        fullImage.onload = () => {
+          if (loadToken !== sosPlateViewerLoadToken) {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            return;
+          }
+          releaseSosPlateObjectUrl("viewer");
+          sosPlateViewerObjectUrl = objectUrl;
+          elements.sosPlateViewerImage.src = displaySource;
+          if (elements.sosPlateViewerNote) {
+            elements.sosPlateViewerNote.textContent =
+              "Largest official artwork available · non-personalized";
+          }
+        };
+        fullImage.onerror = () => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          if (loadToken !== sosPlateViewerLoadToken) return;
+          if (elements.sosPlateViewerNote) {
+            elements.sosPlateViewerNote.textContent =
+              "Official published preview resolution · non-personalized";
+          }
+        };
+        fullImage.src = displaySource;
+      })
+      .catch(() => {
+        if (loadToken !== sosPlateViewerLoadToken) return;
+        sosPlateViewerAbortController = null;
+        if (elements.sosPlateViewerNote) {
+          elements.sosPlateViewerNote.textContent =
+            "Official published preview resolution · non-personalized";
+        }
+      });
+  }
+}
+
+function beginSosPlatePan(event) {
+  if (sosPlateZoom <= 1 || !elements.sosPlateViewerStage) return;
+  sosPlatePan = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    left: elements.sosPlateViewerStage.scrollLeft,
+    top: elements.sosPlateViewerStage.scrollTop,
+  };
+  elements.sosPlateViewerStage.setPointerCapture?.(event.pointerId);
+  elements.sosPlateViewerStage.classList.add("is-panning");
+  event.preventDefault();
+}
+
+function moveSosPlatePan(event) {
+  if (!sosPlatePan || sosPlatePan.pointerId !== event.pointerId) return;
+  elements.sosPlateViewerStage.scrollLeft =
+    sosPlatePan.left - (event.clientX - sosPlatePan.x);
+  elements.sosPlateViewerStage.scrollTop =
+    sosPlatePan.top - (event.clientY - sosPlatePan.y);
+}
+
+function endSosPlatePan(event) {
+  if (!sosPlatePan || sosPlatePan.pointerId !== event.pointerId) return;
+  try {
+    elements.sosPlateViewerStage?.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Pointer capture may already be released if the gesture leaves Chrome.
+  }
+  elements.sosPlateViewerStage?.classList.remove("is-panning");
+  sosPlatePan = null;
 }
 
 function renderSosFeeQuote() {
@@ -693,7 +972,6 @@ function renderSosWorkspace() {
     elements.sosTransferFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.plateTransfer;
   }
   if (elements.sosHandoffPanel) elements.sosHandoffPanel.hidden = !sosHandoffAvailable;
-  renderSosPlatePreview();
   renderSosFeeQuote();
 }
 
@@ -720,12 +998,16 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   if (elements.sosBusinessRegistration) {
     elements.sosBusinessRegistration.hidden = !commercial;
   }
-  const standardDesign = elements.sosPlateType?.value === "PAS";
+  const designOptions = plateDesignOptionsForType(elements.sosPlateType?.value);
+  const previousDesign = elements.sosPlateDesign?.value;
+  replaceSosOptions(elements.sosPlateDesign, designOptions, previousDesign);
   if (elements.sosPlateDesignControl) {
-    elements.sosPlateDesignControl.hidden = !standardDesign;
+    elements.sosPlateDesignControl.hidden = designOptions.length <= 1;
   }
-  if (elements.sosPlatePreview) {
-    elements.sosPlatePreview.hidden = !standardDesign;
+  const selectedDesign = plateDesignByValue(elements.sosPlateDesign?.value);
+  if (elements.sosPlateEligibility) {
+    elements.sosPlateEligibility.hidden = !selectedDesign?.eligibilityNote;
+    elements.sosPlateEligibility.textContent = selectedDesign?.eligibilityNote || "";
   }
   clearSosValidation();
   renderSosPlatePreview();
@@ -733,6 +1015,7 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
 
 async function applyPendingVinSuggestions() {
   if (!pendingVinDecode) return 0;
+  await invalidateSosQuoteAfterEdit();
   let applied = 0;
   const initialSuggestions = makeSosVinSuggestions(
     pendingVinDecode,
@@ -763,15 +1046,34 @@ async function applyPendingVinSuggestions() {
   return applied;
 }
 
+async function invalidateSosQuoteAfterEdit() {
+  if (currentSosFeeQuote) {
+    currentSosFeeQuote = null;
+    renderSosFeeQuote();
+    try {
+      await clearSosFeeQuote();
+    } catch (error) {
+      console.error("Could not remove the stale SOS fee quote:", error);
+      showToast("The older SOS quote could not be removed from this session.", "error");
+    }
+  }
+  sosHandoffAvailable = false;
+  if (elements.sosHandoffPanel) elements.sosHandoffPanel.hidden = true;
+  setSosWorkspaceStatus("Selections changed. Calculate again when complete.");
+}
+
 async function handleSosOfficialFieldChange(event) {
+  await invalidateSosQuoteAfterEdit();
   if (event?.target === elements.sosVehicleType) {
     syncSosLocalDependencies({ resetDependentValues: true });
   } else {
     syncSosLocalDependencies();
   }
-  sosHandoffAvailable = false;
-  elements.sosHandoffPanel.hidden = true;
-  setSosWorkspaceStatus("Selections are ready locally. Calculate when complete.");
+}
+
+async function handleSosCalculationInput() {
+  clearSosValidation();
+  await invalidateSosQuoteAfterEdit();
 }
 
 async function calculateSosFee() {
@@ -1034,6 +1336,22 @@ function initEventListeners() {
   elements.openSosHandoffBtn?.addEventListener("click", openSosHandoff);
   elements.lookupSosVinBtn?.addEventListener("click", handleSosVinLookup);
   elements.sosPlatePreview?.addEventListener("click", openSosPlatePreview);
+  elements.closeSosPlateViewer?.addEventListener("click", closeSosPlateViewer);
+  elements.sosPlateZoomOut?.addEventListener("click", () =>
+    setSosPlateZoom(sosPlateZoom - SOS_PLATE_ZOOM_STEP)
+  );
+  elements.sosPlateZoomIn?.addEventListener("click", () =>
+    setSosPlateZoom(sosPlateZoom + SOS_PLATE_ZOOM_STEP)
+  );
+  elements.sosPlateZoomReset?.addEventListener("click", () => setSosPlateZoom(1));
+  elements.sosPlateViewerImage?.addEventListener("dblclick", () =>
+    setSosPlateZoom(sosPlateZoom === 1 ? 1.75 : 1)
+  );
+  elements.sosPlateViewerStage?.addEventListener("pointerdown", beginSosPlatePan);
+  elements.sosPlateViewerStage?.addEventListener("pointermove", moveSosPlatePan);
+  elements.sosPlateViewerStage?.addEventListener("pointerup", endSosPlatePan);
+  elements.sosPlateViewerStage?.addEventListener("pointercancel", endSosPlatePan);
+  window.addEventListener("pagehide", disposeSosPlateImages, { once: true });
   elements.checkSosLienBtn?.addEventListener("click", handleSosLienCheck);
   elements.sosVinLookupInput?.addEventListener("input", handleSosVinInput);
   syncSosLienCheckButton();
@@ -1048,6 +1366,18 @@ function initEventListeners() {
     elements.sosPlateType,
     elements.sosPlateDesign,
   ].forEach((control) => control?.addEventListener("change", handleSosOfficialFieldChange));
+  ["sosFirstTitle", "sosBusinessRegistration", "sosRecreationPassport"].forEach(
+    (name) =>
+      document
+        .querySelectorAll(`input[name="${name}"]`)
+        .forEach((input) => input.addEventListener("change", handleSosOfficialFieldChange))
+  );
+  [
+    elements.sosModelYear,
+    elements.sosMsrp,
+    elements.sosPurchaseDate,
+    elements.sosTransferPlateNumber,
+  ].forEach((control) => control?.addEventListener("input", handleSosCalculationInput));
   syncSosLocalDependencies({ resetDependentValues: true });
   renderSosWorkspace();
 

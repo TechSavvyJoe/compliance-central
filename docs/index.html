@@ -294,7 +294,7 @@
         <h3>4. SOS Fee Quote and VIN Helper</h3>
         <p>The SOS Fee Quote workspace is a convenience layer over the public Michigan SOS calculators; Michigan SOS remains the source of truth for the final fee and eligibility.</p>
         <ul>
-            <li>The extension displays its bounded dealership form and official Michigan plate artwork locally. Clicking the selected plate opens a large, extension-owned image preview without opening the SOS website. It opens the selected public calculator only in an inactive extension-owned tab after an explicit Calculate SOS fee action, verifies and applies the completed choices as one batch, and returns the fee plus an actual image of the official result page.</li>
+            <li>The extension displays its bounded dealership form and official Michigan plate artwork locally. Clicking the selected plate opens an instant in-sidebar viewer with zoom and drag-to-pan controls, without opening a new window or the SOS website. It opens the selected public calculator only in an inactive extension-owned tab after an explicit Calculate SOS fee action, verifies and applies the completed choices as one batch, and returns the fee plus an actual image of the official result page.</li>
             <li>If the calculator does not produce a verified fee and page capture after three attempts, the extension keeps the partially completed SOS form inactive and offers a separate Finish on Michigan SOS action. Only that explicit action brings the prefilled state tab forward for review.</li>
             <li>The extension does not read or send SOS credentials, cookies, authentication tokens, or account information. It does not submit a filing, issue a BFS-4, transfer a title, or complete an RD-108.</li>
             <li>When you explicitly use the VIN helper, the VIN goes directly from the extension to NHTSA's public vPIC service to obtain vehicle basics. The raw VIN is not kept in the decoder response, sent to SOS, or written to extension storage.</li>
@@ -339,7 +339,7 @@
             <li><code>storage</code> &mdash; to save preferences and bounded, anonymous audit history.</li>
             <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded, anonymous audit history. Customer identity, VINs, and portal screenshots remain session-only.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
-            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (public Michigan SOS calculator), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding). Official plate images load from <code>www.michigan.gov</code> without a broad host permission.</li>
+            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (public Michigan SOS calculator and its live plate-result preview), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding). Official published plate-gallery images load from <code>www.michigan.gov</code> without a broad host permission.</li>
         </ul>
     </div>
 

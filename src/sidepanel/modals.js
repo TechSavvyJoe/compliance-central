@@ -84,26 +84,35 @@ export function showModal(modalEl, opts = {}) {
 
 export function hideModal(modalEl) {
   if (!modalEl) return;
-  modalEl.classList.add("hidden");
-  modalEl.setAttribute("aria-hidden", "true");
   modalEl.removeEventListener("click", handleBackdropClick);
 
   // A late async callback can try to close a pairing modal after another
   // dialog has opened. Do not tear down that newer dialog's focus trap or
   // restore its opener in that case.
-  if (activeModal !== modalEl) return;
+  if (activeModal !== modalEl) {
+    modalEl.classList.add("hidden");
+    modalEl.setAttribute("aria-hidden", "true");
+    return;
+  }
 
   document.removeEventListener("keydown", handleKeydown);
 
   // Run and clear the close hook before restoring focus, guarding against
   // re-entrancy if the hook itself triggers another hide.
   const onClose = activeOnClose;
+  const focusTarget = lastFocusedElement;
   activeModal = null;
   activeOnClose = null;
+  lastFocusedElement = null;
   document.body.classList.remove("modal-open");
   if (onClose) onClose();
 
-  const focusTarget = lastFocusedElement;
-  lastFocusedElement = null;
-  if (focusTarget?.isConnected && focusTarget?.focus) focusTarget.focus();
+  // Move focus out before aria-hiding the dialog. Chrome otherwise blocks
+  // aria-hidden and leaves assistive technology exposed to a closed viewer.
+  if (!activeModal && focusTarget?.isConnected && focusTarget?.focus) {
+    focusTarget.focus();
+  }
+  if (modalEl.contains(document.activeElement)) document.activeElement.blur();
+  modalEl.classList.add("hidden");
+  modalEl.setAttribute("aria-hidden", "true");
 }

@@ -1410,14 +1410,61 @@ body.modal-open {
   justify-content: center;
 }
 
+.report-selection {
+  margin: var(--spacing-md) 0 0;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-card);
+}
+.report-selection legend {
+  padding: 0 6px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.report-select-all,
+.report-selection-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.report-select-all {
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.report-selection-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  padding-top: 5px;
+}
+.report-select-all input,
+.report-selection-item input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--gold);
+}
+.report-selection-status {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
 .all-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
   margin: 0;
 }
-.all-actions button { flex: 1; }
-.evidence-heading .all-actions { display: grid; grid-template-columns: 1fr 1fr; }
-.evidence-heading .all-actions button { min-height: 42px; padding: 8px; font-size: 0.72rem; }
+.all-actions button { flex: 1 1 0; }
 
 /* Co-Buyer results */
 .cobuyer-results {
@@ -2010,6 +2057,10 @@ body.modal-open {
   .main-actions,
   .all-actions {
     flex-direction: column;
+  }
+  .all-actions button {
+    flex: none;
+    width: 100%;
   }
 
   .date-picker-popover {

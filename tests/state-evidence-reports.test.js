@@ -232,6 +232,17 @@ test("an unverified capture stays off the one-page fallback record", () => {
   assert.doesNotMatch(html, /<img\b/);
 });
 
+test("an unconfirmed Title/Lien capture stays off the HTML evidence record", () => {
+  const results = reportFixture();
+  results.checks.title.passed = false;
+  results.checks.title.titleBrand = "UNKNOWN";
+  const html = getTitleReportPageHTML(results);
+
+  assert.equal((html.match(/class="page(?:\s|")/g) || []).length, 1);
+  assert.match(html, /evidence could not be verified/i);
+  assert.doesNotMatch(html, /<img\b/);
+});
+
 test("Repeat and Title PDF sections embed the validated real captures", () => {
   const results = reportFixture();
   const repeatPdf = pdfContext();
@@ -301,6 +312,33 @@ test("PDF fallback labels missing or invalid state evidence honestly", () => {
       value.includes("app-generated summary, not a Michigan Department of State webpage")
     )
   );
+});
+
+test("PDF fallbacks never embed unconfirmed Michigan captures", () => {
+  const results = reportFixture();
+  results.checks.repeatOffender.status = "unknown";
+  results.checks.repeatOffender.passed = false;
+  results.checks.title.passed = false;
+  results.checks.title.titleBrand = "UNKNOWN";
+
+  const repeatPdf = pdfContext();
+  const titlePdf = pdfContext();
+  repeatSection(
+    results.checks.repeatOffender,
+    results.customer,
+    "Michigan Repeat Offender Check",
+    "SUBJECT SCREENED"
+  ).render(repeatPdf.ctx);
+  titleSection(results.checks.title, results.customer).render(titlePdf.ctx);
+
+  for (const pdf of [repeatPdf, titlePdf]) {
+    assert.equal(pdf.calls.images.length, 0);
+    assert.ok(
+      pdf.calls.text.includes(
+        "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE"
+      )
+    );
+  }
 });
 
 test("downloaded PDF rows grow and wrap instead of drawing values across lines", () => {

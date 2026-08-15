@@ -464,16 +464,6 @@
               <h2 id="resultsSectionTitle">Compliance check results</h2>
               <p>Print or download only the records completed in this run.</p>
             </div>
-            <div class="all-actions" aria-label="Available evidence actions">
-              <button type="button" id="printAllBtn" class="btn-secondary" title="Print all completed records">
-                <span class="btn-icon icon icon-printer" aria-hidden="true"></span>
-                Print available
-              </button>
-              <button type="button" id="downloadPdfBtn" class="btn-secondary btn-emphasis" title="Download PDFs for all completed records">
-                <span class="btn-icon icon icon-download" aria-hidden="true"></span>
-                Download PDFs
-              </button>
-            </div>
           </div>
           <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
 
@@ -569,6 +559,55 @@
             </div>
           </div>
 
+          <fieldset id="reportSelectionPanel" class="report-selection">
+            <legend>Documents to export</legend>
+            <label class="report-select-all" for="selectAllReports">
+              <input type="checkbox" id="selectAllReports" checked />
+              <span>Select all available documents</span>
+            </label>
+            <div class="report-selection-list">
+              <label class="report-selection-item" data-report-row="decision" for="selectReportDecision">
+                <input type="checkbox" id="selectReportDecision" value="decision" checked />
+                <span>Overall compliance decision</span>
+              </label>
+              <label class="report-selection-item hidden" data-report-row="buyer-ofac" for="selectReportBuyerOfac">
+                <input type="checkbox" id="selectReportBuyerOfac" value="buyer-ofac" checked />
+                <span>Buyer OFAC screening</span>
+              </label>
+              <label class="report-selection-item hidden" data-report-row="buyer-repeat" for="selectReportBuyerRepeat">
+                <input type="checkbox" id="selectReportBuyerRepeat" value="buyer-repeat" checked />
+                <span>Buyer Repeat Offender</span>
+              </label>
+              <label class="report-selection-item hidden" data-report-row="title" for="selectReportTitle">
+                <input type="checkbox" id="selectReportTitle" value="title" checked />
+                <span>Title &amp; Lien</span>
+              </label>
+              <label class="report-selection-item hidden" data-report-row="co-buyer-ofac" for="selectReportCoBuyerOfac">
+                <input type="checkbox" id="selectReportCoBuyerOfac" value="co-buyer-ofac" checked />
+                <span>Co-buyer OFAC screening</span>
+              </label>
+              <label class="report-selection-item hidden" data-report-row="co-buyer-repeat" for="selectReportCoBuyerRepeat">
+                <input type="checkbox" id="selectReportCoBuyerRepeat" value="co-buyer-repeat" checked />
+                <span>Co-buyer Repeat Offender</span>
+              </label>
+            </div>
+            <p id="reportSelectionStatus" class="report-selection-status" aria-live="polite">1 of 1 documents selected</p>
+          </fieldset>
+
+          <div class="all-actions">
+            <button type="button" id="printAllBtn" class="btn-secondary" title="Print the selected completed records">
+              <span class="btn-icon icon icon-printer" aria-hidden="true"></span>
+              <span id="printAllLabel">Print selected</span>
+            </button>
+            <button type="button" id="downloadPdfBtn" class="btn-secondary btn-emphasis" title="Download the selected records in one PDF">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
+              Download selected PDF
+            </button>
+            <button type="button" id="downloadAllPdfsBtn" class="btn-secondary" title="Download the selected documents as individual PDFs in one ZIP file">
+              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
+              <span id="downloadAllPdfsLabel">Download All PDFs</span>
+            </button>
+          </div>
         </section>
 
         <section class="history-section">

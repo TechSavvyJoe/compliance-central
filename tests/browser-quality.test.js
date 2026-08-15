@@ -47,8 +47,8 @@ test("data-use disclosure ties remote checks to an affirmative user action", () 
 
 test("evidence controls are explicit and completed rows identify their own timestamp", () => {
   assert.match(sidepanelHtml, /class="evidence-heading"/);
-  assert.match(sidepanelHtml, /Print available/);
-  assert.match(sidepanelHtml, /Download PDFs/);
+  assert.match(sidepanelHtml, /Print selected/);
+  assert.match(sidepanelHtml, /Download selected PDF/);
   for (const id of [
     "ofacResultTimestamp",
     "repeatResultTimestamp",
@@ -60,4 +60,23 @@ test("evidence controls are explicit and completed rows identify their own times
   }
   assert.match(resultsSource, /function setResultTimestamp/);
   assert.match(resultsSource, /Completed \$\{date\.toLocaleString\(\)\}/);
+});
+
+test("bulk exports expose accessible per-document selection and all three actions", () => {
+  assert.match(sidepanelHtml, /<fieldset id="reportSelectionPanel"/);
+  assert.match(sidepanelHtml, /id="selectAllReports"/);
+  for (const key of [
+    "decision",
+    "buyer-ofac",
+    "buyer-repeat",
+    "title",
+    "co-buyer-ofac",
+    "co-buyer-repeat",
+  ]) {
+    assert.match(sidepanelHtml, new RegExp(`data-report-row="${key}"`));
+  }
+  assert.match(sidepanelHtml, /id="printAllBtn"/);
+  assert.match(sidepanelHtml, /id="downloadPdfBtn"/);
+  assert.match(sidepanelHtml, /id="downloadAllPdfsBtn"/);
+  assert.match(sidepanelHtml, /Download All PDFs/);
 });

@@ -71,6 +71,8 @@ import {
   downloadAllReportsPDF,
   downloadSosOfficialEvidencePDF,
   printHtmlDocument,
+  downloadAllReportPDFs,
+  availableReportItems,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
 import {
@@ -246,7 +248,12 @@ const elements = {
   downloadRepeatBtn: $("downloadRepeatBtn"),
   downloadTitleBtn: $("downloadTitleBtn"),
   printAllBtn: $("printAllBtn"),
+  printAllLabel: $("printAllLabel"),
   downloadPdfBtn: $("downloadPdfBtn"),
+  downloadAllPdfsBtn: $("downloadAllPdfsBtn"),
+  downloadAllPdfsLabel: $("downloadAllPdfsLabel"),
+  selectAllReports: $("selectAllReports"),
+  reportSelectionStatus: $("reportSelectionStatus"),
 
   // Co-Buyer results
   coBuyerResultsSection: $("coBuyerResultsSection"),
@@ -289,6 +296,63 @@ const elements = {
   settingsVersion: $("settingsVersion"),
   supportEmailLink: $("supportEmailLink"),
 };
+
+const reportSelectionInputs = Array.from(
+  document.querySelectorAll('.report-selection-item input[type="checkbox"]')
+);
+
+function getSelectedReportKeys() {
+  return reportSelectionInputs
+    .filter((input) => !input.disabled && input.checked)
+    .map((input) => input.value);
+}
+
+function updateReportSelectionState() {
+  const available = reportSelectionInputs.filter((input) => !input.disabled);
+  const selected = available.filter((input) => input.checked);
+  const count = selected.length;
+  const total = available.length;
+  const allSelected = total > 0 && count === total;
+
+  if (elements.selectAllReports) {
+    elements.selectAllReports.checked = allSelected;
+    elements.selectAllReports.indeterminate = count > 0 && count < total;
+    elements.selectAllReports.disabled = total === 0;
+  }
+  if (elements.reportSelectionStatus) {
+    elements.reportSelectionStatus.textContent = `${count} of ${total} document${
+      total === 1 ? "" : "s"
+    } selected`;
+  }
+  if (elements.printAllLabel) {
+    elements.printAllLabel.textContent = allSelected ? "Print All" : "Print Selected";
+  }
+  if (elements.downloadAllPdfsLabel) {
+    elements.downloadAllPdfsLabel.textContent = allSelected
+      ? "Download All PDFs"
+      : "Download Selected PDFs";
+  }
+  for (const button of [
+    elements.printAllBtn,
+    elements.downloadPdfBtn,
+    elements.downloadAllPdfsBtn,
+  ]) {
+    if (button) button.disabled = count === 0;
+  }
+}
+
+function syncReportSelection(currentResults) {
+  const availableKeys = new Set(
+    availableReportItems(currentResults).map((item) => item.key)
+  );
+  for (const input of reportSelectionInputs) {
+    const available = availableKeys.has(input.value);
+    input.disabled = !available;
+    input.checked = available;
+    input.closest(".report-selection-item")?.classList.toggle("hidden", !available);
+  }
+  updateReportSelectionState();
+}
 
 // Maps IN_FLIGHT keys to their progress-row status indicators.
 const IN_FLIGHT_TO_STATUS_EL = {
@@ -450,6 +514,7 @@ async function applyPersistedResults() {
   if (persisted.state === "individual" && persisted.results) {
     setCurrentResults(persisted.results);
     displayStoredIndividualResult(persisted.results);
+    syncReportSelection(persisted.results);
     setInputCollapsed(true, persisted.results.customer);
     elements.resultsSection.classList.remove("hidden");
     elements.progressSection.classList.add("hidden");
@@ -458,6 +523,7 @@ async function applyPersistedResults() {
 
   if (persisted.state === "complete" && persisted.results) {
     displayResults(elements, persisted.results);
+    syncReportSelection(persisted.results);
     setInputCollapsed(true, persisted.results.customer);
     activeUiRunId = null;
     elements.resultsSection.classList.remove("hidden");
@@ -1505,11 +1571,23 @@ function initEventListeners() {
 
   // Bulk actions
   elements.printAllBtn.addEventListener("click", () =>
-    printAllReports(getCurrentResults())
+    printAllReports(getCurrentResults(), getSelectedReportKeys())
   );
   elements.downloadPdfBtn?.addEventListener("click", () =>
-    downloadAllReportsPDF(getCurrentResults())
+    downloadAllReportsPDF(getCurrentResults(), getSelectedReportKeys())
   );
+  elements.downloadAllPdfsBtn?.addEventListener("click", () =>
+    downloadAllReportPDFs(getCurrentResults(), getSelectedReportKeys())
+  );
+  elements.selectAllReports?.addEventListener("change", () => {
+    for (const input of reportSelectionInputs) {
+      if (!input.disabled) input.checked = elements.selectAllReports.checked;
+    }
+    updateReportSelectionState();
+  });
+  for (const input of reportSelectionInputs) {
+    input.addEventListener("change", updateReportSelectionState);
+  }
 
   // Cache form data on change
   const cacheableFields = [
@@ -1893,6 +1971,7 @@ async function handleRunOfac() {
       operationId: operation.operationId,
     });
     displayIndividualResult(elements, "ofac", result);
+    syncReportSelection(results);
     setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
@@ -1949,6 +2028,7 @@ async function handleRunRepeatOffender() {
       }
     );
     displayIndividualResult(elements, "repeatOffender", result);
+    syncReportSelection(results);
     setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
@@ -1990,6 +2070,7 @@ async function handleRunTitle() {
       operationId: operation.operationId,
     });
     displayIndividualResult(elements, "title", result);
+    syncReportSelection(results);
     setInputCollapsed(true, results.customer);
     await persistCurrentResults();
     if (!isCurrent()) {
@@ -2339,6 +2420,7 @@ function handleSearchStatusChange(changes) {
     if (results) {
       try {
         displayResults(elements, results);
+        syncReportSelection(results);
         saveToHistory(results)
           .then((saved) => {
             if (!saved) {

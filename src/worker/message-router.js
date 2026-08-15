@@ -22,7 +22,17 @@ import {
   HISTORY_MESSAGES,
   validateHistoryMessage,
 } from "./history.js";
+import {
+  SOS_FEE_MESSAGES,
+  getSosFeeRunner,
+} from "./sos-fee-runner.js";
+import {
+  handleSosLienCheck,
+  isSosLienCheckInFlight,
+} from "./sos-lien-check.js";
 import { CONFIG } from "../../lib/config.js";
+
+const SOS_QUOTE_MODES = new Set(["new_plate", "plate_transfer"]);
 
 function isRecord(value) {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -81,6 +91,21 @@ function isValidRequiredOperationId(value) {
   );
 }
 
+function isValidSosMode(value) {
+  return typeof value === "string" && SOS_QUOTE_MODES.has(value);
+}
+
+function isValidSosFieldUpdate(value) {
+  return (
+    isRecord(value) &&
+    isValidSosMode(value.mode) &&
+    typeof value.fieldId === "string" &&
+    /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(value.fieldId) &&
+    typeof value.value === "string" &&
+    value.value.length <= 128
+  );
+}
+
 function validatePayload(type, data) {
   switch (type) {
     case "RUN_ALL_CHECKS":
@@ -105,8 +130,21 @@ function validatePayload(type, data) {
       return (
         isRecord(data) &&
         isBoundedString(data.vin, CONFIG.validation.vinLength, true) &&
-        isValidRequiredOperationId(data.operationId)
+          isValidRequiredOperationId(data.operationId)
       );
+    case "RUN_SOS_LIEN_CHECK":
+      return (
+        isRecord(data) &&
+        isBoundedString(data.vin, CONFIG.validation.vinLength, true) &&
+        /^[A-HJ-NPR-Z0-9]{17}$/.test(data.vin)
+      );
+    case SOS_FEE_MESSAGES.start:
+    case SOS_FEE_MESSAGES.calculate:
+      return isRecord(data) && isValidSosMode(data.mode);
+    case SOS_FEE_MESSAGES.updateField:
+      return isValidSosFieldUpdate(data);
+    case SOS_FEE_MESSAGES.close:
+      return data === undefined || data === null || isRecord(data);
     case HISTORY_MESSAGES.append:
     case HISTORY_MESSAGES.remove:
     case HISTORY_MESSAGES.purge:
@@ -157,7 +195,11 @@ export async function handleMessage(message, sender) {
     switch (message.type) {
       case "RUN_ALL_CHECKS":
         // Reject busy before starting so the sidepanel learns the truth.
-        if (isRunInFlight() || isIndividualMdosInFlight()) {
+        if (
+          isRunInFlight() ||
+          isIndividualMdosInFlight() ||
+          isSosLienCheckInFlight()
+        ) {
           return {
             success: false,
             error: "A compliance or Michigan state-site check is already in progress.",
@@ -178,22 +220,47 @@ export async function handleMessage(message, sender) {
 
       case "RUN_REPEAT_OFFENDER":
       case "RUN_SEARCH":
-        if (isRunInFlight()) {
+        if (isRunInFlight() || isSosLienCheckInFlight()) {
           return {
             success: false,
-            error: "A compliance run is already in progress.",
+            error: "A compliance or Michigan state-site check is already in progress.",
           };
         }
         return handleRepeatOffenderCheck(message.data);
 
       case "RUN_TITLE_CHECK":
-        if (isRunInFlight()) {
+        if (isRunInFlight() || isSosLienCheckInFlight()) {
           return {
             success: false,
-            error: "A compliance run is already in progress.",
+            error: "A compliance or Michigan state-site check is already in progress.",
           };
         }
         return handleTitleCheck(message.data);
+
+      case "RUN_SOS_LIEN_CHECK":
+        if (
+          isRunInFlight() ||
+          isIndividualMdosInFlight() ||
+          isSosLienCheckInFlight()
+        ) {
+          return {
+            success: false,
+            error: "A compliance or Michigan state-site check is already in progress.",
+          };
+        }
+        return handleSosLienCheck(message.data);
+
+      case SOS_FEE_MESSAGES.start:
+        return getSosFeeRunner().start(message.data.mode);
+
+      case SOS_FEE_MESSAGES.updateField:
+        return getSosFeeRunner().updateField(message.data.mode, message.data);
+
+      case SOS_FEE_MESSAGES.calculate:
+        return getSosFeeRunner().calculate(message.data.mode);
+
+      case SOS_FEE_MESSAGES.close:
+        return getSosFeeRunner().close();
 
       case "getDataStatus":
         return handleGetDataStatus();

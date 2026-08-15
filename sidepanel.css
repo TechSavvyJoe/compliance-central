@@ -203,17 +203,56 @@ body.modal-open {
 .sos-quote-heading .section-title { margin: 0; }
 .sos-quote-intro { margin: 6px 0 0; color: var(--text-muted); font-size: 0.76rem; line-height: 1.45; }
 .sos-quote-source { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--border-color); border-radius: 999px; color: var(--text-muted); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.35px; }
-.sos-quote-source.is-captured { border-color: rgba(34, 197, 94, 0.45); background: var(--success-bg); color: #8cf0ae; }
+.sos-quote-source.is-calculated { border-color: rgba(34, 197, 94, 0.45); background: var(--success-bg); color: #8cf0ae; }
 .sos-quote-source.is-manual { border-color: rgba(245, 158, 11, 0.45); background: var(--warning-bg); color: #ffd27d; }
 .sos-quote-mode { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 15px 0 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--border-color); }
 .sos-quote-mode legend { width: 100%; margin-bottom: 2px; color: var(--text-secondary); font-size: 0.76rem; font-weight: 700; }
 .sos-quote-mode label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; }
 .sos-quote-mode input { width: 16px; height: 16px; accent-color: var(--gold); }
 .sos-quote-status { min-height: 38px; margin: 0; padding: 9px 10px; border-radius: var(--border-radius-sm); background: var(--bg-input); color: var(--text-secondary); font-size: 0.76rem; line-height: 1.4; }
+.sos-vin-lookup { margin-top: 10px; padding: 9px 10px; border: 1px solid rgba(125, 211, 252, 0.25); border-radius: var(--border-radius-sm); background: rgba(14, 165, 233, 0.05); color: var(--text-secondary); }
+.sos-vin-lookup summary { cursor: pointer; color: #7dd3fc; font-size: 0.76rem; font-weight: 700; }
+.sos-vin-lookup p { margin: 8px 0 0; color: var(--text-muted); font-size: 0.7rem; line-height: 1.42; }
+.sos-optional, .sos-unverified { margin-left: 4px; color: var(--text-muted); font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2px; }
+.sos-unverified { color: #fbbf24; }
+.sos-vin-controls { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.sos-vin-controls input { min-width: 0; flex: 1 1 140px; width: auto; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.04em; text-transform: uppercase; }
+.sos-vin-controls .btn-sm { flex: 0 0 auto; }
+.sos-vin-status:not(:empty) { padding-top: 2px; }
+.sos-lien-status:not(:empty) { padding: 7px 8px; border-left: 3px solid #7dd3fc; border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0; background: rgba(14, 165, 233, 0.08); color: var(--text-secondary); }
+.sos-lien-status.is-warning { border-left-color: #fbbf24; background: rgba(245, 158, 11, 0.09); color: #fde68a; }
+.sos-lien-status.is-error { border-left-color: #f87171; background: rgba(239, 68, 68, 0.09); color: #fecaca; }
+.sos-workspace { margin-top: 12px; padding: 11px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); background: rgba(15, 23, 42, 0.16); }
+.sos-workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.sos-workspace-heading h3 { margin: 0; color: var(--text-primary); font-size: 0.82rem; }
+.sos-workspace-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: 0.69rem; line-height: 1.4; }
+.sos-workspace-heading .btn-sm { flex: 0 0 auto; white-space: nowrap; }
+.sos-workspace-status { min-height: 32px; margin: 10px 0 0; color: var(--text-secondary); font-size: 0.73rem; line-height: 1.42; }
+.sos-workspace-status.is-error { color: #fca5a5; }
+.sos-workspace-status.is-busy { color: #7dd3fc; }
+.sos-official-fields { display: grid; gap: 9px; margin-top: 9px; }
+.sos-field-section { display: grid; gap: 8px; padding-top: 9px; border-top: 1px solid rgba(148, 163, 184, 0.16); }
+.sos-field-section:first-child { padding-top: 0; border-top: 0; }
+.sos-field-section-title { margin: 0; color: #dbeafe; font-size: 0.71rem; font-weight: 700; }
+.sos-official-field { display: grid; gap: 5px; min-width: 0; }
+.sos-official-field > label, .sos-official-field legend { color: var(--text-secondary); font-size: 0.71rem; font-weight: 600; }
+.sos-official-field select, .sos-official-field input[type="text"] { width: 100%; min-width: 0; }
+.sos-official-field select:disabled, .sos-official-field input:disabled { cursor: not-allowed; opacity: 0.55; }
+.sos-official-radio { display: flex; flex-wrap: wrap; gap: 5px 8px; margin: 0; padding: 0; border: 0; }
+.sos-official-radio label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-secondary); font-size: 0.72rem; cursor: pointer; }
+.sos-official-radio input { width: 15px; height: 15px; margin: 0; accent-color: var(--gold); }
+.sos-workspace-actions { display: flex; margin-top: 11px; }
+.sos-workspace-actions .btn-sm { flex: 1; justify-content: center; }
+.sos-workspace-actions .btn-sm:disabled { opacity: 0.55; }
+.sos-quote-plate-preview { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 10px; border: 1px solid rgba(255, 203, 5, 0.28); border-radius: var(--border-radius-sm); background: rgba(255, 203, 5, 0.06); }
+.sos-quote-plate-preview[hidden] { display: none; }
+.sos-quote-plate-preview img { display: block; width: 126px; max-height: 58px; object-fit: contain; border-radius: 5px; background: #fff; }
+.sos-quote-plate-preview p { margin: 0; color: var(--text-secondary); font-size: 0.7rem; line-height: 1.4; }
 .sos-quote-actions, .sos-manual-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sos-quote-actions .btn-sm { flex: 1 1 135px; justify-content: center; }
 .sos-manual-entry { margin-top: 12px; color: var(--text-secondary); font-size: 0.77rem; }
 .sos-manual-entry summary { cursor: pointer; color: var(--gold); font-weight: 650; }
+.sos-manual-entry p { margin: 8px 0 0; color: var(--text-muted); font-size: 0.7rem; line-height: 1.42; }
 .sos-manual-entry .form-row { margin-top: 12px; }
 .sos-manual-entry .form-group { min-width: 0; }
 .sos-manual-entry .form-group label { font-size: 0.72rem; }

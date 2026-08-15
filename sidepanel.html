@@ -229,7 +229,7 @@
                 <span class="section-icon icon icon-file" aria-hidden="true"></span>
                 SOS Fee Quote
               </h2>
-              <p class="sos-quote-intro">Open SOS → calculate → capture confirmed result. You stay in control of every SOS action.</p>
+              <p class="sos-quote-intro">Choose the current official SOS options here. Compliance Central runs the public calculator in a protected background tab and returns the result to this sidebar—no SOS sign-in or visible SOS page.</p>
             </div>
             <span id="sosQuoteSource" class="sos-quote-source">Not available</span>
           </div>
@@ -240,34 +240,61 @@
             <label><input type="radio" name="sosQuoteMode" value="plate_transfer" /> Plate transfer</label>
           </fieldset>
 
-          <p id="sosQuoteStatus" class="sos-quote-status" role="status" aria-live="polite">Not available — open SOS, calculate the fee, then capture the confirmed result.</p>
+          <p id="sosQuoteStatus" class="sos-quote-status" role="status" aria-live="polite">Choose official vehicle and plate options, then calculate the SOS fee without leaving this sidebar.</p>
+
+          <details class="sos-vin-lookup">
+            <summary>Fill vehicle basics from a VIN <span class="sos-optional">Optional</span></summary>
+            <p>Use a full 17-character VIN for the best result. A partial VIN can return only partial details. On an explicit lookup, the typed VIN goes only to NHTSA&rsquo;s public vPIC decoder; Compliance Central does not save it or pass it to SOS.</p>
+            <div class="sos-vin-controls">
+              <label class="visually-hidden" for="sosVinLookupInput">VIN or partial VIN</label>
+              <input id="sosVinLookupInput" type="text" inputmode="text" maxlength="17" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="VIN or partial VIN" />
+              <button type="button" id="lookupSosVinBtn" class="btn-secondary btn-sm">Look up VIN</button>
+              <button type="button" id="checkSosLienBtn" class="btn-secondary btn-sm" disabled>Check title/lien</button>
+            </div>
+            <p id="sosVinLookupStatus" class="sos-vin-status" role="status" aria-live="polite"></p>
+            <p id="sosLienStatus" class="sos-lien-status" role="status" aria-live="polite"></p>
+          </details>
+
+          <div class="sos-workspace" aria-labelledby="sosOfficialChoicesTitle">
+            <div class="sos-workspace-heading">
+              <div>
+                <h3 id="sosOfficialChoicesTitle">Official SOS choices</h3>
+                <p>Vehicle type, commercial use, fuel, plate type, and plate design are loaded from the live public calculator. Gas is the usual starting fuel; electric, hybrid, plug-in hybrid, diesel, and other choices stay available when SOS offers them.</p>
+              </div>
+              <button type="button" id="startSosFeeWorkspaceBtn" class="btn-secondary btn-sm">Load official choices</button>
+            </div>
+            <p id="sosWorkspaceStatus" class="sos-workspace-status" role="status" aria-live="polite">Load the current official SOS choices to begin. The SOS tab stays in the background.</p>
+            <div id="sosOfficialFields" class="sos-official-fields" aria-live="polite"></div>
+            <div class="sos-workspace-actions">
+              <button type="button" id="calculateSosFeeBtn" class="btn-secondary btn-emphasis btn-sm" disabled>Calculate SOS fee</button>
+            </div>
+          </div>
+
+          <div id="sosPlatePreview" class="sos-quote-plate-preview" hidden>
+            <img id="sosPlatePreviewImage" alt="Official Michigan SOS plate design preview" referrerpolicy="no-referrer" decoding="async" />
+            <p><strong>Official SOS plate design preview</strong><br />This is the non-personalized design currently selected in the live SOS calculator. It is not a plate number or final issuance.</p>
+          </div>
 
           <div class="sos-quote-actions" role="group" aria-label="Michigan SOS fee quote actions">
-            <button type="button" id="openSosCalculatorBtn" class="btn-secondary btn-sm">Open SOS calculator</button>
-            <button type="button" id="captureSosQuoteBtn" class="btn-secondary btn-emphasis btn-sm">Capture confirmed result</button>
             <button type="button" id="printSosQuoteBtn" class="btn-secondary btn-sm" disabled>Print customer summary</button>
-            <button type="button" id="printSosPageBtn" class="btn-secondary btn-sm">Print official SOS page</button>
+            <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm">Clear quote</button>
           </div>
 
           <details class="sos-manual-entry">
-            <summary>Can’t capture the result? Enter the confirmed fee manually</summary>
+            <summary>Fallback: enter a fee manually <span class="sos-unverified">Unverified</span></summary>
+            <p>Use only when the official calculator cannot return a result. Manual quotes stay visibly unverified on screen and in print.</p>
             <div class="form-row">
               <div class="form-group">
                 <label for="sosManualAmount">Registration / plate fee</label>
                 <input id="sosManualAmount" type="text" inputmode="decimal" placeholder="125.00" autocomplete="off" />
               </div>
-              <div class="form-group">
-                <label for="sosVehicleDescription">Vehicle (optional)</label>
-                <input id="sosVehicleDescription" type="text" maxlength="120" placeholder="2026 Ford Explorer" autocomplete="off" />
-              </div>
             </div>
             <div class="sos-manual-actions">
               <button type="button" id="saveManualSosQuoteBtn" class="btn-secondary btn-sm">Save salesperson-entered quote</button>
-              <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm">Clear quote</button>
             </div>
           </details>
 
-          <p class="sos-quote-privacy">Session only: no SOS sign-in, cookie, VIN, customer name, or page content is retained. SOS remains the source of truth.</p>
+          <p class="sos-quote-privacy">Session only: no SOS credentials, cookies, customer name, VIN, plate number, or calculator choices are saved after the browser session. There is no filing, title transfer, BFS-4, or other SOS transaction automation. SOS remains the source of truth.</p>
         </section>
 
         <section class="action-section">

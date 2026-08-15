@@ -334,6 +334,13 @@ test("message router rejects invalid messages and foreign senders", async () => 
   assert.equal(malformedCancel.success, false);
   assert.match(malformedCancel.error, /invalid CANCEL_CURRENT_RUN payload/i);
 
+  const partialSosLienVin = await handleMessage(
+    { type: "RUN_SOS_LIEN_CHECK", data: { vin: "1HGBH41JXMN10918" } },
+    { id: "test-ext-id", url: "chrome-extension://test-ext-id/sidepanel.html" }
+  );
+  assert.equal(partialSosLienVin.success, false);
+  assert.match(partialSosLienVin.error, /invalid RUN_SOS_LIEN_CHECK payload/i);
+
   const foreign = await handleMessage(
     { type: "getDataStatus" },
     { id: "other-extension" }

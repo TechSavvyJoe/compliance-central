@@ -231,7 +231,7 @@
     <section class="hero" aria-labelledby="product-title">
         <div class="hero-copy">
             <h1 id="product-title">Michigan dealer compliance, all in one side panel.</h1>
-            <p>Scan a driver's license or state ID with a phone, then run OFAC, Repeat Offender, and Title/Lien checks without leaving the deal screen.</p>
+            <p>Scan a driver's license or state ID with a phone, run OFAC, Repeat Offender, and Title/Lien checks, and calculate an official registration/plate estimate without leaving the deal screen.</p>
             <div class="hero-actions">
                 <a class="button button-primary" href="https://chromewebstore.google.com/detail/compliance-central-michig/oijkbdclicekpggjblgknnphfdafdgod" target="_blank" rel="noopener noreferrer">Install from Chrome Web Store</a>
                 <a class="button button-secondary" href="#scan-demo">How scanning works</a>
@@ -247,7 +247,7 @@
     <header class="policy-header" id="privacy-policy">
         <h2>Privacy Policy</h2>
         <p>How Compliance Central handles customer and dealership data.</p>
-        <p class="last-updated">Effective: July 22, 2026</p>
+        <p class="last-updated">Effective: August 14, 2026</p>
     </header>
 
     <div class="section data-summary">
@@ -255,6 +255,8 @@
         <ul>
             <li><strong>OFAC screening stays on your device.</strong> No customer information is transmitted for an OFAC-only check.</li>
             <li><strong>Repeat Offender and Title/Lien checks use our HTTPS service.</strong> The entered name, date of birth, license/ID number, and VIN when used are sent only to request the selected MDOS portal response.</li>
+            <li><strong>SOS Fee Quote stays in the side panel.</strong> On an explicit Calculate SOS fee click, the extension uses the public Michigan SOS calculator in an inactive, extension-owned tab and returns the official fee to the side panel. It does not access SOS credentials or cookies, and it does not file any SOS transaction.</li>
+            <li><strong>VIN helper is optional and explicit.</strong> A VIN or partial VIN is sent to NHTSA's public vPIC decoder only after you click Look up VIN. A separate full-VIN Title/Lien check uses the existing MDOS HTTPS service only after you click Check title/lien.</li>
             <li><strong>Phone scan images stay on the phone.</strong> Only the text fields you approve are sent to your computer in an encrypted, single-use package.</li>
             <li><strong>Persistent history is anonymous and limited.</strong> Up to 50 outcome-only audit records are kept on your device for no more than 30 days. Customer identity, VINs, and portal screenshots are excluded from persistent history.</li>
         </ul>
@@ -267,9 +269,10 @@
 
     <div class="section">
         <h3>2. What Data the Extension Handles</h3>
-        <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. This information is used only to perform the screenings you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the compliance checks.</p>
+        <p>To run a compliance check, you enter buyer and (optionally) co-buyer details: <strong>first / middle / last name, suffix, date of birth, and Michigan DLN/PID</strong>, plus an optional <strong>trade-in VIN</strong>. The optional SOS Fee Quote workspace also handles only the vehicle and plate choices needed by the public calculator, a returned fee, and an optional non-personalized official plate-design preview. This information is used only to perform the checks and quote actions you request. We do <strong>not</strong> sell it, share it with advertisers, or use it for any purpose unrelated to the extension.</p>
         <ul>
             <li><strong>Current-run data stays in the browser session:</strong> customer fields, results, and portal screenshots are available only for the active working session and are not written to persistent extension storage.</li>
+            <li><strong>SOS quote data is session-only:</strong> calculator choices, returned fee, plate preview, and any typed VIN stay only for the browser session. The extension never stores an SOS credential, cookie, plate number, customer name, or VIN in quote storage or anonymous audit history.</li>
             <li><strong>Persistent audit history is anonymous:</strong> each record contains an anonymous reference, timestamp, overall decision, individual check outcomes, and whether the run included a co-buyer or trade-in. It does not contain customer names, dates of birth, license/ID numbers, VINs, screenshots, or full report payloads. Audit history is limited to 50 records and 30 days and can be cleared at any time.</li>
             <li><strong>Files you choose to download:</strong> a PDF or CSV is saved only when you request it. Downloaded files may contain the details shown in the report and remain wherever you save them until you delete them.</li>
             <li><strong>No tracking or analytics:</strong> the extension does not track your browsing, and does not use Google Analytics or any third-party advertising or analytics network.</li>
@@ -288,7 +291,18 @@
     </div>
 
     <div class="section">
-        <h3>4. License Scan (Optional)</h3>
+        <h3>4. SOS Fee Quote and VIN Helper</h3>
+        <p>The SOS Fee Quote workspace is a convenience layer over the public Michigan SOS calculators; Michigan SOS remains the source of truth for the final fee and eligibility.</p>
+        <ul>
+            <li>The extension opens the selected public calculator only in an inactive extension-owned tab after an explicit Calculate SOS fee action. It loads live vehicle, commercial-use, fuel, plate, and plate-design choices from that calculator, then closes the tab after a result, cancellation, unrecoverable error, or worker restart.</li>
+            <li>The extension does not read or send SOS credentials, cookies, authentication tokens, or account information. It does not submit a filing, issue a BFS-4, transfer a title, or complete an RD-108.</li>
+            <li>When you explicitly use the VIN helper, the VIN goes directly from the extension to NHTSA's public vPIC service to obtain vehicle basics. The raw VIN is not kept in the decoder response, sent to SOS, or written to extension storage.</li>
+            <li>When you explicitly use Check title/lien, a full 17-character VIN is sent to the existing MDOS backend as described above. The SOS workspace displays only a bounded live result and does not save the VIN, screenshot, or result to audit history.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h3>5. License Scan (Optional)</h3>
         <p>The optional <strong>"Scan license with phone"</strong> feature lets you capture a customer's Michigan driver's license or state ID with your phone instead of typing. It is designed to be private:</p>
         <ul>
             <li><strong>Scanning and parsing happen on your phone</strong> &mdash; the barcode on the back of the license is read and decoded in your phone's browser. The <strong>license image is never uploaded or transmitted</strong>.</li>
@@ -299,40 +313,43 @@
     </div>
 
     <div class="section">
-        <h3>5. OFAC Screening (Local Only)</h3>
+        <h3>6. OFAC Screening (Local Only)</h3>
         <p>OFAC sanctions screening is performed <strong>entirely on your device</strong>. The extension downloads the official SDN list directly from the U.S. Treasury OFAC Sanctions List Service and matches names locally. <strong>No customer information is sent anywhere</strong> for an OFAC check.</p>
     </div>
 
     <div class="section">
-        <h3>6. Third-Party Services</h3>
+        <h3>7. Third-Party Services</h3>
         <ul>
             <li><strong>U.S. Treasury OFAC Sanctions List Service</strong> (<code>sanctionslistservice.ofac.treas.gov</code>): provides the official SDN list the extension downloads for local screening. Treasury redirects the file download to its dedicated AWS GovCloud storage host. Only the public list is downloaded &mdash; no customer data is sent.</li>
             <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
+            <li><strong>Michigan Secretary of State public fee calculator:</strong> supplies live registration/plate choices, non-personalized plate designs, and the calculated fee only after an explicit SOS Fee Quote action. The extension does not use an SOS account or access SOS credentials/cookies.</li>
+            <li><strong>NHTSA vPIC</strong> (<code>vpic.nhtsa.dot.gov</code>): receives an optional VIN or partial VIN only after you click Look up VIN and returns basic vehicle characteristics for SOS field suggestions.</li>
             <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and is not intentionally retained after each request; ordinary network metadata is handled as described above. For the optional license scan, the service relays only an encrypted, single-use package it cannot read.</li>
             <li><strong>GitHub Pages</strong> (<code>techsavvyjoe.github.io</code>): serves the static phone scan page (and this policy). The scan page performs the barcode decoding on your phone; the license image is not sent to it.</li>
         </ul>
     </div>
 
     <div class="section">
-        <h3>7. Permissions</h3>
+        <h3>8. Permissions</h3>
         <p>The extension requests only the permissions it needs:</p>
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
+            <li><code>tabs</code> &mdash; to create and close the extension-owned inactive public SOS calculator tab used only for an explicit fee calculation.</li>
             <li><code>storage</code> &mdash; to save preferences and bounded, anonymous audit history.</li>
             <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and bounded, anonymous audit history. Customer identity, VINs, and portal screenshots remain session-only.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
-            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), plus <code>compliance-central-api.fly.dev</code> (MDOS backend).</li>
+            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (public Michigan SOS calculator), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding).</li>
         </ul>
     </div>
 
     <div class="section">
-        <h3>8. Chrome Web Store Limited Use</h3>
+        <h3>9. Chrome Web Store Limited Use</h3>
         <p>Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements. See the <a href="https://developer.chrome.com/docs/webstore/program-policies/limited-use" target="_blank" rel="noopener noreferrer">official Limited Use requirements</a>.</p>
         <p>Information is used only to provide the compliance checks, phone-to-computer transfer, local preferences, and audit records described in this policy. It is not used for advertising, market research, credit scoring, or any purpose unrelated to the extension's single purpose. Human access is limited to a user's explicit support request, security investigation, legal requirement, or aggregated operations that cannot identify a person.</p>
     </div>
 
     <div class="section">
-        <h3>9. Your Rights and Choices</h3>
+        <h3>10. Your Rights and Choices</h3>
         <ul>
             <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
             <li>Delete any reports you downloaded from the location where you saved them.</li>
@@ -341,12 +358,12 @@
     </div>
 
     <div class="section" id="get-access">
-        <h3>10. No Account Needed</h3>
+        <h3>11. No Account Needed</h3>
         <p>All checks &mdash; OFAC, Repeat Offender, and Title/Lien &mdash; are included free, with no account, sign-up, or API key. Just install and use.</p>
     </div>
 
     <div class="section">
-        <h3>11. Contact Us</h3>
+        <h3>12. Contact Us</h3>
         <p>Questions about this policy, the extension, or backend access? Email <a href="mailto:joejgallant@gmail.com">joejgallant@gmail.com</a> or use the Chrome Web Store support page for this listing.</p>
     </div>
 

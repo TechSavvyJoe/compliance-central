@@ -1,85 +1,468 @@
 /*
- * Michigan SOS calculator adapter.
+ * Michigan SOS public fee-calculator adapter.
  *
- * This script never reads cookies, storage, credentials, or form fields. On an
- * explicit side-panel request it returns only one uniquely labelled fee and an
- * optional VIN-stripped vehicle label. Unknown page layouts fail closed.
+ * This script runs only in an extension-owned, inactive SOS tab. It uses the
+ * calculator's own form events and returns a bounded schema, official plate
+ * preview URL, or verified total to the sidebar. It never reads cookies,
+ * credentials, local/session storage, arbitrary page text, a VIN, or a
+ * customer name. The worker closes the tab after the calculation.
  */
 (() => {
-  const VIN_PATTERN = /\b[A-HJ-NPR-Z0-9]{17}\b/gi;
-  const FEE_LABEL = /^(?:total\s+)?(?:registration|plate)\s+(?:fee|amount(?:\s+due)?)\s*[:-]?\s*\$?\s*(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)\s*$/i;
-  const INLINE_FEE_LABEL = /\b(?:registration|plate)\s+(?:fee|amount(?:\s+due)?)\b\s*[:-]?\s*\$?\s*(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)\b/i;
-  const VEHICLE_LABEL = /^(?:vehicle|year\s*\/\s*make\s*\/\s*model)\s*[:-]\s*(.+)$/i;
+  const MAX_FEE_CENTS = 9_999_999;
+  const SETTLE_DELAY_MS = 450;
+  const RESULT_TIMEOUT_MS = 15_000;
+  const CALCULATION_MODE = Object.freeze({
+    newPlate: "new_plate",
+    plateTransfer: "plate_transfer",
+  });
 
-  function cents(value) {
-    const normalized = String(value || "").replace(/,/g, "");
-    if (!/^\d{1,5}(?:\.\d{2})?$/.test(normalized)) return null;
-    const [whole, fraction = "00"] = normalized.split(".");
-    const result = Number(whole) * 100 + Number(fraction);
-    return Number.isInteger(result) && result > 0 && result <= 9_999_999 ? result : null;
+  function text(value) {
+    return String(value?.textContent || "").replace(/\s+/g, " ").trim();
   }
 
-  function cleanVehicle(value) {
-    return String(value || "")
-      .replace(VIN_PATTERN, "")
-      .replace(/\bVIN\s*[:#-]?\s*/gi, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/^[\s:|-]+|[\s:|-]+$/g, "")
+  function pause(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function isVisible(element) {
+    if (!element || element.closest?.('[aria-hidden="true"]')) return false;
+    const style = getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function visibleHeadings() {
+    return [...document.querySelectorAll("h1, h2, h3")]
+      .filter(isVisible)
+      .map(text)
+      .filter(Boolean);
+  }
+
+  function calculatorMode() {
+    const headings = visibleHeadings();
+    const isRegistration = headings.filter((label) => /^Calculate Registration Fees$/i.test(label));
+    const isTransfer = headings.filter((label) => /^Plate Transfer Fee Calculator$/i.test(label));
+    if (isRegistration.length === 1 && isTransfer.length === 0) {
+      return CALCULATION_MODE.newPlate;
+    }
+    if (isTransfer.length === 1 && isRegistration.length === 0) {
+      return CALCULATION_MODE.plateTransfer;
+    }
+    return null;
+  }
+
+  function labelFor(element, fieldId = element?.id || element?.name || "") {
+    const labelledBy = String(element?.getAttribute?.("aria-labelledby") || "")
+      .split(/\s+/)
+      .filter(Boolean);
+    for (const id of labelledBy) {
+      const label = text(document.getElementById(id));
+      if (label) return label;
+    }
+
+    const stateLabel = text(document.getElementById(`lb_${fieldId}`));
+    if (stateLabel) return stateLabel;
+
+    const linked = [...document.querySelectorAll("label")].find(
+      (label) => label.htmlFor === element?.id
+    );
+    if (text(linked)) return text(linked);
+
+    const legend = text(element?.closest?.("fieldset")?.querySelector?.("legend"));
+    return legend || "Official SOS choice";
+  }
+
+  function sectionFor(element) {
+    const headings = [...document.querySelectorAll("h2, h3")].filter(isVisible);
+    let section = "Official SOS choices";
+    for (const heading of headings) {
+      if (heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) {
+        section = text(heading) || section;
+      }
+    }
+    return section;
+  }
+
+  function currentForm() {
+    const forms = [...document.querySelectorAll("form")].filter(isVisible);
+    return forms.at(-1) || document.querySelector("main") || document.documentElement;
+  }
+
+  function controls() {
+    const root = currentForm();
+    return [...root.querySelectorAll('select, input[type="text"], input[type="radio"]')].filter(
+      (element) => {
+        if (element.type === "radio") return isVisible(element.closest("fieldset"));
+        return isVisible(element);
+      }
+    );
+  }
+
+  function optionList(select) {
+    return [...select.options]
+      .map((option) => ({ value: String(option.value || ""), label: text(option) }))
+      .filter((option) => option.label || option.value);
+  }
+
+  function dynamicFields() {
+    const seenRadioGroups = new Set();
+    return controls()
+      .map((element) => {
+        if (element.tagName === "SELECT") {
+          return {
+            id: element.id || element.name,
+            label: labelFor(element),
+            section: sectionFor(element),
+            kind: "select",
+            value: String(element.value || ""),
+            disabled: Boolean(element.disabled),
+            required:
+              element.required ||
+              element.getAttribute("aria-required") === "true" ||
+              element.classList.contains("BasicRequiredField"),
+            options: optionList(element),
+          };
+        }
+
+        if (element.type === "text") {
+          return {
+            id: element.id || element.name,
+            label: labelFor(element),
+            section: sectionFor(element),
+            kind: "text",
+            value: String(element.value || ""),
+            disabled: Boolean(element.disabled || element.readOnly),
+            required:
+              element.required ||
+              element.getAttribute("aria-required") === "true" ||
+              element.classList.contains("BasicRequiredField"),
+            inputMode: /MSRP|amount|price/i.test(labelFor(element)) ? "decimal" : "text",
+          };
+        }
+
+        const fieldId = element.dataset.fieldId || element.name || element.id;
+        if (!fieldId || seenRadioGroups.has(fieldId)) return null;
+        seenRadioGroups.add(fieldId);
+        const group = controls().filter(
+          (item) =>
+            item.type === "radio" &&
+            (item.dataset.fieldId || item.name || item.id) === fieldId
+        );
+        if (!group.length) return null;
+        const checked = group.find((item) => item.checked);
+        return {
+          id: fieldId,
+          label: labelFor(group[0], fieldId),
+          section: sectionFor(group[0]),
+          kind: "radio",
+          value: String(checked?.value || ""),
+          disabled: group.every((item) => item.disabled),
+          required: false,
+          options: group.map((item) => ({
+            value: String(item.value || ""),
+            label: text(document.querySelector(`label[for="${item.id}"]`)) || String(item.value || ""),
+          })),
+        };
+      })
+      .filter((field) => field?.id && field.label !== "Official SOS choice");
+  }
+
+  function selectedTextByLabel(expected) {
+    const field = dynamicFields().find((item) => item.label === expected);
+    if (!field) return "";
+    return field.options?.find((option) => option.value === field.value)?.label || "";
+  }
+
+  function textValueByLabel(expected) {
+    const field = dynamicFields().find(
+      (item) => item.label === expected && item.kind === "text"
+    );
+    return String(field?.value || "").trim();
+  }
+
+  function safeVehicleDescription(mode) {
+    if (mode === CALCULATION_MODE.plateTransfer) return "Plate transfer";
+    const year = textValueByLabel("Enter the vehicle model year");
+    const vehicleType = selectedTextByLabel("Select your vehicle type");
+    const bodyStyle = selectedTextByLabel("Select the body style");
+    const use = selectedTextByLabel("Select how you will use your vehicle");
+    return [
+      /^\d{4}$/.test(year) ? year : "",
+      vehicleType,
+      bodyStyle,
+      use,
+    ]
+      .filter(Boolean)
+      .join(" · ")
       .slice(0, 120);
   }
 
-  function captureDisplayedQuote() {
-    const lines = String(document.body?.innerText || "")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
+  function radioValueForLabel(expression) {
+    const field = dynamicFields().find(
+      (item) => item.kind === "radio" && expression.test(item.label)
+    );
+    return field?.value || "";
+  }
+
+  function personalizedPlateSelected() {
+    const value = radioValueForLabel(/personalize your plate/i);
+    return value ? value === "Yes" : null;
+  }
+
+  function recreationPassportSelected() {
+    const value = radioValueForLabel(/recreation passport/i);
+    return value ? value === "Yes" : null;
+  }
+
+  function safePlatePreviewUrl(mode) {
+    // Personalized or transfer previews could expose plate characters; do not
+    // return them. The sidebar gets only a non-personalized official design.
+    if (mode !== CALCULATION_MODE.newPlate || personalizedPlateSelected() !== false) {
+      return null;
+    }
+    const urls = [...document.querySelectorAll("img")]
+      .filter(isVisible)
+      .map((image) => ({
+        value: image.currentSrc || image.getAttribute("src") || "",
+        alt: String(image.alt || ""),
+      }))
+      .map(({ value, alt }) => {
+        try {
+          const url = new URL(value, location.origin);
+          const official =
+            url.protocol === "https:" &&
+            url.hostname === "dsvsesvc.sos.state.mi.us" &&
+            url.pathname.startsWith("/TAP/Image/") &&
+            !/QuestionPlate/i.test(url.pathname) &&
+            /plate/i.test(alt);
+          return official ? `${url.origin}${url.pathname}` : null;
+        } catch {
+          return null;
+        }
+      })
       .filter(Boolean);
-    const candidates = [];
-    let vehicleDescription = "";
+    const unique = [...new Set(urls)];
+    return unique.length === 1 ? unique[0] : null;
+  }
 
-    for (const line of lines) {
-      const direct = line.match(FEE_LABEL) || line.match(INLINE_FEE_LABEL);
-      if (direct) {
-        const amount = cents(direct[1]);
-        if (amount != null) candidates.push(amount);
-      }
-      if (!vehicleDescription) {
-        const vehicle = line.match(VEHICLE_LABEL);
-        if (vehicle) vehicleDescription = cleanVehicle(vehicle[1]);
-      }
-    }
-
-    const unique = [...new Set(candidates)];
-    if (unique.length !== 1) {
-      return {
-        success: false,
-        code: "UNVERIFIED_RESULT",
-        error: "No single labelled registration or plate fee was found. Enter the confirmed fee manually instead.",
-      };
-    }
-
+  function calculatorSnapshot() {
+    const mode = calculatorMode();
+    if (!mode) return null;
     return {
-      success: true,
-      quote: {
-        feeCents: unique[0],
-        vehicleDescription,
-        capturedAt: new Date().toISOString(),
-        calculatorUrl: location.href,
-      },
+      calculationMode: mode,
+      fields: dynamicFields(),
+      platePreviewUrl: safePlatePreviewUrl(mode),
     };
   }
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "SOS_CAPTURE_FEE_QUOTE") {
-      sendResponse(captureDisplayedQuote());
-      return;
-    }
-    if (message?.type === "SOS_PRINT_CURRENT_PAGE") {
-      try {
-        window.print();
-        sendResponse({ success: true });
-      } catch {
-        sendResponse({ success: false, error: "SOS could not open the browser print dialog." });
+  function cents(value) {
+    const normalized = String(value || "").replace(/[$,\s]/g, "");
+    if (!/^\d{1,5}(?:\.\d{2})?$/.test(normalized)) return null;
+    const [whole, fraction = "00"] = normalized.split(".");
+    const result = Number(whole) * 100 + Number(fraction);
+    return Number.isInteger(result) && result > 0 && result <= MAX_FEE_CENTS
+      ? result
+      : null;
+  }
+
+  function feeTable() {
+    const candidates = [...document.querySelectorAll("table")].filter((table) => {
+      const headingId = table.getAttribute("aria-labelledby");
+      return (
+        isVisible(table) &&
+        text(headingId && document.getElementById(headingId)) === "Fees"
+      );
+    });
+    if (candidates.length !== 1) return null;
+
+    const rows = [...candidates[0].querySelectorAll("tbody tr")]
+      .map((row) => [...row.querySelectorAll("td")].map(text))
+      .filter((cells) => cells.some(Boolean));
+    if (!rows.length) return null;
+
+    const amounts = rows.map((cells) => {
+      if (cells.length !== 2 || !/\b(?:fee|registration|plate)\b/i.test(cells[0])) {
+        return null;
       }
+      return cents(cells[1]);
+    });
+    if (amounts.some((amount) => amount == null)) return null;
+
+    const totalCells = [...candidates[0].querySelectorAll("tfoot .TableTotalsRow td")];
+    const total = cents(text(totalCells.at(-1)));
+    return total != null && amounts.reduce((sum, amount) => sum + amount, 0) === total
+      ? total
+      : null;
+  }
+
+  function hasVisibleValidationMessage() {
+    return [...document.querySelectorAll('[role="alert"], .FieldError, .FastValidationMessage, .ValidationMessage')]
+      .filter(isVisible)
+      .some((element) => /required|select|enter|valid|error/i.test(text(element)));
+  }
+
+  function nativeValueSetter(element) {
+    if (element.tagName === "SELECT") {
+      return Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     }
+    return Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  }
+
+  async function settleCalculator() {
+    // SOS exposes a busy overlay while a form event is being processed. A
+    // modest quiet delay also handles the very fast responses where the
+    // overlay is gone before this adapter observes it.
+    const started = Date.now();
+    let sawBusy = false;
+    while (Date.now() - started < RESULT_TIMEOUT_MS) {
+      const overlay = document.getElementById("FastBusyOverlay");
+      const busy = overlay && getComputedStyle(overlay).visibility !== "hidden";
+      sawBusy ||= Boolean(busy);
+      if (!busy && (sawBusy || Date.now() - started >= SETTLE_DELAY_MS)) return;
+      await pause(75);
+    }
+  }
+
+  async function applyField(data) {
+    const fieldId = String(data?.fieldId || "");
+    const value = String(data?.value || "");
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(fieldId) || value.length > 128) {
+      return { success: false, error: "The SOS calculator choice was invalid." };
+    }
+
+    const field = dynamicFields().find((item) => item.id === fieldId);
+    if (!field || field.disabled) {
+      return {
+        success: false,
+        error: "That official SOS choice is not available yet.",
+        calculator: calculatorSnapshot(),
+      };
+    }
+
+    if (field.kind === "radio") {
+      const target = controls().find(
+        (element) =>
+          element.type === "radio" &&
+          (element.dataset.fieldId || element.name || element.id) === fieldId &&
+          element.value === value
+      );
+      if (!target || target.disabled) {
+        return { success: false, error: "That official SOS option is unavailable." };
+      }
+      target.focus();
+      target.click();
+    } else {
+      const target = controls().find(
+        (element) => (element.id || element.name) === fieldId
+      );
+      if (
+        !target ||
+        target.disabled ||
+        (field.kind === "select" &&
+          !field.options?.some?.((option) => option.value === value))
+      ) {
+        return { success: false, error: "That official SOS option is unavailable." };
+      }
+      target.focus();
+      const setter = nativeValueSetter(target);
+      if (typeof setter !== "function") {
+        return { success: false, error: "Michigan SOS could not apply that choice." };
+      }
+      setter.call(target, value);
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+      if (field.kind === "text") target.blur();
+    }
+
+    await settleCalculator();
+    const calculator = calculatorSnapshot();
+    if (!calculator) {
+      return { success: false, error: "Michigan SOS did not return the calculator form." };
+    }
+    return { success: true, calculator };
+  }
+
+  function visibleCalculateButton() {
+    return [...document.querySelectorAll("button")]
+      .filter(isVisible)
+      .find((button) => /^Calculate Fees$/i.test(text(button)) && !button.disabled);
+  }
+
+  async function calculateFee() {
+    const mode = calculatorMode();
+    const button = visibleCalculateButton();
+    if (!mode || !button) {
+      return {
+        success: false,
+        error: "Michigan SOS did not provide a ready public calculator.",
+      };
+    }
+
+    button.focus();
+    button.click();
+    const deadline = Date.now() + RESULT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await settleCalculator();
+      const feeCents = feeTable();
+      if (feeCents != null) {
+        return {
+          success: true,
+          quote: {
+            calculationMode: mode,
+            feeCents,
+            vehicleDescription: safeVehicleDescription(mode),
+            platePreviewUrl: safePlatePreviewUrl(mode),
+            recreationPassport: recreationPassportSelected(),
+            calculatedAt: new Date().toISOString(),
+          },
+        };
+      }
+      if (hasVisibleValidationMessage()) {
+        return {
+          success: false,
+          keepOpen: true,
+          error: "Michigan SOS needs more information before it can calculate this fee.",
+          calculator: calculatorSnapshot(),
+        };
+      }
+      await pause(150);
+    }
+
+    return {
+      success: false,
+      error: "Michigan SOS did not return a verified fee result.",
+    };
+  }
+
+  function discoverCalculator() {
+    const calculator = calculatorSnapshot();
+    if (!calculator) {
+      return {
+        success: false,
+        error: "Michigan SOS did not load a recognized public fee calculator.",
+      };
+    }
+    return { success: true, calculator };
+  }
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    let task = null;
+    if (message?.type === "SOS_DISCOVER_CALCULATOR") {
+      task = Promise.resolve(discoverCalculator());
+    } else if (message?.type === "SOS_APPLY_CALCULATOR_FIELD") {
+      task = applyField(message.data);
+    } else if (message?.type === "SOS_CALCULATE_IN_TAB") {
+      task = calculateFee();
+    }
+    if (!task) return;
+
+    task
+      .then(sendResponse)
+      .catch(() =>
+        sendResponse({
+          success: false,
+          error: "Michigan SOS could not complete the calculator request.",
+        })
+      );
+    return true;
   });
 })();

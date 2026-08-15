@@ -1170,6 +1170,38 @@ body.modal-open {
   gap: var(--spacing-md);
 }
 
+/* Evidence is a single, compact work area: outcome first, then the records
+ * a salesperson can actually print or file. */
+.evidence-heading {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  background: linear-gradient(135deg, #0d2b4a, #122a45);
+  box-shadow: var(--shadow-sm);
+}
+.evidence-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--gold);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.evidence-heading h2 {
+  color: #fff;
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+}
+.evidence-heading p {
+  margin-top: 3px;
+  color: #b8c9db;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .final-decision {
   text-align: center;
   padding: var(--spacing-lg);
@@ -1212,10 +1244,10 @@ body.modal-open {
 .result-card {
   background: var(--bg-card);
   border-radius: var(--border-radius);
-  padding: var(--spacing-md);
+  padding: 14px;
   border: 1px solid var(--border-color);
   transition: border-color var(--transition-base), opacity var(--transition-base);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02), inset 3px 0 0 rgba(255, 203, 5, 0.7);
 }
 .result-card:hover {
   border-color: rgba(255, 203, 5, 0.2);
@@ -1284,9 +1316,17 @@ body.modal-open {
 .result-detail {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 4px;
   white-space: pre-line;
 }
+.result-evidence-meta {
+  min-height: 1.2em;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+.result-evidence-meta[hidden] { display: none; }
 /* OFAC potential-match list (with DOB-disambiguation confidence) */
 .ofac-match-summary {
   display: block;
@@ -1363,15 +1403,21 @@ body.modal-open {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
-  margin-top: var(--spacing-sm);
+  margin-top: 10px;
+}
+.result-actions .btn-secondary {
+  min-height: 40px;
+  justify-content: center;
 }
 
 .all-actions {
   display: flex;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
+  margin: 0;
 }
 .all-actions button { flex: 1; }
+.evidence-heading .all-actions { display: grid; grid-template-columns: 1fr 1fr; }
+.evidence-heading .all-actions button { min-height: 42px; padding: 8px; font-size: 0.72rem; }
 
 /* Co-Buyer results */
 .cobuyer-results {

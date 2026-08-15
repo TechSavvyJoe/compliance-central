@@ -7,6 +7,10 @@ const datePickerSource = readFileSync(
   new URL("../src/sidepanel/date-picker.js", import.meta.url),
   "utf8"
 );
+const resultsSource = readFileSync(
+  new URL("../src/sidepanel/results.js", import.meta.url),
+  "utf8"
+);
 
 test("DOB fields avoid browser autofill warnings in the extension panel", () => {
   assert.doesNotMatch(sidepanelHtml, /autocomplete="bday"/);
@@ -39,4 +43,21 @@ test("data-use disclosure ties remote checks to an affirmative user action", () 
       new RegExp(`id="${id}"[^>]*aria-describedby="dataUseNote"`)
     );
   }
+});
+
+test("evidence controls are explicit and completed rows identify their own timestamp", () => {
+  assert.match(sidepanelHtml, /class="evidence-heading"/);
+  assert.match(sidepanelHtml, /Print available/);
+  assert.match(sidepanelHtml, /Download PDFs/);
+  for (const id of [
+    "ofacResultTimestamp",
+    "repeatResultTimestamp",
+    "titleResultTimestamp",
+    "cbOfacResultTimestamp",
+    "cbRepeatResultTimestamp",
+  ]) {
+    assert.match(sidepanelHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(resultsSource, /function setResultTimestamp/);
+  assert.match(resultsSource, /Completed \$\{date\.toLocaleString\(\)\}/);
 });

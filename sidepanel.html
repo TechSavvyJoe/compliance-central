@@ -458,7 +458,23 @@
         </section>
 
         <section id="resultsSection" class="results-section hidden" aria-labelledby="resultsSectionTitle">
-          <h2 id="resultsSectionTitle" class="visually-hidden">Compliance check results</h2>
+          <div class="evidence-heading">
+            <div>
+              <span class="evidence-kicker">Evidence</span>
+              <h2 id="resultsSectionTitle">Compliance check results</h2>
+              <p>Print or download only the records completed in this run.</p>
+            </div>
+            <div class="all-actions" aria-label="Available evidence actions">
+              <button type="button" id="printAllBtn" class="btn-secondary" title="Print all completed records">
+                <span class="btn-icon icon icon-printer" aria-hidden="true"></span>
+                Print available
+              </button>
+              <button type="button" id="downloadPdfBtn" class="btn-secondary btn-emphasis" title="Download PDFs for all completed records">
+                <span class="btn-icon icon icon-download" aria-hidden="true"></span>
+                Download PDFs
+              </button>
+            </div>
+          </div>
           <div id="finalDecision" class="final-decision" role="status" aria-live="polite"></div>
 
           <div class="results-grid">
@@ -468,12 +484,13 @@
                 <span class="result-status status-pass" id="ofacResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="ofacResultDetail">No matches in SDN list</p>
+              <p class="result-evidence-meta" id="ofacResultTimestamp"></p>
               <div class="result-actions">
                 <button type="button" class="btn-secondary btn-sm" id="printOfacBtn">
-                  <span class="icon icon-printer" aria-hidden="true"></span>Print
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print record
                 </button>
                 <button type="button" class="btn-secondary btn-emphasis btn-sm" id="downloadOfacBtn">
-                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
+                  <span class="icon icon-download" aria-hidden="true"></span>Download record PDF
                 </button>
               </div>
             </div>
@@ -484,12 +501,13 @@
                 <span class="result-status status-pass" id="repeatResultStatus">Pass</span>
               </div>
               <p class="result-detail" id="repeatResultDetail">Eligible per MDOS repeat-offender response</p>
+              <p class="result-evidence-meta" id="repeatResultTimestamp"></p>
               <div class="result-actions">
                 <button type="button" class="btn-secondary btn-sm hidden" id="printRepeatBtn">
-                  <span class="icon icon-printer" aria-hidden="true"></span>Print
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print record
                 </button>
                 <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadRepeatBtn">
-                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
+                  <span class="icon icon-download" aria-hidden="true"></span>Download record PDF
                 </button>
               </div>
             </div>
@@ -500,12 +518,13 @@
                 <span class="result-status status-skipped" id="titleResultStatus">No Trade</span>
               </div>
               <p class="result-detail" id="titleResultDetail">No trade-in provided</p>
+              <p class="result-evidence-meta" id="titleResultTimestamp"></p>
               <div class="result-actions">
                 <button type="button" class="btn-secondary btn-sm hidden" id="printTitleBtn">
-                  <span class="icon icon-printer" aria-hidden="true"></span>Print
+                  <span class="icon icon-printer" aria-hidden="true"></span>Print record
                 </button>
                 <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadTitleBtn">
-                  <span class="icon icon-download" aria-hidden="true"></span>Download PDF
+                  <span class="icon icon-download" aria-hidden="true"></span>Download record PDF
                 </button>
               </div>
             </div>
@@ -520,12 +539,13 @@
                   <span class="result-status status-pass" id="cbOfacResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbOfacResultDetail">No matches in SDN list</p>
+                <p class="result-evidence-meta" id="cbOfacResultTimestamp"></p>
                 <div class="result-actions">
                   <button type="button" class="btn-secondary btn-sm" id="printCbOfacBtn">
-                    <span class="icon icon-printer" aria-hidden="true"></span>Print
+                    <span class="icon icon-printer" aria-hidden="true"></span>Print record
                   </button>
                   <button type="button" class="btn-secondary btn-emphasis btn-sm" id="downloadCbOfacBtn">
-                    <span class="icon icon-download" aria-hidden="true"></span>Download PDF
+                    <span class="icon icon-download" aria-hidden="true"></span>Download record PDF
                   </button>
                 </div>
               </div>
@@ -536,28 +556,19 @@
                   <span class="result-status status-pass" id="cbRepeatResultStatus">Pass</span>
                 </div>
                 <p class="result-detail" id="cbRepeatResultDetail">Eligible per MDOS repeat-offender response</p>
+                <p class="result-evidence-meta" id="cbRepeatResultTimestamp"></p>
                 <div class="result-actions">
                   <button type="button" class="btn-secondary btn-sm hidden" id="printCbRepeatBtn">
-                    <span class="icon icon-printer" aria-hidden="true"></span>Print
+                    <span class="icon icon-printer" aria-hidden="true"></span>Print record
                   </button>
                   <button type="button" class="btn-secondary btn-emphasis btn-sm hidden" id="downloadCbRepeatBtn">
-                    <span class="icon icon-download" aria-hidden="true"></span>Download PDF
+                    <span class="icon icon-download" aria-hidden="true"></span>Download record PDF
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="all-actions">
-            <button type="button" id="printAllBtn" class="btn-secondary">
-              <span class="btn-icon icon icon-printer" aria-hidden="true"></span>
-              Print All
-            </button>
-            <button type="button" id="downloadPdfBtn" class="btn-secondary btn-emphasis">
-              <span class="btn-icon icon icon-download" aria-hidden="true"></span>
-              Download PDF
-            </button>
-          </div>
         </section>
 
         <section class="history-section">

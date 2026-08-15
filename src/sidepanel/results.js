@@ -89,6 +89,20 @@ function setActionVisibility(button, visible) {
   button?.classList.toggle("hidden", !visible);
 }
 
+/** Present a local, per-check evidence time without adding any new storage. */
+function setResultTimestamp(el, result, fallbackTimestamp) {
+  if (!el) return;
+  const value = result?.timestamp || fallbackTimestamp;
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    el.textContent = "";
+    el.hidden = true;
+    return;
+  }
+  el.textContent = `Completed ${date.toLocaleString()}`;
+  el.hidden = false;
+}
+
 function prepareFullResultsView(elements) {
   elements.ofacResultCard?.classList.remove("hidden");
   elements.repeatResultCard?.classList.remove("hidden");
@@ -152,12 +166,13 @@ function renderOfacMatchList(matches, totalCount = matches?.length || 0) {
     </details>`;
 }
 
-function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
+function renderOfacResult(statusEl, detailEl, timestampEl, printBtn, downloadBtn, ofac, fallbackTimestamp) {
   if (!ofac) {
     setResultStatus(statusEl, "skipped", "Not Run");
     if (detailEl) detailEl.textContent = "OFAC screening has not run";
     setActionVisibility(printBtn, false);
     setActionVisibility(downloadBtn, false);
+    setResultTimestamp(timestampEl, null);
     return;
   }
 
@@ -171,6 +186,7 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
     }
     setActionVisibility(printBtn, false);
     setActionVisibility(downloadBtn, false);
+    setResultTimestamp(timestampEl, ofac, fallbackTimestamp);
     return;
   }
 
@@ -203,6 +219,7 @@ function renderOfacResult(statusEl, detailEl, printBtn, downloadBtn, ofac) {
   }
   setActionVisibility(printBtn, true);
   setActionVisibility(downloadBtn, true);
+  setResultTimestamp(timestampEl, ofac, fallbackTimestamp);
 }
 
 function repeatOffenderDetail(result) {
@@ -422,9 +439,11 @@ export function displayResults(elements, results) {
   renderOfacResult(
     elements.ofacResultStatus,
     elements.ofacResultDetail,
+    elements.ofacResultTimestamp,
     elements.printOfacBtn,
     elements.downloadOfacBtn,
-    results.checks.ofac
+    results.checks.ofac,
+    results.timestamp
   );
 
   // Buyer Repeat Offender.
@@ -460,6 +479,11 @@ export function displayResults(elements, results) {
     setActionVisibility(elements.printRepeatBtn, false);
     setActionVisibility(elements.downloadRepeatBtn, false);
   }
+  setResultTimestamp(
+    elements.repeatResultTimestamp,
+    results.checks.repeatOffender,
+    results.timestamp
+  );
 
   // Title.
   if (results.checks.title) {
@@ -538,6 +562,7 @@ export function displayResults(elements, results) {
     elements.printTitleBtn?.classList.add("hidden");
     elements.downloadTitleBtn?.classList.add("hidden");
   }
+  setResultTimestamp(elements.titleResultTimestamp, results.checks.title, results.timestamp);
 
   // Co-Buyer.
   const hasCoBuyer =
@@ -549,9 +574,11 @@ export function displayResults(elements, results) {
     renderOfacResult(
       elements.cbOfacResultStatus,
       elements.cbOfacResultDetail,
+      elements.cbOfacResultTimestamp,
       elements.printCbOfacBtn,
       elements.downloadCbOfacBtn,
-      results.checks.coBuyerOfac
+      results.checks.coBuyerOfac,
+      results.timestamp
     );
 
     if (results.checks.coBuyerRepeatOffender) {
@@ -587,8 +614,15 @@ export function displayResults(elements, results) {
       setActionVisibility(elements.printCbRepeatBtn, false);
       setActionVisibility(elements.downloadCbRepeatBtn, false);
     }
+    setResultTimestamp(
+      elements.cbRepeatResultTimestamp,
+      results.checks.coBuyerRepeatOffender,
+      results.timestamp
+    );
   } else if (elements.coBuyerResultsSection) {
     elements.coBuyerResultsSection.classList.add("hidden");
+    setResultTimestamp(elements.cbOfacResultTimestamp, null);
+    setResultTimestamp(elements.cbRepeatResultTimestamp, null);
   }
 }
 
@@ -606,9 +640,11 @@ export function displayIndividualResult(elements, type, result) {
     renderOfacResult(
       elements.ofacResultStatus,
       elements.ofacResultDetail,
+      elements.ofacResultTimestamp,
       elements.printOfacBtn,
       elements.downloadOfacBtn,
-      result
+      result,
+      result.timestamp
     );
   } else if (type === "repeatOffender") {
     elements.repeatResultCard?.classList.remove("hidden");
@@ -634,6 +670,7 @@ export function displayIndividualResult(elements, type, result) {
     }
     setActionVisibility(elements.printRepeatBtn, !result.error && result.status !== "error");
     setActionVisibility(elements.downloadRepeatBtn, !result.error && result.status !== "error");
+    setResultTimestamp(elements.repeatResultTimestamp, result, result.timestamp);
   } else if (type === "title") {
     elements.titleResultCard?.classList.remove("hidden");
     if (result.error) {
@@ -684,6 +721,7 @@ export function displayIndividualResult(elements, type, result) {
     }
     setActionVisibility(elements.printTitleBtn, !result.error);
     setActionVisibility(elements.downloadTitleBtn, !result.error);
+    setResultTimestamp(elements.titleResultTimestamp, result, result.timestamp);
   }
 }
 

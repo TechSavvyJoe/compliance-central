@@ -222,6 +222,54 @@
         </section>
         </div>
 
+        <section class="input-section sos-quote-section" aria-labelledby="sosQuoteTitle">
+          <div class="sos-quote-heading">
+            <div>
+              <h2 id="sosQuoteTitle" class="section-title">
+                <span class="section-icon icon icon-file" aria-hidden="true"></span>
+                SOS Fee Quote
+              </h2>
+              <p class="sos-quote-intro">Open SOS → calculate → capture confirmed result. You stay in control of every SOS action.</p>
+            </div>
+            <span id="sosQuoteSource" class="sos-quote-source">Not available</span>
+          </div>
+
+          <fieldset class="sos-quote-mode">
+            <legend>Registration choice</legend>
+            <label><input type="radio" name="sosQuoteMode" value="new_plate" checked /> New plate</label>
+            <label><input type="radio" name="sosQuoteMode" value="plate_transfer" /> Plate transfer</label>
+          </fieldset>
+
+          <p id="sosQuoteStatus" class="sos-quote-status" role="status" aria-live="polite">Not available — open SOS, calculate the fee, then capture the confirmed result.</p>
+
+          <div class="sos-quote-actions" role="group" aria-label="Michigan SOS fee quote actions">
+            <button type="button" id="openSosCalculatorBtn" class="btn-secondary btn-sm">Open SOS calculator</button>
+            <button type="button" id="captureSosQuoteBtn" class="btn-secondary btn-emphasis btn-sm">Capture confirmed result</button>
+            <button type="button" id="printSosQuoteBtn" class="btn-secondary btn-sm" disabled>Print customer summary</button>
+            <button type="button" id="printSosPageBtn" class="btn-secondary btn-sm">Print official SOS page</button>
+          </div>
+
+          <details class="sos-manual-entry">
+            <summary>Can’t capture the result? Enter the confirmed fee manually</summary>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sosManualAmount">Registration / plate fee</label>
+                <input id="sosManualAmount" type="text" inputmode="decimal" placeholder="125.00" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="sosVehicleDescription">Vehicle (optional)</label>
+                <input id="sosVehicleDescription" type="text" maxlength="120" placeholder="2026 Ford Explorer" autocomplete="off" />
+              </div>
+            </div>
+            <div class="sos-manual-actions">
+              <button type="button" id="saveManualSosQuoteBtn" class="btn-secondary btn-sm">Save salesperson-entered quote</button>
+              <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm">Clear quote</button>
+            </div>
+          </details>
+
+          <p class="sos-quote-privacy">Session only: no SOS sign-in, cookie, VIN, customer name, or page content is retained. SOS remains the source of truth.</p>
+        </section>
+
         <section class="action-section">
           <p id="dataUseNote" class="data-use-note">
             Privacy: OFAC stays on this computer. State checks send the name, birth date,

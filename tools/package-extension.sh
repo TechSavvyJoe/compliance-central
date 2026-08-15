@@ -16,6 +16,7 @@ rm -f "$OUT"
 zip -r -X "$OUT" \
   manifest.json \
   service-worker.js \
+  sos-fee-quote-content.js \
   sidepanel.html sidepanel.js sidepanel.css \
   print-runner.html print-runner.js \
   src lib ofac \

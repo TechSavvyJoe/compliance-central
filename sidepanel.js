@@ -69,6 +69,7 @@ import {
   downloadCoBuyerRepeatOffenderPDF,
   downloadTitleReportPDF,
   downloadAllReportsPDF,
+  printHtmlDocument,
 } from "./src/sidepanel/export.js";
 import { showModal, hideModal } from "./src/sidepanel/modals.js";
 import {
@@ -85,6 +86,19 @@ import {
   getIsRunning,
   setIsRunning,
 } from "./src/sidepanel/state.js";
+import {
+  SOS_CALCULATOR_URL,
+  SOS_QUOTE_MODE,
+  SOS_QUOTE_SOURCE,
+  clearSosFeeQuote,
+  createCapturedQuote,
+  createManualQuote,
+  createSosFeeQuotePrintHTML,
+  loadSosFeeQuote,
+  quoteStatusText,
+  saveSosFeeQuote,
+  sourceLabel,
+} from "./src/sidepanel/sos-fee-quote.js";
 
 // ---------- DOM ----------
 
@@ -114,6 +128,18 @@ const elements = {
   runOfacBtn: $("runOfacBtn"),
   runRepeatOffenderBtn: $("runRepeatOffenderBtn"),
   runTitleBtn: $("runTitleBtn"),
+
+  // Session-only SOS registration fee quote
+  openSosCalculatorBtn: $("openSosCalculatorBtn"),
+  captureSosQuoteBtn: $("captureSosQuoteBtn"),
+  printSosQuoteBtn: $("printSosQuoteBtn"),
+  printSosPageBtn: $("printSosPageBtn"),
+  saveManualSosQuoteBtn: $("saveManualSosQuoteBtn"),
+  clearSosQuoteBtn: $("clearSosQuoteBtn"),
+  sosManualAmount: $("sosManualAmount"),
+  sosVehicleDescription: $("sosVehicleDescription"),
+  sosQuoteStatus: $("sosQuoteStatus"),
+  sosQuoteSource: $("sosQuoteSource"),
 
   viewHistoryBtn: $("viewHistoryBtn"),
 
@@ -272,6 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Independent async tasks — run in parallel, don't block paint.
   restoreCachedForm();
   applyPersistedResults();
+  restoreSosFeeQuote();
   updateHistoryCount(elements.historyCount);
   checkSdnDataStatus();
 
@@ -380,6 +407,177 @@ async function applyPersistedResults() {
   }
 }
 
+// ---------- SOS fee quote ----------
+
+let currentSosFeeQuote = null;
+
+function selectedSosQuoteMode() {
+  return (
+    document.querySelector('input[name="sosQuoteMode"]:checked')?.value ||
+    SOS_QUOTE_MODE.newPlate
+  );
+}
+
+function setSosQuoteMode(mode) {
+  const input = document.querySelector(
+    `input[name="sosQuoteMode"][value="${mode}"]`
+  );
+  if (input) input.checked = true;
+}
+
+function isOfficialSosUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return (
+      url.protocol === "https:" &&
+      (host === "sos.state.mi.us" || host.endsWith(".sos.state.mi.us"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function currentOfficialSosTab() {
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const tab = tabs[0];
+  if (!tab?.id || !isOfficialSosUrl(tab.url)) {
+    throw new Error("Open the logged-in Michigan SOS calculator tab first.");
+  }
+  return tab;
+}
+
+function renderSosFeeQuote() {
+  const quote = currentSosFeeQuote;
+  if (elements.sosQuoteStatus) {
+    elements.sosQuoteStatus.textContent = quoteStatusText(quote);
+  }
+  if (elements.sosQuoteSource) {
+    elements.sosQuoteSource.textContent = sourceLabel(quote?.source);
+    elements.sosQuoteSource.classList.toggle(
+      "is-captured",
+      quote?.source === SOS_QUOTE_SOURCE.captured
+    );
+    elements.sosQuoteSource.classList.toggle(
+      "is-manual",
+      quote?.source === SOS_QUOTE_SOURCE.manual
+    );
+  }
+  if (elements.printSosQuoteBtn) elements.printSosQuoteBtn.disabled = !quote;
+  if (quote) setSosQuoteMode(quote.mode);
+}
+
+async function restoreSosFeeQuote() {
+  try {
+    currentSosFeeQuote = await loadSosFeeQuote();
+    renderSosFeeQuote();
+  } catch (error) {
+    console.error("Could not restore SOS fee quote:", error);
+  }
+}
+
+async function openSosCalculator() {
+  try {
+    await chrome.tabs.create({ url: SOS_CALCULATOR_URL });
+    showToast("Sign in to SOS, choose the fee calculator, and calculate the fee.", "info");
+  } catch (error) {
+    console.error("Could not open SOS calculator:", error);
+    showToast("Could not open Michigan SOS. Try the calculator from your browser.", "error");
+  }
+}
+
+async function captureSosFeeQuote() {
+  try {
+    const tab = await currentOfficialSosTab();
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "SOS_CAPTURE_FEE_QUOTE",
+    });
+    if (!response?.success) {
+      throw new Error(
+        response?.error ||
+          "The confirmed registration or plate fee was not found on this SOS page."
+      );
+    }
+    const quote = createCapturedQuote(response.quote, selectedSosQuoteMode());
+    if (!quote) {
+      throw new Error("SOS returned an incomplete fee result. Enter the confirmed fee manually.");
+    }
+    currentSosFeeQuote = await saveSosFeeQuote(quote);
+    if (elements.sosManualAmount) elements.sosManualAmount.value = "";
+    if (elements.sosVehicleDescription) elements.sosVehicleDescription.value = "";
+    renderSosFeeQuote();
+    showToast("Confirmed SOS fee captured for this browser session.", "success");
+  } catch (error) {
+    console.error("Could not capture SOS fee quote:", error);
+    showToast(error?.message || "Could not capture the SOS fee. Enter it manually instead.", "warning");
+  }
+}
+
+async function saveManualSosQuote() {
+  const quote = createManualQuote({
+    mode: selectedSosQuoteMode(),
+    amount: elements.sosManualAmount?.value,
+    vehicleDescription: elements.sosVehicleDescription?.value,
+  });
+  if (!quote) {
+    showToast("Enter a valid confirmed registration or plate fee, such as 125.00.", "warning");
+    elements.sosManualAmount?.focus();
+    return;
+  }
+  try {
+    currentSosFeeQuote = await saveSosFeeQuote(quote);
+    renderSosFeeQuote();
+    showToast("Salesperson-entered fee quote saved for this browser session.", "success");
+  } catch (error) {
+    console.error("Could not save manual SOS fee quote:", error);
+    showToast("Could not save the fee quote.", "error");
+  }
+}
+
+async function clearCurrentSosFeeQuote() {
+  try {
+    await clearSosFeeQuote();
+    currentSosFeeQuote = null;
+    if (elements.sosManualAmount) elements.sosManualAmount.value = "";
+    if (elements.sosVehicleDescription) elements.sosVehicleDescription.value = "";
+    renderSosFeeQuote();
+    showToast("SOS fee quote cleared from this browser session.", "success");
+  } catch (error) {
+    console.error("Could not clear SOS fee quote:", error);
+    showToast("Could not clear the SOS fee quote.", "error");
+  }
+}
+
+async function handleSosQuoteModeChange() {
+  if (!currentSosFeeQuote || currentSosFeeQuote.mode === selectedSosQuoteMode()) return;
+  // A captured fee is specific to the transaction choice. Do not silently
+  // relabel a new-plate calculation as a plate-transfer calculation.
+  await clearCurrentSosFeeQuote();
+  showToast("Registration choice changed — capture or enter a new confirmed fee.", "info");
+}
+
+async function printSosFeeQuote() {
+  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote);
+  if (!html) {
+    showToast("Capture or enter a fee before printing the customer summary.", "info");
+    return;
+  }
+  await printHtmlDocument(html);
+}
+
+async function printCurrentSosPage() {
+  try {
+    const tab = await currentOfficialSosTab();
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "SOS_PRINT_CURRENT_PAGE",
+    });
+    if (!response?.success) throw new Error(response?.error || "Print dialog unavailable.");
+  } catch (error) {
+    console.error("Could not print official SOS page:", error);
+    showToast(error?.message || "Could not open the SOS print dialog.", "warning");
+  }
+}
+
 function applyInFlight(key) {
   if (!key) return;
   const factory = IN_FLIGHT_TO_STATUS_EL[key];
@@ -416,6 +614,18 @@ function initEventListeners() {
   elements.runOfacBtn.addEventListener("click", handleRunOfac);
   elements.runRepeatOffenderBtn.addEventListener("click", handleRunRepeatOffender);
   elements.runTitleBtn.addEventListener("click", handleRunTitle);
+
+  // SOS is deliberately assist-only: the salesperson opens and operates the
+  // state site, then explicitly asks this panel to capture or print.
+  elements.openSosCalculatorBtn?.addEventListener("click", openSosCalculator);
+  elements.captureSosQuoteBtn?.addEventListener("click", captureSosFeeQuote);
+  elements.printSosQuoteBtn?.addEventListener("click", printSosFeeQuote);
+  elements.printSosPageBtn?.addEventListener("click", printCurrentSosPage);
+  elements.saveManualSosQuoteBtn?.addEventListener("click", saveManualSosQuote);
+  elements.clearSosQuoteBtn?.addEventListener("click", clearCurrentSosFeeQuote);
+  document.querySelectorAll('input[name="sosQuoteMode"]').forEach((input) => {
+    input.addEventListener("change", handleSosQuoteModeChange);
+  });
 
   elements.tradeVin.addEventListener("input", (e) => {
     elements.runTitleBtn.disabled = e.target.value.trim().length === 0;

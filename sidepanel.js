@@ -507,7 +507,7 @@ function filterHistoryWorkspace(query = "") {
       empty = document.createElement("div");
       empty.className = "history-empty history-filter-empty";
       empty.innerHTML =
-        "<strong>No matching audit records</strong><span>Try a reference, outcome, check name, or date.</span>";
+        "<strong>No matching customer records</strong><span>Try a customer name, vehicle, date, or outcome.</span>";
       elements.historyList.append(empty);
     }
   } else {
@@ -1347,7 +1347,7 @@ async function calculateSosFee() {
     currentSosFeeQuote = await saveSosFeeQuote(quote);
     pendingVinDecode = null;
     renderSosFeeQuote();
-    setSosWorkspaceStatus("Official SOS fee returned to the sidebar. The background SOS tab is closed.");
+    setSosWorkspaceStatus("Official SOS fee returned to the sidebar. The hidden calculator is closed.");
     showToast("Official SOS fee calculated for this browser session.", "success");
   } catch (error) {
     setSosWorkspaceStatus(
@@ -1618,7 +1618,7 @@ function initEventListeners() {
 
   window.addEventListener("pagehide", () => {
     // Do not await during teardown. The worker separately closes a recorded
-    // background tab after a worker restart as a privacy backstop.
+    // inactive calculator after a worker restart as a privacy backstop.
     chrome.runtime.sendMessage({ type: "SOS_FEE_CLOSE", data: {} }).catch(() => {});
   });
 
@@ -1839,6 +1839,9 @@ function initEventListeners() {
   // Co-Buyer toggle
   elements.hasCoBuyer?.addEventListener("change", (e) => {
     elements.coBuyerSection?.classList.toggle("hidden", !e.target.checked);
+    e.target.setAttribute("aria-expanded", String(e.target.checked));
+    const action = e.target.closest(".cobuyer-toggle")?.querySelector(".checkbox-text");
+    if (action) action.textContent = e.target.checked ? "Remove" : "Add";
   });
 
   // Trade-In collapse — the native button provides keyboard activation.

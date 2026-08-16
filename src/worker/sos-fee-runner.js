@@ -2,9 +2,10 @@
  * Public Michigan SOS fee-calculator runner.
  *
  * Sidebar edits are entirely local. Only an explicit Calculate action creates
- * an inactive tab and sends one bounded batch of completed choices. A verified
- * result closes the tab. After bounded failures, the same prefilled tab can be
- * foregrounded only by a second explicit salesperson action.
+ * one inactive tab in the salesperson's current window and sends one bounded
+ * batch of completed choices. It never replaces the active sales tab. A
+ * verified result closes the calculator. After bounded failures, the same
+ * prefilled page can be shown only by a second explicit salesperson action.
  */
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
@@ -107,6 +108,23 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
     return { success: true };
   }
 
+  async function restoreOriginTab(activeSession = session) {
+    if (!Number.isInteger(activeSession?.originTabId)) return;
+    try {
+      await chromeApi.tabs.update(activeSession.originTabId, { active: true });
+    } catch {
+      // If the salesperson closed the origin tab, leave Chrome's chosen tab.
+    }
+  }
+
+  // A remote page should not be able to steal focus from the sales workflow.
+  // This guard uses the same Chrome tabs API on Windows, macOS, and ChromeOS.
+  chromeApi.tabs.onActivated?.addListener((activeInfo) => {
+    const activeSession = session;
+    if (!activeSession || activeInfo?.tabId !== activeSession.tabId) return;
+    restoreOriginTab(activeSession);
+  });
+
   async function sendToCalculator(tabId, message) {
     let lastError = null;
     for (let attempt = 0; attempt < RECEIVER_RETRY_COUNT; attempt += 1) {
@@ -128,21 +146,35 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
 
     await close();
     try {
+      const [originTab] = await chromeApi.tabs.query({
+        active: true,
+        lastFocusedWindow: true,
+      });
+      if (!Number.isInteger(originTab?.id) || !Number.isInteger(originTab?.windowId)) {
+        return safeError("Chrome could not identify the active sales tab.");
+      }
       const createdTab = await chromeApi.tabs.create({
         url: sosCalculatorUrlForMode(mode),
         active: false,
+        windowId: originTab.windowId,
       });
       if (!Number.isInteger(createdTab?.id)) {
         return safeError("Michigan SOS could not start the public fee calculator.");
       }
       if (createdTab.active) {
+        await restoreOriginTab({ originTabId: originTab.id });
         await removeTab(createdTab.id);
         return safeError(
           "Chrome could not keep the SOS calculator in the background. Nothing was submitted."
         );
       }
 
-      session = { tabId: createdTab.id, mode };
+      session = {
+        tabId: createdTab.id,
+        originTabId: originTab.id,
+        originWindowId: originTab.windowId,
+        mode,
+      };
       await chromeApi.storage.session.set({
         [STORAGE_KEYS.sosFeeActiveTabId]: createdTab.id,
       });
@@ -184,17 +216,26 @@ export function createSosFeeRunner(chromeApi, { sleep = pause } = {}) {
   }
 
   async function openHandoff(mode) {
-    if (!VALID_MODES.has(mode) || session?.mode !== mode || !Number.isInteger(session?.tabId)) {
+    if (
+      !VALID_MODES.has(mode) ||
+      session?.mode !== mode ||
+      !Number.isInteger(session?.tabId)
+    ) {
       return safeError("The completed SOS form is no longer available. Calculate again.");
     }
     const tabId = session.tabId;
+    const activeSession = session;
+    // Disarm the activation guard only for this explicit salesperson handoff.
+    // If Chrome cannot activate the tab, remove the exact extension-owned tab
+    // instead of leaving a hidden form behind.
+    session = null;
     try {
       await chromeApi.tabs.update(tabId, { active: true });
-      session = null;
       await clearTabMetadata();
       return { success: true };
     } catch {
-      await close();
+      await removeTab(activeSession.tabId);
+      await clearTabMetadata();
       return safeError("Chrome could not open the completed SOS form. Calculate again.");
     }
   }
@@ -215,7 +256,7 @@ export function getSosFeeRunner() {
   return singleton;
 }
 
-/** Close only an extension-owned inactive tab recorded before worker restart. */
+/** Close only the extension-owned inactive calculator recorded before restart. */
 export async function closeInterruptedSosFeeSession(chromeApi = chrome) {
   const stored = await chromeApi.storage.session.get(STORAGE_KEYS.sosFeeActiveTabId);
   const tabId = stored[STORAGE_KEYS.sosFeeActiveTabId];

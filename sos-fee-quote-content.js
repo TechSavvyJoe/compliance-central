@@ -1,7 +1,7 @@
 /*
  * Michigan SOS public fee-calculator adapter.
  *
- * This script runs only in an extension-owned, inactive SOS tab. It uses the
+ * This script runs only in an extension-owned inactive SOS tab. It uses the
  * calculator's own form events and returns a bounded schema, official plate
  * preview URL, or verified total to the sidebar. It never reads cookies,
  * credentials, local/session storage, arbitrary page text, a VIN, or a
@@ -469,10 +469,16 @@
     return calculateFee();
   }
 
-  function visibleCalculateButton() {
+  function visibleCalculateButton(mode = calculatorMode()) {
     return [...document.querySelectorAll("button")]
       .filter(isVisible)
-      .find((button) => /^Calculate Fees$/i.test(text(button)) && !button.disabled);
+      .find((button) => {
+        const label = text(button);
+        const allowed =
+          /^Calculate Fees$/i.test(label) ||
+          (mode === CALCULATION_MODE.plateTransfer && /^Search$/i.test(label));
+        return allowed && !button.disabled;
+      });
   }
 
   async function captureOfficialResultPage() {
@@ -522,7 +528,7 @@
     if (mode && existingFee != null) {
       return verifiedQuoteResult(mode, existingFee);
     }
-    const button = visibleCalculateButton();
+    let button = visibleCalculateButton(mode);
     if (!mode || !button) {
       return {
         success: false,
@@ -530,10 +536,14 @@
       };
     }
 
-    button.focus();
-    button.click();
+    const clickedButtons = new WeakSet();
     const deadline = Date.now() + RESULT_TIMEOUT_MS;
     while (Date.now() < deadline) {
+      if (button && !clickedButtons.has(button)) {
+        clickedButtons.add(button);
+        button.focus();
+        button.click();
+      }
       await settleCalculator();
       const fee = feeTable();
       if (fee != null) {
@@ -547,6 +557,9 @@
           calculator: calculatorSnapshot(),
         };
       }
+      // Plate transfer begins with Search. A valid lookup can either return
+      // the fee immediately or reveal a second Calculate Fees action.
+      button = visibleCalculateButton(mode);
       await pause(150);
     }
 

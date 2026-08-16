@@ -106,13 +106,14 @@ function verifiedResult(mode = SOS_QUOTE_MODE.newPlate) {
   };
 }
 
-function runnerHarness({ responses = [], active = false } = {}) {
+function runnerHarness({ responses = [], createdActive = false } = {}) {
   const state = {};
   const created = [];
   const removed = [];
   const updated = [];
   const messages = [];
   const queue = [...responses];
+  let activatedListener = null;
   const chromeApi = {
     storage: {
       session: {
@@ -128,9 +129,17 @@ function runnerHarness({ responses = [], active = false } = {}) {
       },
     },
     tabs: {
+      onActivated: {
+        addListener(listener) {
+          activatedListener = listener;
+        },
+      },
+      async query() {
+        return [{ id: 101, windowId: 11, active: true }];
+      },
       async create(options) {
         created.push(options);
-        return { id: 401, active };
+        return { id: 401, windowId: 11, active: createdActive };
       },
       async remove(tabId) {
         removed.push(tabId);
@@ -151,6 +160,10 @@ function runnerHarness({ responses = [], active = false } = {}) {
     removed,
     updated,
     messages,
+    async activate(tabId) {
+      activatedListener?.({ tabId, windowId: 11 });
+      await Promise.resolve();
+    },
     runner: createSosFeeRunner(chromeApi, { sleep: async () => {} }),
   };
 }
@@ -318,15 +331,20 @@ test("specialty selections submit the exact live SOS subtype and background", ()
   );
 });
 
-test("background runner creates one inactive tab only on Calculate and closes on success", async () => {
+test("background runner creates one inactive same-window tab only on Calculate and closes on success", async () => {
   const fields = buildSosSubmission(newPlateValues());
   const harness = runnerHarness({ responses: [verifiedResult()] });
   const response = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate, fields);
   assert.equal(response.success, true);
   assert.deepEqual(harness.created, [
-    { url: SOS_CALCULATOR_URLS[SOS_QUOTE_MODE.newPlate], active: false },
+    {
+      url: SOS_CALCULATOR_URLS[SOS_QUOTE_MODE.newPlate],
+      active: false,
+      windowId: 11,
+    },
   ]);
   assert.equal(harness.messages.length, 1);
+  assert.deepEqual(harness.updated, []);
   assert.equal(harness.messages[0].message.type, SOS_FEE_MESSAGES.applyAndCalculate);
   assert.deepEqual(harness.messages[0].message.data.fields, fields);
   assert.deepEqual(harness.removed, [401]);
@@ -353,25 +371,60 @@ test("three failed attempts stay in sidebar until explicit prefilled handoff", a
 
   const handoff = await harness.runner.openHandoff(SOS_QUOTE_MODE.newPlate);
   assert.equal(handoff.success, true);
-  assert.deepEqual(harness.updated, [{ tabId: 401, options: { active: true } }]);
+  assert.deepEqual(harness.updated, [
+    { tabId: 401, options: { active: true } },
+  ]);
   assert.deepEqual(harness.removed, []);
   assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
 });
 
-test("runner fails closed if Chrome tries to foreground the automatic calculator", async () => {
-  const harness = runnerHarness({ active: true });
+test("activation guard restores the sales tab until an explicit handoff", async () => {
+  const harness = runnerHarness({
+    responses: Array.from({ length: 3 }, () => ({ success: false, keepOpen: true })),
+  });
+  await harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
+  await harness.activate(401);
+  assert.deepEqual(harness.updated, [{ tabId: 101, options: { active: true } }]);
+});
+
+test("plate transfer submits the plate and uses the official Search action before fee capture", async () => {
+  const transferValues = {
+    mode: SOS_QUOTE_MODE.plateTransfer,
+    transferPlateNumber: "ABC 1234",
+  };
+  assert.deepEqual(validateSosLocalValues(transferValues), []);
+  assert.deepEqual(buildSosSubmission(transferValues), [{
+    label: "Enter the plate number being transferred",
+    kind: "text",
+    value: "ABC 1234",
+  }]);
+
+  const adapter = readFileSync(new URL("../sos-fee-quote-content.js", import.meta.url), "utf8");
+  assert.match(adapter, /plateTransfer\s*&&\s*\/\^Search\$\/i/);
+  assert.match(adapter, /Plate transfer begins with Search/);
+  assert.match(adapter, /visibleCalculateButton\(mode\)/);
+});
+
+test("runner fails closed if Chrome activates the automatic calculator tab", async () => {
+  const harness = runnerHarness({ createdActive: true });
   const response = await harness.runner.calculate(
     SOS_QUOTE_MODE.newPlate,
     buildSosSubmission(newPlateValues())
   );
   assert.equal(response.success, false);
   assert.match(response.error, /background/i);
+  assert.deepEqual(harness.updated, [{ tabId: 101, options: { active: true } }]);
   assert.deepEqual(harness.removed, [401]);
   assert.equal(harness.messages.length, 0);
 });
 
 test("interrupted session closes only its recorded extension-owned tab", async () => {
-  const state = { [STORAGE_KEYS.sosFeeActiveTabId]: 812 };
+  const state = {
+    [STORAGE_KEYS.sosFeeActiveTabId]: 812,
+  };
   const removed = [];
   await closeInterruptedSosFeeSession({
     storage: {
@@ -420,7 +473,7 @@ test("official quote and print output retain only a verified customer-safe resul
   );
   const html = createSosFeeQuotePrintHTML(quote);
   assert.match(html, /Calculated by SOS/);
-  assert.match(html, /protected background browser tab/);
+  assert.match(html, /protected inactive background tab/);
   assert.match(html, /Selected — included in the SOS calculation/);
   assert.match(html, /\$126\.00/);
   assert.doesNotMatch(html, /1FMDE8AP9RLA12345/);
@@ -542,6 +595,8 @@ test("UI and adapters enforce local edits, explicit handoff, and session-only da
   assert.ok(manifest.host_permissions.includes("https://dsvsesvc.sos.state.mi.us/*"));
   assert.ok(manifest.host_permissions.includes("https://vpic.nhtsa.dot.gov/*"));
   assert.match(runnerScript, /active:\s*false/);
+  assert.match(runnerScript, /tabs\.onActivated/);
+  assert.doesNotMatch(runnerScript, /navigator\.platform|process\.platform|windows\.create/);
   assert.doesNotMatch(sidepanelScript, /chrome\.tabs\.(?:create|update|query)/);
   assert.doesNotMatch(sidepanelHtml, /Fallback: enter a fee manually|Load official choices/);
   assert.doesNotMatch(sidepanelScript, /SOS_FEE_UPDATE_FIELD|SOS_FEE_START/);

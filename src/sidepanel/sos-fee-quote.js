@@ -2,7 +2,7 @@
  * Session-only SOS registration fee quote helpers.
  *
  * The state calculator remains the source of truth. This module accepts only
- * a narrow, customer-safe result from the extension's background-tab adapter;
+ * a narrow, customer-safe result from the extension's background adapter;
  * it never stores calculator fields, customer identity, a VIN, a plate number,
  * credentials, or a state-page capture.
  */
@@ -138,7 +138,7 @@ export function normalizeSosFeeQuote(value) {
   };
 }
 
-/** Convert a verified background-tab result into a session-only quote. */
+/** Convert a verified background result into a session-only quote. */
 export function createCalculatedQuote(result, mode, now = new Date()) {
   if (result?.calculationMode !== mode) return null;
   return normalizeSosFeeQuote({
@@ -193,7 +193,7 @@ export function createSosFeeQuotePrintHTML(quote) {
 
   const calculatedAt = new Date(normalized.calculatedAt).toLocaleString();
   const sourceDetail =
-    "The registration/plate fee was calculated by the public Michigan SOS calculator in a protected background browser tab.";
+    "The registration/plate fee was calculated by the public Michigan SOS calculator in a protected inactive background tab.";
 
   return `<!doctype html>
   <html lang="en"><head><meta charset="utf-8" />

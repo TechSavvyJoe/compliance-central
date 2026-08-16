@@ -58,7 +58,7 @@ Key Features:
 
 ✅ Title & Lien Check — Sends the required customer fields and trade-in VIN over HTTPS and displays the details returned by the MDOS portal, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the actual captured Michigan state page; missing or uncertain results are labeled for review.
 
-✅ SOS Registration Fee Quote — Complete common passenger or commercial vehicle, fuel, use, and plate choices locally. Inspect official plate artwork in an instant in-sidebar zoom viewer. One explicit Calculate action runs the public SOS calculator in an inactive tab and returns the verified fee plus the actual captured SOS result page for one-page printing or PDF download.
+✅ SOS Registration Fee Quote — Complete common passenger or commercial vehicle, fuel, use, and plate choices locally. Inspect official plate artwork in an instant in-sidebar zoom viewer. One explicit Calculate action runs the public SOS calculator in an inactive background tab with a sales-tab focus guard and returns the verified fee plus the actual captured SOS result page for one-page printing or PDF download.
 
 ✅ VIN Assist — An explicit NHTSA vPIC lookup fills supported vehicle type, body, fuel, and model-year fields locally for review. The raw VIN is not stored in quote history or passed to SOS.
 

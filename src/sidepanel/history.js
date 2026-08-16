@@ -31,6 +31,24 @@ function agoLabel(days) {
   return `${days} days ago`;
 }
 
+export function shortHistoryReference(reference) {
+  const value = String(reference || "").trim();
+  const tail = value.match(/([A-Za-z0-9]{2})$/)?.[1];
+  return tail ? `ref ${tail}` : "saved record";
+}
+
+export function historyCustomerLabel(item) {
+  const customer = item?.savedResults?.customer || {};
+  const last = String(customer.lastName || "").trim();
+  const given = [customer.firstName, customer.middleName, customer.suffix]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+  if (last && given) return `${last}, ${given}`;
+  if (last) return last;
+  return String(item?.customerName || "").trim();
+}
+
 const HISTORY_DASH = '<span class="hchip-dash" aria-hidden="true">–</span>';
 
 // Decision pill styling/label, keyed off the stored decision level.
@@ -299,8 +317,9 @@ export async function populateHistoryModal(historyListEl) {
           }
 
           const tradeText = item.hasTrade ? "Trade-in included" : "No trade-in";
-          const primaryLabel = item.customerName
-            ? sanitizeHTML(item.customerName)
+          const displayCustomerName = historyCustomerLabel(item);
+          const primaryLabel = displayCustomerName
+            ? sanitizeHTML(displayCustomerName)
             : `Audit ${sanitizeHTML(item.reference)}`;
           const coBuyerText = item.coBuyerName
             ? ` · Co-buyer ${sanitizeHTML(item.coBuyerName)}`
@@ -319,9 +338,9 @@ export async function populateHistoryModal(historyListEl) {
             <div class="history-id">
               <span class="history-customer">${primaryLabel}</span>
               <span class="history-meta">
-                <span>${dateStr} · ${timeStr}</span>
+                <span>${dateStr} · ${timeStr} · ${tradeText}</span>
                 ${agoBadge}
-                <span class="history-meta-trade">${sanitizeHTML(item.reference)} · ${tradeText}${vehicleText}${coBuyerText}${runText}</span>
+                <span class="history-meta-trade" title="${sanitizeHTML(item.reference)}">${vehicleText ? vehicleText.slice(3) + " · " : ""}${sanitizeHTML(shortHistoryReference(item.reference))}${coBuyerText}${runText}</span>
               </span>
             </div>
             <span class="history-decision ${dm.cls}">${dm.icon}<span>${dm.label}</span></span>

@@ -78,7 +78,10 @@
           aria-controls="inputPanel"
         >
           <span class="input-summary-icon icon icon-user" aria-hidden="true"></span>
-          <span class="input-summary-text" id="inputSummaryText">Customer details</span>
+          <span class="input-summary-copy">
+            <strong>Buyer</strong>
+            <span class="input-summary-text" id="inputSummaryText">Customer details</span>
+          </span>
           <span class="input-summary-edit"
             ><span id="inputSummaryAction">Edit</span
             ><span class="icon icon-chevron section-toggle" aria-hidden="true"></span
@@ -149,14 +152,14 @@
           </div>
         </section>
 
-        <div class="cobuyer-toggle input-section">
+        <label class="cobuyer-toggle input-section" for="hasCoBuyer">
           <span class="step-number step-number-muted" aria-hidden="true">2</span>
           <span class="optional-step-copy"><strong>Co-buyer</strong><small>Optional — a second person on the deal</small></span>
-          <label class="checkbox-label">
-            <input type="checkbox" id="hasCoBuyer" />
+          <span class="checkbox-label">
+            <input type="checkbox" id="hasCoBuyer" aria-controls="coBuyerSection" aria-expanded="false" />
             <span class="checkbox-text">Add</span>
-          </label>
-        </div>
+          </span>
+        </label>
 
         <section id="coBuyerSection" class="input-section cobuyer-section hidden">
           <h2 class="section-title">
@@ -413,6 +416,48 @@
             <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm" aria-label="Clear SOS quote">Clear</button>
           </div>
 
+          <details class="sos-fee-reference">
+            <summary>
+              <span>2026 Michigan fee add-ons</span>
+              <small>Official amounts · verified Aug 15</small>
+            </summary>
+            <div class="sos-fee-reference-body">
+              <p class="sos-fee-reference-note">These are published reference amounts. The official calculation above remains the amount to use.</p>
+              <section aria-labelledby="sosElectricFeesTitle">
+                <h3 id="sosElectricFeesTitle">Electric and hybrid</h3>
+                <dl>
+                  <div><dt>Battery electric</dt><dd>$267 car · $367 truck/bus</dd></div>
+                  <div><dt>Plug-in hybrid</dt><dd>$113 car · $183 truck/bus</dd></div>
+                  <div><dt>Conventional hybrid</dt><dd>No surcharge</dd></div>
+                </dl>
+                <p class="sos-fee-catch">The EV or PHEV surcharge also applies when a plate moves from a non-electric vehicle to an EV or PHEV.</p>
+              </section>
+              <section aria-labelledby="sosPlateFeesTitle">
+                <h3 id="sosPlateFeesTitle">First-time plate fee</h3>
+                <dl>
+                  <div><dt>Standard</dt><dd>$5</dd></div>
+                  <div><dt>Legacy</dt><dd>$55 ($5 + $50 Road Fund)</dd></div>
+                  <div><dt>University / special cause</dt><dd>$35 ($25 donation + $10 service)</dd></div>
+                  <div><dt>Special organization</dt><dd>$25</dd></div>
+                  <div><dt>Amateur radio</dt><dd>$2</dd></div>
+                  <div><dt>Historical / authentic</dt><dd>$30 / $35</dd></div>
+                  <div><dt>Military / veteran / disability</dt><dd>No added plate fee</dd></div>
+                </dl>
+              </section>
+              <section aria-labelledby="sosOtherFeesTitle">
+                <h3 id="sosOtherFeesTitle">Optional and transfer</h3>
+                <dl>
+                  <div><dt>Recreation Passport</dt><dd>$15 one year · $29 two year</dd></div>
+                  <div><dt>Transfer · same registration fee</dt><dd>$10</dd></div>
+                  <div><dt>Transfer · higher registration fee</dt><dd>$10 + prorated difference</dd></div>
+                  <div><dt>Transfer · lower registration fee</dt><dd>$15</dd></div>
+                  <div><dt>Transfer · immediate family</dt><dd>$10</dd></div>
+                </dl>
+              </section>
+              <p class="sos-fee-catch">Existing digital plates must be replaced with standard metal plates as of Aug. 9, 2026.</p>
+            </div>
+          </details>
+
           <p id="sosQuoteStatus" class="sos-quote-status" role="status" aria-live="polite">No fee calculated yet.</p>
           <p class="sos-quote-privacy">Session only. Nothing is filed; no SOS login, VIN, plate, customer, or quote data is kept after the browser session.</p>
         </section>
@@ -622,7 +667,7 @@
             <button type="button" id="editCompletedBuyerBtn" class="completed-step-row">
               <span class="completed-step-icon completed" aria-hidden="true">&#10003;</span>
               <span class="completed-step-copy"><strong>Buyer</strong><small id="completedBuyerSummary">Customer details</small></span>
-              <span class="completed-step-action">Edit</span>
+              <span class="completed-step-action">Expand <span class="icon icon-chevron" aria-hidden="true"></span></span>
             </button>
             <button type="button" id="editCompletedCoBuyerBtn" class="completed-step-row">
               <span class="completed-step-icon optional" aria-hidden="true">2</span>
@@ -701,7 +746,7 @@
           </div>
           <div class="history-search-shell">
             <span class="command-search" aria-hidden="true"></span>
-            <input id="historySearchInput" type="search" placeholder="Search customer, VIN, reference or outcome" autocomplete="off" />
+            <input id="historySearchInput" type="search" placeholder="Search by name, vehicle or date" autocomplete="off" />
           </div>
           <label class="history-aging-filter">
             <input id="historyAgingOnly" type="checkbox" />

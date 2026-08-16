@@ -16,6 +16,7 @@ import {
   formatLienStatus,
   titlePresentation,
 } from "./title-format.js";
+import { historyCustomerLabel, shortHistoryReference } from "./history.js";
 
 const MISSING_KEY_DETAIL =
   "This check is temporarily unavailable — please try again in a moment.";
@@ -499,12 +500,16 @@ export function displayResults(elements, results) {
   }
 
   elements.finalDecision.className = `final-decision ${tone}`;
+  const customerLabel = historyCustomerLabel({
+    customerName: [results.customer?.firstName, results.customer?.lastName].filter(Boolean).join(" "),
+    savedResults: results,
+  }) || buyerFirstName;
   elements.finalDecision.innerHTML = `
     <div class="decision-eyebrow"><span class="decision-icon">${icon}</span>${sanitizeHTML(eyebrow)}</div>
     <h2 class="decision-headline">${sanitizeHTML(headline)}</h2>
     <p class="decision-text">${sanitizeHTML(summary)}</p>
     ${action}
-    <div class="decision-meta"><span>${sanitizeHTML(reference)}</span><span aria-hidden="true">·</span><span>${sanitizeHTML(timeLabel)}</span></div>
+    <div class="decision-meta"><span>${sanitizeHTML(customerLabel)}</span><span aria-hidden="true">·</span><span>${sanitizeHTML(timeLabel)}</span><span aria-hidden="true">·</span><span title="${sanitizeHTML(reference)}">${sanitizeHTML(shortHistoryReference(reference))}</span></div>
     ${
       decision.warnings?.length
         ? '<p class="decision-warnings">' +

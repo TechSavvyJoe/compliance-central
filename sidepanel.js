@@ -193,9 +193,6 @@ const elements = {
   sosPlateZoomOut: $("sosPlateZoomOut"),
   sosPlateZoomReset: $("sosPlateZoomReset"),
   sosPlateZoomIn: $("sosPlateZoomIn"),
-  sosHandoffPanel: $("sosHandoffPanel"),
-  sosHandoffMessage: $("sosHandoffMessage"),
-  openSosHandoffBtn: $("openSosHandoffBtn"),
 
   viewHistoryBtn: $("viewHistoryBtn"),
 
@@ -701,7 +698,6 @@ let currentSosFeeQuote = null;
 let pendingVinDecode = null;
 let sosWorkspaceBusy = false;
 let sosLienCheckBusy = false;
-let sosHandoffAvailable = false;
 
 function selectedSosQuoteMode() {
   return (
@@ -1157,9 +1153,7 @@ function renderSosFeeQuote() {
       ? sourceLabel(quote.source)
       : sosWorkspaceBusy
         ? "Checking SOS"
-        : sosHandoffAvailable
-          ? "Finish on SOS"
-          : "Ready locally";
+        : "Ready locally";
     elements.sosQuoteSource.classList.toggle(
       "is-calculated",
       quote?.source === SOS_QUOTE_SOURCE.calculated
@@ -1167,10 +1161,6 @@ function renderSosFeeQuote() {
     elements.sosQuoteSource.classList.toggle(
       "is-busy",
       sosWorkspaceBusy
-    );
-    elements.sosQuoteSource.classList.toggle(
-      "is-handoff",
-      sosHandoffAvailable
     );
   }
   if (elements.printSosQuoteBtn) elements.printSosQuoteBtn.disabled = !quote;
@@ -1206,15 +1196,16 @@ function renderSosWorkspace() {
   if (elements.sosTransferFields) {
     elements.sosTransferFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.plateTransfer;
   }
-  if (elements.sosHandoffPanel) elements.sosHandoffPanel.hidden = !sosHandoffAvailable;
   renderSosFeeQuote();
 }
 
-async function closeSosBackgroundWorkspace() {
+// Abandoning an in-flight quote is what keeps a late backend response from
+// repainting a fee for choices the salesperson has already changed.
+async function cancelSosFeeRequest() {
   try {
-    await chrome.runtime.sendMessage({ type: "SOS_FEE_CLOSE", data: {} });
+    await chrome.runtime.sendMessage({ type: "SOS_FEE_CANCEL", data: {} });
   } catch {
-    // The worker may already have closed the extension-owned tab.
+    // The worker may already have settled or dropped the request.
   }
 }
 
@@ -1292,8 +1283,6 @@ async function invalidateSosQuoteAfterEdit() {
       showToast("The older SOS quote could not be removed from this session.", "error");
     }
   }
-  sosHandoffAvailable = false;
-  if (elements.sosHandoffPanel) elements.sosHandoffPanel.hidden = true;
   setSosWorkspaceStatus("Selections changed. Calculate again when complete.");
 }
 
@@ -1322,7 +1311,6 @@ async function calculateSosFee() {
   }
   clearSosValidation();
   sosWorkspaceBusy = true;
-  sosHandoffAvailable = false;
   renderSosWorkspace();
   setSosWorkspaceStatus("Sending all completed choices to the official calculator…", "busy");
   try {
@@ -1333,11 +1321,12 @@ async function calculateSosFee() {
         fields: buildSosSubmission(values),
       },
     });
+    // A cancelled request was superseded on purpose; do not shout about it.
+    if (response?.cancelled) {
+      setSosWorkspaceStatus("Calculation cancelled. Calculate again when ready.");
+      return;
+    }
     if (!response?.success || !response.quote) {
-      sosHandoffAvailable = Boolean(response?.handoffAvailable);
-      if (elements.sosHandoffMessage && response?.error) {
-        elements.sosHandoffMessage.textContent = response.error;
-      }
       throw new Error(response?.error || "Michigan SOS did not return a verified registration fee.");
     }
     const quote = createCalculatedQuote(response.quote, selectedSosQuoteMode());
@@ -1347,7 +1336,7 @@ async function calculateSosFee() {
     currentSosFeeQuote = await saveSosFeeQuote(quote);
     pendingVinDecode = null;
     renderSosFeeQuote();
-    setSosWorkspaceStatus("Official SOS fee returned to the sidebar. The hidden calculator is closed.");
+    setSosWorkspaceStatus("Official SOS fee returned to the sidebar. Nothing opened on this computer.");
     showToast("Official SOS fee calculated for this browser session.", "success");
   } catch (error) {
     setSosWorkspaceStatus(
@@ -1448,11 +1437,10 @@ async function handleSosLienCheck() {
 
 async function clearCurrentSosFeeQuote() {
   try {
-    await closeSosBackgroundWorkspace();
+    await cancelSosFeeRequest();
     await clearSosFeeQuote();
     currentSosFeeQuote = null;
     pendingVinDecode = null;
-    sosHandoffAvailable = false;
     if (elements.sosVinLookupInput) elements.sosVinLookupInput.value = "";
     if (elements.sosVinLookupStatus) elements.sosVinLookupStatus.textContent = "";
     if (elements.sosLienStatus) {
@@ -1472,9 +1460,8 @@ async function clearCurrentSosFeeQuote() {
 }
 
 async function handleSosQuoteModeChange() {
-  await closeSosBackgroundWorkspace();
+  await cancelSosFeeRequest();
   pendingVinDecode = null;
-  sosHandoffAvailable = false;
   if (currentSosFeeQuote && currentSosFeeQuote.mode !== selectedSosQuoteMode()) {
     await clearSosFeeQuote();
     currentSosFeeQuote = null;
@@ -1482,24 +1469,6 @@ async function handleSosQuoteModeChange() {
   renderSosFeeQuote();
   renderSosWorkspace();
   setSosWorkspaceStatus("Registration choice changed. Complete the local fields, then calculate.");
-}
-
-async function openSosHandoff() {
-  if (!sosHandoffAvailable) return;
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "SOS_FEE_OPEN_HANDOFF",
-      data: { mode: selectedSosQuoteMode() },
-    });
-    if (!response?.success) {
-      throw new Error(response?.error || "The completed SOS form is no longer available.");
-    }
-    sosHandoffAvailable = false;
-    renderSosWorkspace();
-    setSosWorkspaceStatus("The prefilled Michigan SOS calculator is open for your final review.");
-  } catch (error) {
-    setSosWorkspaceStatus(error?.message || "Could not open the completed SOS form.", "error");
-  }
 }
 
 async function printSosFeeQuote() {
@@ -1568,7 +1537,6 @@ function initEventListeners() {
   elements.printSosCalculationBtn?.addEventListener("click", printSosOfficialCalculation);
   elements.downloadSosCalculationPdfBtn?.addEventListener("click", downloadSosOfficialCalculation);
   elements.clearSosQuoteBtn?.addEventListener("click", clearCurrentSosFeeQuote);
-  elements.openSosHandoffBtn?.addEventListener("click", openSosHandoff);
   elements.lookupSosVinBtn?.addEventListener("click", handleSosVinLookup);
   elements.sosPlatePreview?.addEventListener("click", openSosPlatePreview);
   elements.closeSosPlateViewer?.addEventListener("click", closeSosPlateViewer);
@@ -1617,9 +1585,9 @@ function initEventListeners() {
   renderSosWorkspace();
 
   window.addEventListener("pagehide", () => {
-    // Do not await during teardown. The worker separately closes a recorded
-    // inactive calculator after a worker restart as a privacy backstop.
-    chrome.runtime.sendMessage({ type: "SOS_FEE_CLOSE", data: {} }).catch(() => {});
+    // Do not await during teardown. Nobody is left to read the answer, so
+    // release the worker's in-flight quote instead of letting it finish.
+    chrome.runtime.sendMessage({ type: "SOS_FEE_CANCEL", data: {} }).catch(() => {});
   });
 
   elements.tradeVin.addEventListener("input", (e) => {

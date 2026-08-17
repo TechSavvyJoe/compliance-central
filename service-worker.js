@@ -8,7 +8,6 @@
 import { handleMessage } from "./src/worker/message-router.js";
 import { registerAlarmListeners } from "./src/worker/alarms.js";
 import { STORAGE_KEYS, SEARCH_STATUS } from "./lib/storage-keys.js";
-import { closeInterruptedSosFeeSession } from "./src/worker/sos-fee-runner.js";
 
 // Keep API-key/history storage private to trusted extension pages. Chrome's
 // local storage area is otherwise readable by any future content script.
@@ -38,9 +37,6 @@ async function reconcileInterruptedRun() {
 }
 
 const startupReady = storageAccessReady
-  // A worker restart must not leave a hidden calculator holding temporary
-  // customer/vehicle choices. Only an extension-owned tab ID is recorded.
-  .then(() => closeInterruptedSosFeeSession())
   .then(reconcileInterruptedRun)
   .catch((err) => console.error("[SW] startup reconciliation failed:", err));
 

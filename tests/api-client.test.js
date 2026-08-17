@@ -3,10 +3,45 @@ import test from "node:test";
 
 import {
   backendRepeatOffenderCheck,
+  backendSosFeeQuote,
   backendTitleCheck,
   isBackendAvailable,
 } from "../lib/api-client.js";
 import { CONFIG } from "../lib/config.js";
+
+const SOS_FIELDS = [
+  { label: "Select your vehicle type", kind: "select", optionValue: "Passenger" },
+];
+
+function sosQuoteBody(overrides = {}) {
+  return {
+    success: true,
+    quote: {
+      calculationMode: "new_plate",
+      feeCents: 20500,
+      feeBreakdown: [
+        { label: "Registration fee", feeCents: 18000 },
+        { label: "Plate fee", feeCents: 2500 },
+      ],
+      vehicleDescription: "2026 · Car / Mini-Van / SUV · 4 Door",
+      platePreviewUrl: "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.PM",
+      recreationPassport: false,
+      officialPageImage: "data:image/jpeg;base64,QUJDRA==",
+      calculatedAt: "2026-08-15T12:00:00.000Z",
+      ...overrides,
+    },
+  };
+}
+
+/** Answer one /api/sos-fee-quote POST and record what was actually sent. */
+function stubSosBackend(body) {
+  const sent = [];
+  globalThis.fetch = async (url, options) => {
+    sent.push({ url, body: JSON.parse(options.body) });
+    return { ok: true, json: async () => body };
+  };
+  return sent;
+}
 
 function stubStorage(key) {
   globalThis.chrome = {
@@ -256,6 +291,156 @@ test("an in-flight backend request can be cancelled", async () => {
   await fetchStarted;
   controller.abort();
   await assert.rejects(() => pending, /cancelled/i);
+});
+
+test("a SOS fee quote posts the contract payload and returns a verified quote", async () => {
+  stubStorage("test-key");
+  const sent = stubSosBackend(sosQuoteBody());
+
+  const result = await backendSosFeeQuote({
+    mode: "new_plate",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].url, /\/api\/sos-fee-quote$/);
+  // The wire spelling of the mode is the backend's, not the extension's.
+  assert.equal(sent[0].body.mode, "newPlate");
+  assert.deepEqual(sent[0].body.fields, SOS_FIELDS);
+  assert.equal(result.success, true);
+  assert.equal(result.quote.calculationMode, "new_plate");
+  assert.equal(result.quote.feeCents, 20500);
+  assert.equal(result.quote.feeBreakdown.length, 2);
+  assert.equal(result.quote.calculatedAt, "2026-08-15T12:00:00.000Z");
+});
+
+test("a plate transfer quote uses the transfer wire mode", async () => {
+  stubStorage("test-key");
+  const sent = stubSosBackend(
+    sosQuoteBody({ calculationMode: "plate_transfer" })
+  );
+
+  const result = await backendSosFeeQuote({
+    mode: "plate_transfer",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(sent[0].body.mode, "plateTransfer");
+  assert.equal(result.success, true);
+  assert.equal(result.quote.calculationMode, "plate_transfer");
+});
+
+test("a quote echoed in the backend's own mode spelling is still accepted", async () => {
+  stubStorage("test-key");
+  stubSosBackend(sosQuoteBody({ calculationMode: "newPlate" }));
+
+  const result = await backendSosFeeQuote({
+    mode: "new_plate",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(result.success, true);
+  // Consumers only ever see the extension's internal mode value.
+  assert.equal(result.quote.calculationMode, "new_plate");
+});
+
+// A quote for the other registration choice is not incomplete — it is a
+// different, wrong price in front of a customer.
+test("a quote calculated for the other registration choice fails closed", async () => {
+  stubStorage("test-key");
+  stubSosBackend(sosQuoteBody({ calculationMode: "plate_transfer" }));
+
+  const result = await backendSosFeeQuote({
+    mode: "new_plate",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error, /incomplete Michigan SOS fee result/i);
+});
+
+test("malformed SOS fee quotes fail closed instead of reaching the customer", async () => {
+  stubStorage("test-key");
+  const malformed = [
+    ["no quote at all", { success: true }],
+    ["a fractional total", sosQuoteBody({ feeCents: 205.5 })],
+    ["a string total", sosQuoteBody({ feeCents: "20500" })],
+    ["a zero total", sosQuoteBody({ feeCents: 0, feeBreakdown: [{ label: "Fee", feeCents: 0 }] })],
+    ["a negative total", sosQuoteBody({ feeCents: -100, feeBreakdown: [{ label: "Fee", feeCents: -100 }] })],
+    ["an absent breakdown", sosQuoteBody({ feeBreakdown: undefined })],
+    ["an empty breakdown", sosQuoteBody({ feeBreakdown: [] })],
+    ["an unlabelled row", sosQuoteBody({ feeBreakdown: [{ label: "  ", feeCents: 20500 }] })],
+    ["a row with no amount", sosQuoteBody({ feeBreakdown: [{ label: "Registration fee" }] })],
+    [
+      "a breakdown that does not reconcile to the total",
+      sosQuoteBody({ feeBreakdown: [{ label: "Registration fee", feeCents: 18000 }] }),
+    ],
+    ["an unparseable timestamp", sosQuoteBody({ calculatedAt: "not a date" })],
+  ];
+
+  for (const [description, body] of malformed) {
+    stubSosBackend(body);
+    const result = await backendSosFeeQuote({
+      mode: "new_plate",
+      fields: SOS_FIELDS,
+    });
+    assert.equal(result.success, false, `${description} must fail closed`);
+    assert.match(result.error, /incomplete Michigan SOS fee result/i, description);
+  }
+});
+
+// Evidence capture is supporting material. Rejecting a correct, reconciled
+// total because the screenshot failed is the bug this guards against.
+test("a verified SOS total survives a missing official-page capture", async () => {
+  stubStorage("test-key");
+  stubSosBackend(sosQuoteBody({ officialPageImage: null }));
+
+  const result = await backendSosFeeQuote({
+    mode: "new_plate",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.quote.feeCents, 20500);
+  assert.equal(result.quote.officialPageImage, null);
+});
+
+test("a SOS fee request is never sent without a mode and fields", async () => {
+  stubStorage("test-key");
+  let called = false;
+  globalThis.fetch = async () => {
+    called = true;
+    return { ok: true, json: async () => sosQuoteBody() };
+  };
+
+  for (const payload of [
+    undefined,
+    {},
+    { mode: "sideways", fields: SOS_FIELDS },
+    { mode: "new_plate", fields: [] },
+    { mode: "new_plate", fields: "fields" },
+  ]) {
+    const result = await backendSosFeeQuote(payload);
+    assert.equal(result.success, false);
+    assert.match(result.error, /Complete the required SOS fee fields/i);
+  }
+  assert.equal(called, false, "an invalid payload must never reach the network");
+});
+
+test("a backend-reported SOS failure surfaces its user-safe message", async () => {
+  stubStorage("test-key");
+  stubSosBackend({
+    success: false,
+    error: "Michigan SOS is not responding right now.",
+  });
+
+  const result = await backendSosFeeQuote({
+    mode: "new_plate",
+    fields: SOS_FIELDS,
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error, "Michigan SOS is not responding right now.");
 });
 
 test("isBackendAvailable reflects the health endpoint result", async () => {

@@ -255,7 +255,7 @@
         <ul>
             <li><strong>OFAC screening stays on your device.</strong> No customer information is transmitted for an OFAC-only check.</li>
             <li><strong>Repeat Offender and Title/Lien checks use our HTTPS service.</strong> The entered name, date of birth, license/ID number, and VIN when used are sent only to request the selected MDOS portal response.</li>
-            <li><strong>SOS Fee Quote stays in the side panel.</strong> Vehicle, fuel, commercial-use, plate, and plate-design edits happen locally. On an explicit Calculate SOS fee click, the extension applies the completed choices in an inactive extension-owned background tab, guards the active sales tab from losing focus, and returns the verified fee plus an actual image of the official result page. It does not access SOS credentials or cookies, and it does not file any SOS transaction.</li>
+            <li><strong>SOS Fee Quote stays in the side panel.</strong> Vehicle, fuel, commercial-use, plate, and plate-design edits happen locally. On an explicit Calculate SOS fee click, the completed vehicle and plate choices are sent to our HTTPS service, which applies them to the public Michigan SOS calculator and returns the verified fee plus an actual image of the official result page. Nothing opens on your computer. It does not access SOS credentials or cookies, and it does not file any SOS transaction.</li>
             <li><strong>VIN helper is optional and explicit.</strong> A sold-vehicle VIN or partial VIN is sent to NHTSA's public vPIC decoder only after you click Decode. Supported vehicle type, body, fuel, and model-year fields are filled locally for review. Trade Title/Lien stays in the existing Trade-In workflow and is not mixed into the fee workspace.</li>
             <li><strong>Phone scan images stay on the phone.</strong> Only the text fields you approve are sent to your computer in an encrypted, single-use package.</li>
             <li><strong>Saved customer history is local and limited.</strong> Up to 50 working records are kept on your device for no more than 30 days so dealership staff can reopen a customer, re-screen, and reproduce prior reports. History can be cleared at any time.</li>
@@ -335,11 +335,10 @@
         <p>The extension requests only the permissions it needs:</p>
         <ul>
             <li><code>sidePanel</code> &mdash; to show the compliance interface in Chrome's side panel.</li>
-            <li><code>tabs</code> &mdash; to create and close the extension-owned inactive public SOS calculator tab used only for an explicit fee calculation, and to foreground the same prefilled tab only after the user clicks Finish on Michigan SOS.</li>
             <li><code>storage</code> &mdash; to save preferences and bounded, device-local customer/report history.</li>
             <li><code>unlimitedStorage</code> &mdash; to hold the downloaded OFAC sanctions dataset and up to 50 saved customer/report records, including state-site evidence images, for no more than 30 days.</li>
             <li><code>alarms</code> &mdash; to refresh the OFAC sanctions list automatically about once per day.</li>
-            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (public Michigan SOS calculator and its live plate-result preview), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding). Official published plate-gallery images load from <code>www.michigan.gov</code> without a broad host permission.</li>
+            <li>Host access to <code>sanctionslistservice.ofac.treas.gov</code> and its dedicated AWS GovCloud file host (official OFAC list download), <code>compliance-central-api.fly.dev</code> (MDOS backend), <code>dsvsesvc.sos.state.mi.us</code> (official plate-design artwork shown next to a fee quote), and <code>vpic.nhtsa.dot.gov</code> (optional VIN decoding). Official published plate-gallery images load from <code>www.michigan.gov</code> without a broad host permission.</li>
         </ul>
     </div>
 

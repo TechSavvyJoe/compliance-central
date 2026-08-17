@@ -16,12 +16,10 @@ export const SOS_QUOTE_MODE = Object.freeze({
   plateTransfer: "plate_transfer",
 });
 
-export const SOS_CALCULATOR_URLS = Object.freeze({
-  [SOS_QUOTE_MODE.newPlate]:
-    "https://dsvsesvc.sos.state.mi.us/TAP/_/?Link=RegFeeCalculator",
-  [SOS_QUOTE_MODE.plateTransfer]:
-    "https://dsvsesvc.sos.state.mi.us/TAP/_/?Link=TransferFeeCalculator",
-});
+// The backend drives the official calculator pages
+// (dsvsesvc.sos.state.mi.us/TAP/_/?Link=RegFeeCalculator and
+// ?Link=TransferFeeCalculator) and picks the page from `mode`. The extension
+// no longer navigates anywhere itself, so it holds no calculator URLs.
 
 export const SOS_QUOTE_SOURCE = Object.freeze({
   calculated: "calculated",
@@ -36,10 +34,6 @@ const LABELED_VIN_PATTERN =
 
 export function modeLabel(mode) {
   return mode === SOS_QUOTE_MODE.plateTransfer ? "Plate transfer" : "New plate";
-}
-
-export function sosCalculatorUrlForMode(mode) {
-  return SOS_CALCULATOR_URLS[mode] || SOS_CALCULATOR_URLS[SOS_QUOTE_MODE.newPlate];
 }
 
 export function sourceLabel(source) {
@@ -193,7 +187,7 @@ export function createSosFeeQuotePrintHTML(quote) {
 
   const calculatedAt = new Date(normalized.calculatedAt).toLocaleString();
   const sourceDetail =
-    "The registration/plate fee was calculated by the public Michigan SOS calculator in a protected inactive background tab.";
+    "The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service.";
 
   return `<!doctype html>
   <html lang="en"><head><meta charset="utf-8" />

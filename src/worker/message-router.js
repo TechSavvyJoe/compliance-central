@@ -134,9 +134,7 @@ function validatePayload(type, data) {
         isValidSosMode(data.mode) &&
         validSosSubmissionFields(data.fields)
       );
-    case SOS_FEE_MESSAGES.openHandoff:
-      return isRecord(data) && isValidSosMode(data.mode);
-    case SOS_FEE_MESSAGES.close:
+    case SOS_FEE_MESSAGES.cancel:
       return data === undefined || data === null || isRecord(data);
     case HISTORY_MESSAGES.append:
     case HISTORY_MESSAGES.remove:
@@ -246,11 +244,8 @@ export async function handleMessage(message, sender) {
       case SOS_FEE_MESSAGES.calculate:
         return getSosFeeRunner().calculate(message.data.mode, message.data.fields);
 
-      case SOS_FEE_MESSAGES.openHandoff:
-        return getSosFeeRunner().openHandoff(message.data.mode);
-
-      case SOS_FEE_MESSAGES.close:
-        return getSosFeeRunner().close();
+      case SOS_FEE_MESSAGES.cancel:
+        return getSosFeeRunner().cancel();
 
       case "getDataStatus":
         return handleGetDataStatus();

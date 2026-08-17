@@ -4,7 +4,6 @@ import test from "node:test";
 
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
 import {
-  SOS_CALCULATOR_URLS,
   SOS_QUOTE_MODE,
   SOS_QUOTE_SOURCE,
   createCalculatedQuote,
@@ -32,16 +31,11 @@ import {
 } from "../src/sidepanel/vin-lookup.js";
 import {
   SOS_FEE_MESSAGES,
-  closeInterruptedSosFeeSession,
   createSosFeeRunner,
   validSosSubmissionFields,
 } from "../src/worker/sos-fee-runner.js";
 import { __test as sosLienCheckTest } from "../src/worker/sos-lien-check.js";
 
-const contentScript = readFileSync(
-  new URL("../sos-fee-quote-content.js", import.meta.url),
-  "utf8"
-);
 const runnerScript = readFileSync(
   new URL("../src/worker/sos-fee-runner.js", import.meta.url),
   "utf8"
@@ -81,6 +75,9 @@ function newPlateValues(overrides = {}) {
     msrp: "42500",
     firstTitle: "no",
     businessRegistration: "no",
+    // Michigan expires a passenger plate on the owner's birthday, so the
+    // official calculator will not return any total without this.
+    ownerBirthdate: "03/14/1985",
     plateType: "PAS",
     plateDesign: "pure_michigan",
     recreationPassport: "no",
@@ -106,66 +103,21 @@ function verifiedResult(mode = SOS_QUOTE_MODE.newPlate) {
   };
 }
 
-function runnerHarness({ responses = [], createdActive = false } = {}) {
-  const state = {};
-  const created = [];
-  const removed = [];
-  const updated = [];
-  const messages = [];
-  const queue = [...responses];
-  let activatedListener = null;
-  const chromeApi = {
-    storage: {
-      session: {
-        async set(values) {
-          Object.assign(state, values);
-        },
-        async get(key) {
-          return { [key]: state[key] };
-        },
-        async remove(keys) {
-          for (const key of Array.isArray(keys) ? keys : [keys]) delete state[key];
-        },
-      },
+/**
+ * Drive the runner against a stubbed backend client.
+ *
+ * `respond` receives the payload and the caller's abort signal so a test can
+ * assert what was sent, resolve, reject, or hang until it is cancelled.
+ */
+function runnerHarness(respond) {
+  const requests = [];
+  const runner = createSosFeeRunner({
+    async requestQuote(payload, options) {
+      requests.push({ payload, options });
+      return respond(payload, options);
     },
-    tabs: {
-      onActivated: {
-        addListener(listener) {
-          activatedListener = listener;
-        },
-      },
-      async query() {
-        return [{ id: 101, windowId: 11, active: true }];
-      },
-      async create(options) {
-        created.push(options);
-        return { id: 401, windowId: 11, active: createdActive };
-      },
-      async remove(tabId) {
-        removed.push(tabId);
-      },
-      async update(tabId, options) {
-        updated.push({ tabId, options });
-        return { id: tabId, ...options };
-      },
-      async sendMessage(tabId, message) {
-        messages.push({ tabId, message });
-        return queue.shift() || { success: false, keepOpen: true };
-      },
-    },
-  };
-  return {
-    state,
-    created,
-    removed,
-    updated,
-    messages,
-    async activate(tabId) {
-      activatedListener?.({ tabId, windowId: 11 });
-      await Promise.resolve();
-    },
-    runner: createSosFeeRunner(chromeApi, { sleep: async () => {} }),
-  };
+  });
+  return { requests, runner };
 }
 
 test("local dealer form defaults to Gas and includes modern fuels and commercial plates", () => {
@@ -331,120 +283,177 @@ test("specialty selections submit the exact live SOS subtype and background", ()
   );
 });
 
-test("background runner creates one inactive same-window tab only on Calculate and closes on success", async () => {
+test("Calculate sends one bounded backend request and nothing opens locally", async () => {
   const fields = buildSosSubmission(newPlateValues());
-  const harness = runnerHarness({ responses: [verifiedResult()] });
+  const harness = runnerHarness(() => verifiedResult());
+
   const response = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate, fields);
+
   assert.equal(response.success, true);
-  assert.deepEqual(harness.created, [
-    {
-      url: SOS_CALCULATOR_URLS[SOS_QUOTE_MODE.newPlate],
-      active: false,
-      windowId: 11,
-    },
-  ]);
-  assert.equal(harness.messages.length, 1);
-  assert.deepEqual(harness.updated, []);
-  assert.equal(harness.messages[0].message.type, SOS_FEE_MESSAGES.applyAndCalculate);
-  assert.deepEqual(harness.messages[0].message.data.fields, fields);
-  assert.deepEqual(harness.removed, [401]);
-  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
+  assert.equal(response.quote.feeCents, 20500);
+  assert.equal(harness.requests.length, 1);
+  assert.equal(harness.requests[0].payload.mode, SOS_QUOTE_MODE.newPlate);
+  assert.deepEqual(harness.requests[0].payload.fields, fields);
+  assert.ok(harness.requests[0].options.signal instanceof AbortSignal);
+  assert.equal(harness.runner.isInFlight(), false);
+  // The whole point of this change: no tab, window, or content script is
+  // touched on the customer-facing machine.
+  assert.doesNotMatch(runnerScript, /chrome\.tabs|chromeApi\.tabs|tabs\.create|tabs\.sendMessage/);
+  assert.equal(SOS_FEE_MESSAGES.calculate, "SOS_FEE_CALCULATE");
 });
 
-test("three failed attempts stay in sidebar until explicit prefilled handoff", async () => {
-  const fields = buildSosSubmission(newPlateValues());
-  const harness = runnerHarness({
-    responses: [
-      { success: false, keepOpen: true },
-      { success: false, keepOpen: true },
-      { success: false, keepOpen: true },
-    ],
-  });
-  const response = await harness.runner.calculate(SOS_QUOTE_MODE.newPlate, fields);
-  assert.equal(response.success, false);
-  assert.equal(response.handoffAvailable, true);
-  assert.equal(response.attempts, 3);
-  assert.match(response.error, /completed choices remain/i);
-  assert.equal(harness.messages.length, 3);
-  assert.deepEqual(harness.removed, []);
-  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], 401);
+test("an incomplete field batch never reaches the backend", async () => {
+  const harness = runnerHarness(() => verifiedResult());
 
-  const handoff = await harness.runner.openHandoff(SOS_QUOTE_MODE.newPlate);
-  assert.equal(handoff.success, true);
-  assert.deepEqual(harness.updated, [
-    { tabId: 401, options: { active: true } },
-  ]);
-  assert.deepEqual(harness.removed, []);
-  assert.equal(harness.state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
+  for (const [mode, fields] of [
+    ["sideways", buildSosSubmission(newPlateValues())],
+    [SOS_QUOTE_MODE.newPlate, []],
+    [SOS_QUOTE_MODE.newPlate, [{ label: "x", kind: "select" }]],
+    [SOS_QUOTE_MODE.newPlate, "fields"],
+  ]) {
+    const response = await harness.runner.calculate(mode, fields);
+    assert.equal(response.success, false);
+    assert.match(response.error, /Complete the required SOS fee fields/i);
+  }
+  assert.equal(harness.requests.length, 0);
 });
 
-test("activation guard restores the sales tab until an explicit handoff", async () => {
-  const harness = runnerHarness({
-    responses: Array.from({ length: 3 }, () => ({ success: false, keepOpen: true })),
-  });
-  await harness.runner.calculate(
+// The api-client rejects a malformed quote; the runner relays that as a plain
+// failure and never invents a fee of its own.
+test("a rejected backend quote fails closed with actionable recourse", async () => {
+  const harness = runnerHarness(() => ({
+    success: false,
+    error:
+      "The compliance service returned an incomplete Michigan SOS fee result. Please try again.",
+  }));
+
+  const response = await harness.runner.calculate(
     SOS_QUOTE_MODE.newPlate,
     buildSosSubmission(newPlateValues())
   );
-  await harness.activate(401);
-  assert.deepEqual(harness.updated, [{ tabId: 101, options: { active: true } }]);
+
+  assert.equal(response.success, false);
+  assert.equal(response.quote, undefined);
+  assert.match(response.error, /incomplete Michigan SOS fee result/i);
+  // No handoff path survives, so the failure text has to carry the recourse.
+  assert.doesNotMatch(runnerScript, /handoffAvailable|openHandoff/);
+  assert.match(runnerScript, /confirm the fee with Michigan SOS before quoting the customer/);
 });
 
-test("plate transfer submits the plate and uses the official Search action before fee capture", async () => {
+test("a malformed backend envelope is rejected rather than half-read", async () => {
+  for (const malformed of [
+    undefined,
+    null,
+    {},
+    { success: true },
+    { success: true, quote: null },
+  ]) {
+    const harness = runnerHarness(() => malformed);
+    const response = await harness.runner.calculate(
+      SOS_QUOTE_MODE.newPlate,
+      buildSosSubmission(newPlateValues())
+    );
+    assert.equal(response.success, false);
+    assert.equal(response.quote, undefined);
+    assert.ok(response.error);
+  }
+});
+
+test("a transport failure is reported without echoing the backend error", async () => {
+  const harness = runnerHarness(() => {
+    throw new Error("ECONNRESET while POSTing VIN 1FMDE8AP9RLA12345");
+  });
+
+  const response = await harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
+
+  assert.equal(response.success, false);
+  assert.doesNotMatch(response.error, /ECONNRESET|1FMDE8AP9RLA12345/);
+  assert.match(response.error, /Try again in a moment/i);
+});
+
+test("cancelling aborts the in-flight quote and reports it as cancelled", async () => {
+  let markStarted;
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
+  });
+  const harness = runnerHarness(
+    (_payload, { signal }) =>
+      new Promise((_resolve, reject) => {
+        markStarted();
+        signal.addEventListener(
+          "abort",
+          () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          },
+          { once: true }
+        );
+      })
+  );
+
+  const pending = harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
+  await started;
+  assert.equal(harness.runner.isInFlight(), true);
+
+  assert.deepEqual(harness.runner.cancel(), { success: true });
+  const response = await pending;
+  assert.equal(response.success, false);
+  assert.equal(response.cancelled, true);
+  assert.equal(harness.runner.isInFlight(), false);
+  assert.equal(harness.requests[0].options.signal.aborted, true);
+});
+
+// A late answer for superseded choices is how a customer ends up reading a fee
+// for a vehicle configuration that is no longer on screen.
+test("a superseded quote resolves as cancelled instead of repainting a stale fee", async () => {
+  const pendingResolvers = [];
+  const harness = runnerHarness(
+    () => new Promise((resolve) => pendingResolvers.push(resolve))
+  );
+
+  const first = harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
+  await Promise.resolve();
+  const second = harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues({ msrp: "51000" }))
+  );
+  await Promise.resolve();
+
+  pendingResolvers[0](verifiedResult());
+  pendingResolvers[1](verifiedResult());
+
+  assert.equal((await first).cancelled, true);
+  assert.equal((await second).success, true);
+});
+
+test("plate transfer submits only the plate number being transferred", async () => {
   const transferValues = {
     mode: SOS_QUOTE_MODE.plateTransfer,
     transferPlateNumber: "ABC 1234",
   };
   assert.deepEqual(validateSosLocalValues(transferValues), []);
-  assert.deepEqual(buildSosSubmission(transferValues), [{
+  const fields = buildSosSubmission(transferValues);
+  assert.deepEqual(fields, [{
     label: "Enter the plate number being transferred",
     kind: "text",
     value: "ABC 1234",
   }]);
 
-  const adapter = readFileSync(new URL("../sos-fee-quote-content.js", import.meta.url), "utf8");
-  assert.match(adapter, /plateTransfer\s*&&\s*\/\^Search\$\/i/);
-  assert.match(adapter, /Plate transfer begins with Search/);
-  assert.match(adapter, /visibleCalculateButton\(mode\)/);
-});
-
-test("runner fails closed if Chrome activates the automatic calculator tab", async () => {
-  const harness = runnerHarness({ createdActive: true });
-  const response = await harness.runner.calculate(
-    SOS_QUOTE_MODE.newPlate,
-    buildSosSubmission(newPlateValues())
-  );
-  assert.equal(response.success, false);
-  assert.match(response.error, /background/i);
-  assert.deepEqual(harness.updated, [{ tabId: 101, options: { active: true } }]);
-  assert.deepEqual(harness.removed, [401]);
-  assert.equal(harness.messages.length, 0);
-});
-
-test("interrupted session closes only its recorded extension-owned tab", async () => {
-  const state = {
-    [STORAGE_KEYS.sosFeeActiveTabId]: 812,
-  };
-  const removed = [];
-  await closeInterruptedSosFeeSession({
-    storage: {
-      session: {
-        async get(key) {
-          return { [key]: state[key] };
-        },
-        async remove(key) {
-          delete state[key];
-        },
-      },
-    },
-    tabs: {
-      async remove(tabId) {
-        removed.push(tabId);
-      },
-    },
-  });
-  assert.deepEqual(removed, [812]);
-  assert.equal(state[STORAGE_KEYS.sosFeeActiveTabId], undefined);
+  const harness = runnerHarness(() => verifiedResult(SOS_QUOTE_MODE.plateTransfer));
+  const response = await harness.runner.calculate(SOS_QUOTE_MODE.plateTransfer, fields);
+  assert.equal(response.success, true);
+  assert.equal(harness.requests[0].payload.mode, SOS_QUOTE_MODE.plateTransfer);
+  assert.equal(response.quote.calculationMode, SOS_QUOTE_MODE.plateTransfer);
 });
 
 test("official quote and print output retain only a verified customer-safe result", () => {
@@ -473,7 +482,9 @@ test("official quote and print output retain only a verified customer-safe resul
   );
   const html = createSosFeeQuotePrintHTML(quote);
   assert.match(html, /Calculated by SOS/);
-  assert.match(html, /protected inactive background tab/);
+  assert.match(html, /through the Compliance Central service/);
+  // The customer sheet must not still describe a local browser tab.
+  assert.doesNotMatch(html, /background tab/i);
   assert.match(html, /Selected — included in the SOS calculation/);
   assert.match(html, /\$126\.00/);
   assert.doesNotMatch(html, /1FMDE8AP9RLA12345/);
@@ -590,16 +601,35 @@ test("title/lien helper discards page evidence and is never written to storage",
   assert.doesNotMatch(lienScript, /chrome\.storage|screenshotData|rawText/);
 });
 
-test("UI and adapters enforce local edits, explicit handoff, and session-only data", () => {
-  assert.ok(manifest.permissions.includes("tabs"));
+test("UI, manifest, and package drop every local-tab affordance", () => {
+  // `tabs` existed only to drive the visible SOS calculator. Nothing else in
+  // the extension touches the tabs API, so the permission goes with it.
+  assert.equal(manifest.permissions.includes("tabs"), false);
+  assert.equal(manifest.content_scripts, undefined);
+  // The SOS host stays: the side panel still fetches official plate artwork
+  // from dsvsesvc.sos.state.mi.us and the CSP still renders it.
   assert.ok(manifest.host_permissions.includes("https://dsvsesvc.sos.state.mi.us/*"));
   assert.ok(manifest.host_permissions.includes("https://vpic.nhtsa.dot.gov/*"));
-  assert.match(runnerScript, /active:\s*false/);
-  assert.match(runnerScript, /tabs\.onActivated/);
-  assert.doesNotMatch(runnerScript, /navigator\.platform|process\.platform|windows\.create/);
+  assert.match(
+    manifest.content_security_policy.extension_pages,
+    /https:\/\/dsvsesvc\.sos\.state\.mi\.us/
+  );
+  assert.ok(manifest.host_permissions.includes("https://compliance-central-api.fly.dev/*"));
+
+  // Nothing may reference the deleted content script or its screenshot library.
+  for (const source of [runnerScript, sidepanelScript, packageScript, JSON.stringify(manifest)]) {
+    assert.doesNotMatch(source, /sos-fee-quote-content|html2canvas/);
+  }
+  assert.doesNotMatch(runnerScript, /chrome\.tabs|chromeApi\.tabs|storage\.local|sosFeeActiveTabId/);
   assert.doesNotMatch(sidepanelScript, /chrome\.tabs\.(?:create|update|query)/);
+  assert.doesNotMatch(sidepanelScript, /SOS_FEE_OPEN_HANDOFF|sosHandoffAvailable|openSosHandoff/);
+  assert.doesNotMatch(sidepanelHtml, /sosHandoffPanel|openSosHandoffBtn|Finish on Michigan SOS/);
+  assert.doesNotMatch(sidepanelCss, /\.sos-handoff|is-handoff/);
   assert.doesNotMatch(sidepanelHtml, /Fallback: enter a fee manually|Load official choices/);
   assert.doesNotMatch(sidepanelScript, /SOS_FEE_UPDATE_FIELD|SOS_FEE_START/);
+  assert.equal(STORAGE_KEYS.sosFeeActiveTabId, undefined);
+
+  // The rest of the workspace contract is unchanged.
   for (const id of [
     "calculateSosFeeBtn",
     "sosVehicleType",
@@ -608,8 +638,6 @@ test("UI and adapters enforce local edits, explicit handoff, and session-only da
     "sosPlateDesign",
     "sosPlatePreview",
     "lookupSosVinBtn",
-    "sosHandoffPanel",
-    "openSosHandoffBtn",
     "printSosQuoteBtn",
     "printSosCalculationBtn",
     "downloadSosCalculationPdfBtn",
@@ -617,20 +645,18 @@ test("UI and adapters enforce local edits, explicit handoff, and session-only da
     assert.match(sidepanelHtml, new RegExp(`id="${id}"`));
   }
   assert.match(sidepanelScript, /type:\s*"SOS_FEE_CALCULATE"/);
+  assert.match(sidepanelScript, /type:\s*"SOS_FEE_CANCEL"/);
   assert.match(sidepanelScript, /fields:\s*buildSosSubmission\(values\)/);
   assert.match(sidepanelScript, /applyPendingVinSuggestions\(\)/);
   assert.match(sidepanelHtml, /Auto-fill by vehicle VIN/);
   assert.match(sidepanelHtml, /Trade Title\/Lien stays in the Trade-In section above/);
   assert.doesNotMatch(sidepanelHtml, /Use trade VIN|VIN assist \+ lien check/);
-  assert.doesNotMatch(contentScript, /document\.cookie|chrome\.storage|localStorage|sessionStorage|window\.print/);
-  assert.doesNotMatch(runnerScript, /storage\.local/);
-  assert.match(contentScript, /SOS_APPLY_AND_CALCULATE/);
-  assert.match(contentScript, /window\.html2canvas/);
-  assert.equal(
-    manifest.content_scripts[0].js[0],
-    "lib/html2canvas.min.js"
+  // Print/PDF still gate on the optional official-page capture.
+  assert.match(sidepanelScript, /printSosCalculationBtn\.disabled = !quote\?\.officialPageImage/);
+  assert.match(
+    sidepanelScript,
+    /downloadSosCalculationPdfBtn\.disabled = !quote\?\.officialPageImage/
   );
-  assert.match(contentScript, /plate number\|\\bVIN\\b\|customer\|name/);
 });
 
 // A failed official-page capture used to invalidate an otherwise correct SOS
@@ -638,7 +664,7 @@ test("UI and adapters enforce local edits, explicit handoff, and session-only da
 test("a verified total is accepted when the evidence capture fails", async () => {
   const withoutImage = verifiedResult();
   withoutImage.quote.officialPageImage = null;
-  const harness = runnerHarness({ responses: [withoutImage] });
+  const harness = runnerHarness(() => withoutImage);
 
   const response = await harness.runner.calculate(
     SOS_QUOTE_MODE.newPlate,
@@ -647,17 +673,72 @@ test("a verified total is accepted when the evidence capture fails", async () =>
 
   assert.equal(response.success, true);
   assert.equal(response.quote.feeCents, 20500);
-  // One send only: the runner must not burn its retries on a verified fee.
-  assert.equal(harness.messages.length, 1);
-  // The extension-owned calculator tab is still cleaned up.
-  assert.deepEqual(harness.removed, [401]);
+  assert.equal(response.quote.officialPageImage, null);
+  // One request only: a verified fee must not be retried away.
+  assert.equal(harness.requests.length, 1);
+
+  // The whole render/print chain still accepts the quote without evidence.
+  const quote = createCalculatedQuote(response.quote, SOS_QUOTE_MODE.newPlate);
+  assert.equal(quote.feeCents, 20500);
+  assert.equal(quote.officialPageImage, null);
+  assert.ok(createSosFeeQuotePrintHTML(quote));
+  // Only the official-evidence print, which needs the image, degrades.
+  assert.equal(createSosOfficialEvidencePrintHTML(quote), "");
 });
 
 // Michigan line items such as "Recreation Passport" carry none of the words the
-// parser used to require, and one unmatched row failed the entire table.
-test("fee table parsing accepts labelled rows that are not named fee/registration/plate", () => {
-  const adapter = readFileSync(new URL("../sos-fee-quote-content.js", import.meta.url), "utf8");
-  assert.doesNotMatch(adapter, /!\/\\b\(\?:fee\|registration\|plate\)\\b\/i\.test\(cells\[0\]\)/);
-  // The exact-sum reconciliation must remain the integrity guard.
-  assert.match(adapter, /breakdown\.reduce\(\(sum, row\) => sum \+ row\.feeCents, 0\) === total/);
+// old parser required, and one unmatched row failed the entire table. The
+// exact-sum reconciliation moved to the api-client and remains the guard.
+test("a fee breakdown must reconcile exactly to the state total", () => {
+  const apiClient = readFileSync(new URL("../lib/api-client.js", import.meta.url), "utf8");
+  assert.match(
+    apiClient,
+    /feeBreakdown\.reduce\(\s*\(sum, row\) => sum \+ row\.feeCents,\s*0\s*\)/
+  );
+  assert.match(apiClient, /breakdownTotal !== quote\.feeCents/);
+  // Any labelled, non-negative integer row is acceptable; only the sum decides.
+  assert.doesNotMatch(apiClient, /fee\|registration\|plate/);
+});
+
+// Michigan reads a passenger plate's expiration from the owner's birthday. The
+// official calculator asks on every flow, not just the commercial one, and
+// omitting these left the state form silently unanswered — no total was ever
+// produced and the salesperson was pushed onto the SOS site to finish by hand.
+test("every new-plate batch answers registered-to and the owner birthdate", () => {
+  const submission = buildSosSubmission(newPlateValues());
+  const business = submission.find((f) => f.label === "Is this for a business?");
+  const birthdate = submission.find((f) => /birthdate/i.test(f.label));
+  assert.equal(business?.value, "No");
+  assert.equal(birthdate?.value, "03/14/1985");
+  assert.equal(validSosSubmissionFields(submission), true);
+});
+
+test("a business registration is never asked for a birthdate", () => {
+  const values = newPlateValues({ businessRegistration: "yes", ownerBirthdate: "" });
+  assert.deepEqual(validateSosLocalValues(values), []);
+  const submission = buildSosSubmission(values);
+  assert.equal(submission.find((f) => f.label === "Is this for a business?").value, "Yes");
+  assert.equal(submission.some((f) => /birthdate/i.test(f.label)), false);
+});
+
+test("a person registration requires a real birthdate", () => {
+  for (const bad of ["", "3/14/1985", "13/01/1990", "02/31/1990", "03/14/2999"]) {
+    const issues = validateSosLocalValues(newPlateValues({ ownerBirthdate: bad }));
+    assert.ok(
+      issues.some((i) => i.id === "sosOwnerBirthdate"),
+      `${bad || "(empty)"} must be rejected`
+    );
+  }
+  // While registered-to is still unanswered, that question owns the error.
+  const unanswered = validateSosLocalValues(
+    newPlateValues({ businessRegistration: "", ownerBirthdate: "" })
+  );
+  assert.equal(unanswered.some((i) => i.id === "sosOwnerBirthdate"), false);
+});
+
+test("the birthdate field is present and explains why it is asked", () => {
+  assert.match(sidepanelHtml, /id="sosOwnerBirthdate"/);
+  assert.match(sidepanelHtml, /expire on the owner's birthday/i);
+  // Registered-to drives the birthdate, so it can no longer start hidden.
+  assert.doesNotMatch(sidepanelHtml, /id="sosBusinessRegistration"[^>]*hidden/);
 });

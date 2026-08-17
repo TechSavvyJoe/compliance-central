@@ -951,3 +951,19 @@ test("a finished screening can be cleared from the results header", () => {
   // The heading must be able to wrap, or a third action squeezes the label.
   assert.match(sidepanelCss, /\.evidence-heading \{[^}]*flex-wrap:\s*wrap/);
 });
+
+// The scan prompt is a step above the form, not a landing page. At its old size
+// it filled roughly half a 700px panel before the first field was reachable.
+test("the scan prompt stays compact above the form", () => {
+  const hero = sidepanelCss.slice(
+    sidepanelCss.indexOf(".first-run-hero {"),
+    sidepanelCss.indexOf(".first-run-hero {") + 400
+  );
+  assert.match(hero, /padding:\s*13px 20px 15px/);
+  // The headline must stay well under the old 2rem cap in a 400px panel.
+  const heading = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-hero h2 {"));
+  assert.match(heading, /font-size:\s*clamp\(1\.2rem, 5\.2vw, 1\.4rem\)/);
+  // Trimming the box must not shrink the tap target below the 44px minimum.
+  const scan = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-scan-btn {"));
+  assert.match(scan, /min-height:\s*44px/);
+});

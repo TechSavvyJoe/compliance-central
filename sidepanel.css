@@ -2238,7 +2238,10 @@ body.modal-open {
  * These rules intentionally change layout structure, not only the palette. */
 .first-run-hero {
   margin: -14px -12px 4px;
-  padding: 26px 20px 24px;
+  /* This is a prompt above the form, not a landing page: at 26px/24px with a
+     32px headline it filled roughly half a 700px panel before the first field
+     was reachable. Tightened so the form starts near the top. */
+  padding: 13px 20px 15px;
   background: #0d2b4a;
   color: #fff;
 }
@@ -2263,10 +2266,10 @@ body.modal-open {
 
 .first-run-hero h2 {
   max-width: 330px;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #fff;
   font-family: "Bricolage Grotesque", Archivo, sans-serif;
-  font-size: clamp(1.75rem, 8vw, 2rem);
+  font-size: clamp(1.2rem, 5.2vw, 1.4rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.06;
@@ -2274,17 +2277,17 @@ body.modal-open {
 
 .first-run-hero > p {
   max-width: 310px;
-  margin: 9px 0 0;
+  margin: 5px 0 0;
   color: #cfe0ef;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .first-run-actions {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .first-run-scan-btn {
@@ -2292,8 +2295,8 @@ body.modal-open {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 46px;
-  padding: 0 20px;
+  min-height: 44px;
+  padding: 0 18px;
   border: 0;
   border-radius: 11px;
   background: #ffcb05;
@@ -2317,7 +2320,7 @@ body.modal-open {
 
 .first-run-hint {
   display: block;
-  margin-top: 9px;
+  margin-top: 6px;
   color: #9fb8cf;
   font-size: 11px;
   line-height: 1.4;

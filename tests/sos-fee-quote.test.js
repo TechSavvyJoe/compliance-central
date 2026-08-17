@@ -257,7 +257,9 @@ test("local form builds one semantic SOS batch and validates commercial details"
     validateSosLocalValues({ ...values, purchaseDate: "02/31/2026" }).at(-1).id,
     "sosPurchaseDate"
   );
-  assert.match(sidepanelHtml, /Plate purchase date <span>Important · today if blank<\/span>/);
+  // The field prefills to today, so "today if blank" no longer described the
+  // behaviour; the note now says what the date actually does.
+  assert.match(sidepanelHtml, /Plate purchase date <span>Changes the fee · defaults to today<\/span>/);
   assert.doesNotMatch(sidepanelHtml, /Passport &amp; purchase date/);
 });
 
@@ -792,26 +794,34 @@ test("the birthdate field is present and explains why it is asked", () => {
 // The registered owner's birthdate is personal data belonging to one deal.
 // Leaving it behind would retain a date of birth and price the next customer's
 // registration off the wrong expiration date.
-test("clearing a deal or a quote drops the owner birthdate", () => {
+test("both Clear controls reset the whole plate workbench", () => {
+  // These inputs used to survive Clear, so the next customer inherited the
+  // previous deal's model year, MSRP and plate choice.
   for (const fn of ["handleClear", "clearCurrentSosFeeQuote"]) {
     const start = sidepanelScript.indexOf(`function ${fn}(`);
     assert.ok(start > -1, `${fn} must exist`);
     const body = sidepanelScript.slice(start, start + 4200);
-    assert.match(
-      body,
-      /elements\.sosOwnerBirthdate\.value = ""/,
-      `${fn} must clear the owner birthdate`
-    );
-    assert.match(
-      body,
-      /delete elements\.sosOwnerBirthdate\.dataset\.touched/,
-      `${fn} must let the Screening DOB prefill again`
-    );
+    assert.match(body, /resetSosLocalForm\(\)/, `${fn} must reset the workbench`);
   }
+
+  const start = sidepanelScript.indexOf("function resetSosLocalForm()");
+  assert.ok(start > -1, "resetSosLocalForm must exist");
+  const body = sidepanelScript.slice(start, start + 2000);
+  for (const field of [
+    "sosModelYear",
+    "sosMsrp",
+    "sosPurchaseDate",
+    "sosTransferPlateNumber",
+    "sosOwnerBirthdate",
+  ]) {
+    assert.match(body, new RegExp(`elements\\.${field}`), `${field} must be cleared`);
+  }
+  // The owner birthdate is personal data, and its touched flag must reset so
+  // the Screening DOB can prefill again for the next customer.
+  assert.match(body, /delete elements\.sosOwnerBirthdate\.dataset\.touched/);
+  assert.match(body, /prefillSosPurchaseDate\(\)/);
 });
 
-// The hint uses the workbench's existing muted-note convention; a bespoke class
-// would have rendered unstyled.
 test("the birthdate hint uses a styled element", () => {
   assert.match(sidepanelHtml, /<small id="sosOwnerBirthdateHint">/);
   assert.doesNotMatch(sidepanelHtml, /class="sos-hint"/);
@@ -853,4 +863,21 @@ test("the purchase date is labelled the way Michigan labels it", () => {
     stateLabel.toLowerCase().includes(purchase.labelIncludes.toLowerCase()),
     `labelIncludes "${purchase.labelIncludes}" is not in the state's wording`
   );
+});
+
+// The panel was redesigned onto a light canvas, but several colours were left
+// over from the original dark theme. Gold on white is about 1.5:1, far under
+// the 4.5:1 AA minimum, which is why the progress percentage and the purchase
+// date note were hard to read.
+test("the progress readout and date note are legible on the light canvas", () => {
+  const redesign = sidepanelCss.slice(sidepanelCss.indexOf("--design-navy:"));
+  // The fill also carried a gold glow and shimmer that the override left behind.
+  assert.match(redesign, /\.progress-fill\s*{[^}]*animation:\s*none/);
+  assert.match(redesign, /\.progress-fill\s*{[^}]*box-shadow:\s*none/);
+  assert.match(redesign, /#progressPercent\s*{[^}]*var\(--design-navy\)/);
+  assert.match(redesign, /\.progress-text\s*{[^}]*var\(--design-ink\)/);
+  assert.match(redesign, /\.progress-text\s*{[^}]*text-shadow:\s*none/);
+  assert.match(redesign, /\.sos-purchase-date > label span\s*{[^}]*var\(--design-warning\)/);
+  // Nothing in the readout should still resolve to the gold token.
+  assert.doesNotMatch(redesign, /#progressPercent\s*{[^}]*var\(--gold\)/);
 });

@@ -3609,8 +3609,40 @@ body {
   background: #dfe6ee;
 }
 
+/* The baseline rules were written for the original dark panel: a gold gradient
+   with a gold glow, and gold text with a dark shadow behind it. On the light
+   canvas that reads as a bright yellow smear, and #ffcb05 on white is about
+   1.7:1 — far under the 4.5:1 AA minimum, so the percentage was barely legible.
+   The fill keeps only its solid navy, and the readout moves to body ink. */
 .progress-fill {
   background: var(--design-navy);
+  animation: none;
+  box-shadow: none;
+}
+
+.progress-text {
+  color: var(--design-ink);
+  text-shadow: none;
+}
+
+#progressPercent {
+  color: var(--design-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+#progressLabel {
+  color: var(--design-slate);
+}
+
+.progress-spinner {
+  border-color: rgba(13, 43, 74, 0.18);
+  border-top-color: var(--design-navy);
+}
+
+/* Same dark-theme leftover as the progress readout: gold on a white card is
+   1.5:1. This note is an advisory, so it takes the warning ink at 5.05:1. */
+.sos-purchase-date > label span {
+  color: var(--design-warning);
 }
 
 .evidence-kicker,

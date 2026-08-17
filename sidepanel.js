@@ -1258,6 +1258,51 @@ function prefillSosPurchaseDate() {
   ].join("/");
 }
 
+/**
+ * Return the plate-calculator workbench to its first-use state.
+ *
+ * These inputs used to survive Clear entirely, so the next customer inherited
+ * the previous deal's model year, MSRP and plate choice — quietly quoting them
+ * a fee for a car that was not theirs. Both Clear controls call this so the
+ * Screening and Plate pages agree on what "cleared" means.
+ */
+function resetSosLocalForm() {
+  for (const input of [
+    elements.sosModelYear,
+    elements.sosMsrp,
+    elements.sosPurchaseDate,
+    elements.sosTransferPlateNumber,
+    elements.sosOwnerBirthdate,
+    elements.sosVinLookupInput,
+  ]) {
+    if (input) input.value = "";
+  }
+  if (elements.sosOwnerBirthdate) delete elements.sosOwnerBirthdate.dataset.touched;
+
+  // Radios go back to the defaults the markup ships with.
+  for (const [name, value] of [
+    ["sosFirstTitle", "no"],
+    ["sosBusinessRegistration", "no"],
+    ["sosRecreationPassport", "no"],
+    ["sosTransferChangePlate", "no"],
+    ["sosTransferAlreadyOwn", "no"],
+  ]) {
+    document
+      .querySelectorAll(`input[name="${name}"]`)
+      .forEach((radio) => {
+        radio.checked = radio.value === value;
+      });
+  }
+
+  if (elements.sosVehicleType) elements.sosVehicleType.value = "Passenger";
+  // Rebuild the dependent option lists, then re-apply the defaults that depend
+  // on them, so the workbench is usable immediately rather than half-empty.
+  syncSosLocalDependencies({ resetDependentValues: true });
+  syncSosOwnerBirthdateVisibility();
+  prefillSosOwnerBirthdate();
+  prefillSosPurchaseDate();
+}
+
 function syncSosOwnerBirthdateVisibility() {
   const business = selectedRadioValue("sosBusinessRegistration") === "yes";
   if (elements.sosOwnerBirthdateControl) {
@@ -1517,11 +1562,7 @@ async function clearCurrentSosFeeQuote() {
     // behind would carry a date of birth into the next customer's quote and
     // could price their registration off the wrong expiration. Dropping the
     // touched flag too lets the Screening DOB prefill again for that customer.
-    if (elements.sosOwnerBirthdate) {
-      elements.sosOwnerBirthdate.value = "";
-      delete elements.sosOwnerBirthdate.dataset.touched;
-    }
-    prefillSosOwnerBirthdate();
+    resetSosLocalForm();
     if (elements.sosLienStatus) {
       elements.sosLienStatus.textContent = "";
       elements.sosLienStatus.className = "sos-lien-status";
@@ -2516,10 +2557,7 @@ async function handleClear() {
   // It is personal data from the customer being cleared, and leaving it would
   // both retain a date of birth and price the next customer's registration off
   // the wrong expiration date.
-  if (elements.sosOwnerBirthdate) {
-    elements.sosOwnerBirthdate.value = "";
-    delete elements.sosOwnerBirthdate.dataset.touched;
-  }
+  resetSosLocalForm();
 
   const persistedIndividual = await persistedIndividualOperation;
   if (!cancelledIndividualOperationId) {

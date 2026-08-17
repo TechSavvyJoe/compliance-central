@@ -881,3 +881,29 @@ test("the progress readout and date note are legible on the light canvas", () =>
   // Nothing in the readout should still resolve to the gold token.
   assert.doesNotMatch(redesign, /#progressPercent\s*{[^}]*var\(--gold\)/);
 });
+
+// Clear form sat ~1200px down a 400px-wide panel, below the co-buyer, trade-in
+// and privacy sections, so it was effectively undiscoverable.
+test("the screening action row stays reachable without scrolling to the end", () => {
+  const rule = sidepanelCss.slice(sidepanelCss.indexOf(".main-actions {"));
+  assert.match(rule, /position:\s*sticky/);
+  assert.match(rule, /bottom:\s*0/);
+  assert.match(rule, /background:\s*var\(--design-card\)/);
+  // Run All Checks and Clear form must both live in that pinned row.
+  const actions = sidepanelHtml.slice(sidepanelHtml.indexOf('class="main-actions"'));
+  assert.ok(actions.indexOf('id="runAllChecksBtn"') > -1);
+  assert.ok(actions.indexOf('id="clearBtn"') > -1);
+});
+
+// The active-tab underline hung 1px below a sticky strip with overflow:visible,
+// so it floated over the content scrolling beneath and looked clipped.
+test("the active tab underline sits inside the tab strip", () => {
+  const rule = sidepanelCss.slice(
+    sidepanelCss.indexOf(".workspace-tabs button::after {"),
+    sidepanelCss.indexOf(".workspace-tabs button::after {") + 600
+  );
+  assert.match(rule, /bottom:\s*0;/);
+  assert.doesNotMatch(rule, /bottom:\s*-1px/);
+  // Rounded both ends; the old 999px/999px/0/0 read upside-down as an underline.
+  assert.match(rule, /border-radius:\s*999px;/);
+});

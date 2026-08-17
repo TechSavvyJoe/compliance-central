@@ -3191,9 +3191,13 @@ body {
   position: absolute;
   left: 9px;
   right: 9px;
-  bottom: -1px;
-  height: 4px;
-  border-radius: 999px 999px 0 0;
+  /* Sat at -1px under a position:sticky strip with overflow:visible, so the bar
+     overhung the tabs and floated across the content scrolling beneath it. It
+     now sits fully inside the strip, and is rounded on both ends rather than
+     only on top, which read upside-down for an underline. */
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
   background: transparent;
 }
 
@@ -3478,8 +3482,21 @@ body {
   padding: 12px;
 }
 
+/* Run All Checks and Clear form sat below the co-buyer, trade-in and privacy
+   sections, roughly 1200px down a 400px-wide panel, so Clear was effectively
+   undiscoverable without scrolling to the very bottom. Pinning the row to the
+   foot of the panel keeps both always reachable. The privacy disclosure above
+   it is a consent notice and is deliberately left untouched. */
 .main-actions {
   gap: 8px;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: 0 -14px -14px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--design-card);
+  border-top: 1px solid var(--design-line-soft);
+  box-shadow: 0 -6px 14px rgba(16, 26, 38, 0.06);
 }
 
 .btn-primary,

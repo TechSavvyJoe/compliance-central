@@ -538,7 +538,9 @@ test("official quote and print output retain only a verified customer-safe resul
   assert.doesNotMatch(html, /1FMDE8AP9RLA12345/);
   const evidenceHtml = createSosOfficialEvidencePrintHTML(quote);
   assert.match(evidenceHtml, /Actual official state-site result page/);
-  assert.match(evidenceHtml, /letter landscape/);
+  // The capture is a tall state web page; landscape letterboxed it and shrank
+  // the text that has to stay readable on paper.
+  assert.match(evidenceHtml, /letter portrait/);
   assert.match(evidenceHtml, /data:image\/jpeg;base64,QUJDRA==/);
   assert.equal(
     normalizeSosFeeQuote({

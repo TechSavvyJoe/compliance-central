@@ -1471,6 +1471,15 @@ async function clearCurrentSosFeeQuote() {
     pendingVinDecode = null;
     if (elements.sosVinLookupInput) elements.sosVinLookupInput.value = "";
     if (elements.sosVinLookupStatus) elements.sosVinLookupStatus.textContent = "";
+    // The owner birthdate is personal data belonging to one deal. Leaving it
+    // behind would carry a date of birth into the next customer's quote and
+    // could price their registration off the wrong expiration. Dropping the
+    // touched flag too lets the Screening DOB prefill again for that customer.
+    if (elements.sosOwnerBirthdate) {
+      elements.sosOwnerBirthdate.value = "";
+      delete elements.sosOwnerBirthdate.dataset.touched;
+    }
+    prefillSosOwnerBirthdate();
     if (elements.sosLienStatus) {
       elements.sosLienStatus.textContent = "";
       elements.sosLienStatus.className = "sos-lien-status";
@@ -2457,6 +2466,15 @@ async function handleClear() {
   if (elements.cbDlnPid) elements.cbDlnPid.value = "";
   if (elements.hasCoBuyer) elements.hasCoBuyer.checked = false;
   elements.coBuyerSection?.classList.add("hidden");
+
+  // Clearing the deal must also drop the SOS registered owner's birthdate.
+  // It is personal data from the customer being cleared, and leaving it would
+  // both retain a date of birth and price the next customer's registration off
+  // the wrong expiration date.
+  if (elements.sosOwnerBirthdate) {
+    elements.sosOwnerBirthdate.value = "";
+    delete elements.sosOwnerBirthdate.dataset.touched;
+  }
 
   const persistedIndividual = await persistedIndividualOperation;
   if (!cancelledIndividualOperationId) {

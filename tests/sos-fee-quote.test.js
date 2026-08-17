@@ -742,3 +742,34 @@ test("the birthdate field is present and explains why it is asked", () => {
   // Registered-to drives the birthdate, so it can no longer start hidden.
   assert.doesNotMatch(sidepanelHtml, /id="sosBusinessRegistration"[^>]*hidden/);
 });
+
+// The registered owner's birthdate is personal data belonging to one deal.
+// Leaving it behind would retain a date of birth and price the next customer's
+// registration off the wrong expiration date.
+test("clearing a deal or a quote drops the owner birthdate", () => {
+  for (const fn of ["handleClear", "clearCurrentSosFeeQuote"]) {
+    const start = sidepanelScript.indexOf(`function ${fn}(`);
+    assert.ok(start > -1, `${fn} must exist`);
+    const body = sidepanelScript.slice(start, start + 4200);
+    assert.match(
+      body,
+      /elements\.sosOwnerBirthdate\.value = ""/,
+      `${fn} must clear the owner birthdate`
+    );
+    assert.match(
+      body,
+      /delete elements\.sosOwnerBirthdate\.dataset\.touched/,
+      `${fn} must let the Screening DOB prefill again`
+    );
+  }
+});
+
+// The hint uses the workbench's existing muted-note convention; a bespoke class
+// would have rendered unstyled.
+test("the birthdate hint uses a styled element", () => {
+  assert.match(sidepanelHtml, /<small id="sosOwnerBirthdateHint">/);
+  assert.doesNotMatch(sidepanelHtml, /class="sos-hint"/);
+  assert.match(sidepanelCss, /\.sos-control small/);
+  // Hiding the control for a business relies on this rule existing.
+  assert.match(sidepanelCss, /\.sos-control\[hidden\]\s*{\s*display:\s*none/);
+});

@@ -436,24 +436,66 @@ test("a superseded quote resolves as cancelled instead of repainting a stale fee
   assert.equal((await second).success, true);
 });
 
-test("plate transfer submits only the plate number being transferred", async () => {
+test("plate transfer submits the vehicle being purchased, not just the plate", async () => {
+  // Verified live: the transfer calculator is two-stage. After it searches the
+  // plate it asks about the vehicle being purchased, and sending only the plate
+  // left that stage unanswered so no total was ever produced.
   const transferValues = {
     mode: SOS_QUOTE_MODE.plateTransfer,
     transferPlateNumber: "ABC 1234",
+    transferChangePlate: "no",
+    transferAlreadyOwn: "no",
+    vehicleType: "Passenger",
+    bodyStyle: "4D",
+    vehicleUse: "PASS",
+    fuelType: "GAS",
+    modelYear: "2026",
+    msrp: "42500",
+    firstTitle: "no",
+    recreationPassport: "no",
   };
   assert.deepEqual(validateSosLocalValues(transferValues), []);
   const fields = buildSosSubmission(transferValues);
-  assert.deepEqual(fields, [{
-    label: "Enter the plate number being transferred",
-    kind: "text",
-    value: "ABC 1234",
-  }]);
+  const labels = fields.map((f) => f.label);
+
+  assert.equal(fields[0].value, "ABC 1234");
+  for (const required of [
+    "Do you want to change the plate being transferred?",
+    "Select the vehicle type",
+    "Select the body style",
+    "Select how this vehicle will be used",
+    "Select the fuel type",
+    "Enter the vehicle model year",
+    "Enter the vehicle MSRP",
+    "Is the plate being transferred to a vehicle you already own?",
+  ]) {
+    assert.ok(labels.includes(required), `transfer must submit “${required}”`);
+  }
+  // The state words these differently on the transfer screen; the new-plate
+  // wording would not be found there.
+  assert.equal(labels.includes("Select your vehicle type"), false);
+  assert.equal(labels.includes("Select how you will use your vehicle"), false);
+  assert.equal(validSosSubmissionFields(fields), true);
 
   const harness = runnerHarness(() => verifiedResult(SOS_QUOTE_MODE.plateTransfer));
   const response = await harness.runner.calculate(SOS_QUOTE_MODE.plateTransfer, fields);
   assert.equal(response.success, true);
   assert.equal(harness.requests[0].payload.mode, SOS_QUOTE_MODE.plateTransfer);
   assert.equal(response.quote.calculationMode, SOS_QUOTE_MODE.plateTransfer);
+});
+
+test("a transfer will not be sent without the vehicle being purchased", () => {
+  const issues = validateSosLocalValues({
+    mode: SOS_QUOTE_MODE.plateTransfer,
+    transferPlateNumber: "ABC 1234",
+  });
+  const ids = issues.map((issue) => issue.id);
+  for (const id of ["sosVehicleType", "sosModelYear", "sosMsrp", "sosFirstTitle"]) {
+    assert.ok(ids.includes(id), `${id} must be required for a transfer`);
+  }
+  // Plate options belong to a new plate; a transfer reuses the existing plate.
+  assert.equal(ids.includes("sosPlateType"), false);
+  assert.equal(ids.includes("sosOwnerBirthdate"), false);
 });
 
 test("official quote and print output retain only a verified customer-safe result", () => {

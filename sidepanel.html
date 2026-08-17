@@ -344,21 +344,21 @@
                 <label><input type="radio" name="sosFirstTitle" value="yes" /><span>New</span></label>
                 <label><input type="radio" name="sosFirstTitle" value="no" checked /><span>Used</span></label>
               </fieldset>
-              <fieldset id="sosBusinessRegistration" class="sos-control sos-segmented-field">
+              <fieldset id="sosBusinessRegistration" class="sos-control sos-segmented-field" data-new-plate-only>
                 <legend>Registered to</legend>
                 <label><input type="radio" name="sosBusinessRegistration" value="yes" /><span>Business</span></label>
                 <label><input type="radio" name="sosBusinessRegistration" value="no" checked /><span>Person</span></label>
               </fieldset>
-              <div id="sosOwnerBirthdateControl" class="sos-control">
+              <div id="sosOwnerBirthdateControl" class="sos-control" data-new-plate-only>
                 <label for="sosOwnerBirthdate">Owner birthdate</label>
                 <input id="sosOwnerBirthdate" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="MM/DD/YYYY" aria-describedby="sosOwnerBirthdateHint" />
                 <small id="sosOwnerBirthdateHint">Michigan plates expire on the owner's birthday.</small>
               </div>
-              <div class="sos-control sos-control-wide">
+              <div class="sos-control sos-control-wide" data-new-plate-only>
                 <label for="sosPlateType">Plate type</label>
                 <select id="sosPlateType"></select>
               </div>
-              <div id="sosPlateDesignControl" class="sos-control sos-control-wide">
+              <div id="sosPlateDesignControl" class="sos-control sos-control-wide" data-new-plate-only>
                 <label for="sosPlateDesign">Plate design</label>
                 <select id="sosPlateDesign">
                   <option value="pure_michigan" selected>Pure Michigan</option>
@@ -402,8 +402,18 @@
             <div class="sos-control">
               <label for="sosTransferPlateNumber">Plate being transferred</label>
               <input id="sosTransferPlateNumber" type="text" inputmode="text" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC 1234" />
-              <small>SOS may require more plate-specific details after lookup.</small>
+              <small>The vehicle details above describe the vehicle being purchased.</small>
             </div>
+            <fieldset id="sosTransferChangePlate" class="sos-control sos-segmented-field">
+              <legend>Change the plate</legend>
+              <label><input type="radio" name="sosTransferChangePlate" value="yes" /><span>Yes</span></label>
+              <label><input type="radio" name="sosTransferChangePlate" value="no" checked /><span>No</span></label>
+            </fieldset>
+            <fieldset id="sosTransferAlreadyOwn" class="sos-control sos-segmented-field">
+              <legend>Vehicle already owned</legend>
+              <label><input type="radio" name="sosTransferAlreadyOwn" value="yes" /><span>Yes</span></label>
+              <label><input type="radio" name="sosTransferAlreadyOwn" value="no" checked /><span>No</span></label>
+            </fieldset>
           </div>
 
           <p id="sosWorkspaceStatus" class="sos-workspace-status" role="status" aria-live="polite">Complete the fields, then run one official SOS calculation.</p>

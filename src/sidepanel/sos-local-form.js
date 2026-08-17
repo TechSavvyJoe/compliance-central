@@ -177,9 +177,53 @@ function field(label, kind, values = {}) {
 export function buildSosSubmission(values) {
   const mode = values?.mode;
   if (mode === SOS_QUOTE_MODE.plateTransfer) {
+    // A transfer is a two-stage official form. Only the plate number exists on
+    // the first screen; after the state searches it, it asks about the vehicle
+    // being purchased, and the backend answers those as each stage appears.
+    // Sending only the plate left that second stage unanswered, so no total was
+    // ever produced. These labels are the state's own wording for the transfer
+    // calculator and deliberately differ from the new-plate screen ("Select the
+    // vehicle type" here vs "Select your vehicle type" there).
+    const transferBody = bodyOptionsForVehicle(values.vehicleType);
+    const transferUse = useOptionsForVehicle(values.vehicleType);
     return [
       field("Enter the plate number being transferred", "text", {
         value: String(values.transferPlateNumber || "").trim().toUpperCase(),
+      }),
+      field("Do you want to change the plate being transferred?", "radio", {
+        value: values.transferChangePlate === "yes" ? "Yes" : "No",
+        labelIncludes: "change the plate",
+      }),
+      field("Select the vehicle type", "select", {
+        optionValue: values.vehicleType,
+        optionLabel: selectedLabel(SOS_VEHICLE_OPTIONS, values.vehicleType),
+      }),
+      field("Select the body style", "select", {
+        optionValue: values.bodyStyle,
+        optionLabel: selectedLabel(transferBody, values.bodyStyle),
+      }),
+      field("Select how this vehicle will be used", "select", {
+        optionValue: values.vehicleUse,
+        optionLabel: selectedLabel(transferUse, values.vehicleUse),
+      }),
+      field("Select the fuel type", "select", {
+        optionValue: values.fuelType,
+        optionLabel: selectedLabel(SOS_FUEL_OPTIONS, values.fuelType),
+      }),
+      field("Enter the vehicle model year", "text", { value: values.modelYear }),
+      field("Enter the vehicle MSRP", "text", { value: values.msrp }),
+      field("Is this vehicle being titled for the first time (no previous owner)?", "radio", {
+        value: values.firstTitle === "yes" ? "Yes" : "No",
+        labelIncludes: "titled for the first",
+      }),
+      field("Is the plate being transferred to a vehicle you already own?", "radio", {
+        value: values.transferAlreadyOwn === "yes" ? "Yes" : "No",
+        labelIncludes: "plate being transferred to a vehicle",
+      }),
+      field("Would you like to add a recreation passport?", "radio", {
+        value: values.recreationPassport === "yes" ? "Yes" : "No",
+        optional: true,
+        labelIncludes: "recreation passport",
       }),
     ];
   }
@@ -265,9 +309,42 @@ export function buildSosSubmission(values) {
 
 export function validateSosLocalValues(values, now = new Date()) {
   if (values?.mode === SOS_QUOTE_MODE.plateTransfer) {
-    return /^[A-Z0-9 -]{1,10}$/i.test(String(values.transferPlateNumber || "").trim())
-      ? []
-      : [{ id: "sosTransferPlateNumber", message: "Enter the plate being transferred." }];
+    // The transfer form asks for the vehicle being purchased too, so the same
+    // vehicle details a new plate needs must be present before the state is
+    // asked for a total — minus the plate options, which a transfer reuses from
+    // the existing plate rather than choosing again.
+    const transferErrors = [];
+    if (!/^[A-Z0-9 -]{1,10}$/i.test(String(values.transferPlateNumber || "").trim())) {
+      transferErrors.push({
+        id: "sosTransferPlateNumber",
+        message: "Enter the plate being transferred.",
+      });
+    }
+    [
+      ["sosVehicleType", values?.vehicleType, "Select a vehicle type."],
+      ["sosBodyStyle", values?.bodyStyle, "Select a body style."],
+      ["sosVehicleUse", values?.vehicleUse, "Select how the vehicle will be used."],
+      ["sosFuelType", values?.fuelType, "Select a fuel type."],
+      ["sosFirstTitle", values?.firstTitle, "Choose new or used."],
+    ].forEach(([id, value, message]) => {
+      if (!value) transferErrors.push({ id, message });
+    });
+    const transferYear = Number(values?.modelYear);
+    if (
+      !/^\d{4}$/.test(String(values?.modelYear || "")) ||
+      transferYear < 1900 ||
+      transferYear > now.getFullYear() + 2
+    ) {
+      transferErrors.push({
+        id: "sosModelYear",
+        message: "Enter a valid four-digit model year.",
+      });
+    }
+    const transferMsrp = String(values?.msrp || "").replace(/[$,\s]/g, "");
+    if (!/^\d{1,7}(?:\.\d{1,2})?$/.test(transferMsrp) || Number(transferMsrp) <= 0) {
+      transferErrors.push({ id: "sosMsrp", message: "Enter the vehicle MSRP." });
+    }
+    return transferErrors;
   }
 
   const errors = [];

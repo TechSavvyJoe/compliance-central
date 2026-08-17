@@ -757,6 +757,8 @@ function localSosValues() {
     recreationPassport: selectedRadioValue("sosRecreationPassport"),
     purchaseDate: elements.sosPurchaseDate?.value.trim() || "",
     transferPlateNumber: elements.sosTransferPlateNumber?.value.trim() || "",
+    transferChangePlate: selectedRadioValue("sosTransferChangePlate"),
+    transferAlreadyOwn: selectedRadioValue("sosTransferAlreadyOwn"),
   };
 }
 
@@ -1192,9 +1194,17 @@ function renderSosWorkspace() {
       ? "Checking SOS…"
       : "Calculate SOS fee";
   }
-  if (elements.sosNewPlateFields) {
-    elements.sosNewPlateFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.newPlate;
-  }
+  // A plate transfer needs the same vehicle details as a new plate — the state
+  // asks about the vehicle being purchased either way — so the shared workbench
+  // stays visible and only the plate-specific controls drop out.
+  const newPlate = selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate;
+  if (elements.sosNewPlateFields) elements.sosNewPlateFields.hidden = false;
+  document
+    .querySelectorAll("[data-new-plate-only]")
+    .forEach((node) => {
+      node.hidden = !newPlate;
+    });
+  if (newPlate) syncSosOwnerBirthdateVisibility();
   if (elements.sosTransferFields) {
     elements.sosTransferFields.hidden = selectedSosQuoteMode() !== SOS_QUOTE_MODE.plateTransfer;
   }

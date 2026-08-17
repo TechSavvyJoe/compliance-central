@@ -102,12 +102,29 @@ export function normalizeName(name) {
 const NAME_SUFFIXES = new Set(["jr", "sr", "ii", "iii", "iv", "v"]);
 const FULL_NAME_RESCUE_THRESHOLD = 95;
 
-// Minimum stand-alone Jaro-Winkler similarity a surname must reach before the
-// weighted component score can qualify as a match. Set below an exact match so
-// ordinary spelling and transliteration variance still screens (Gallant/Gallent
-// = 0.94, Muhammad/Mohammad = 0.89), while unrelated surnames cannot be carried
-// by a matching first name. Component scores are 0-1 here, not 0-100.
-const SURNAME_FLOOR = 0.85;
+// Minimum stand-alone similarity a surname must reach before the weighted
+// component score can qualify as a match.
+//
+// This deliberately uses plain Jaro, NOT Jaro-Winkler. Winkler's prefix bonus
+// inflates exactly the pairs that produced false positives — a surname that is
+// a truncation or extension of another shares its whole prefix, so Gallant/Gallo
+// scored 0.87 and Smith/Smithson 0.93. No Jaro-Winkler threshold can work here:
+// Smith/Smithson (must not match) outscores Qaddafi/Gaddafi (must match). Plain
+// Jaro separates them, because it weighs the unmatched tail instead of
+// rewarding the shared head:
+//
+//   reject  Gallant/Gallo 0.79 · Gallant/Gallagher 0.76 · Smith/Smithson 0.88
+//   accept  Gallant/Gallent 0.91 · Muhammad/Mohammad 0.92 · Qaddafi/Gaddafi 0.91
+//           Abdulla/Abdullah 0.96 · Yusuf/Yousuf 0.94 · Hussein/Hussain 0.91
+//
+// Scores are 0-1 here, not 0-100.
+const SURNAME_FLOOR = 0.9;
+
+// Below this length an edit-distance score is dominated by a single character
+// (Kim/Kym scores 0.78, Li/Lee 0.61), so the floor would suppress real hits on
+// short surnames. Screening must fail toward flagging, so short surnames keep
+// the previous, more sensitive behaviour and are never rejected by the floor.
+const SURNAME_FLOOR_MIN_LENGTH = 4;
 
 function comparableFullName(name) {
   return normalizeName(name)
@@ -153,7 +170,51 @@ function fullNameSimilarity(searchName, candidateName) {
   return Math.round(bestScore * 100);
 }
 
+/**
+ * True when both sides state a comparable surname and they are not the same
+ * name. Short surnames are exempt (see SURNAME_FLOOR_MIN_LENGTH).
+ */
+export function surnameConflicts(searchLast, candidateLast) {
+  const a = normalizeName(searchLast);
+  const b = normalizeName(candidateLast);
+  if (!a || !b) return false;
+  if (Math.min(a.length, b.length) < SURNAME_FLOOR_MIN_LENGTH) return false;
+  return jaroSimilarity(a, b) < SURNAME_FLOOR;
+}
+
+// The full-name path exists to rescue records whose components we could not
+// parse — an alias held in one field, a comma-reversed order, a compound
+// surname, a trailing suffix. It must not become a way around a decided surname
+// mismatch: "John Smith" against "John Smithson" scores 95 as one string
+// because they share a long prefix, the same false positive the surname floor
+// rejects component-wise.
+//
+// The candidate is therefore checked token-by-token rather than parsed into
+// first/last, because which token carries the surname is exactly what this path
+// cannot assume. If ANY token is a plausible rendering of the searched surname
+// the rescue proceeds; only a candidate containing nothing like it is refused.
 function qualifyingFullNameScore(searchName, candidateName, threshold) {
+  // Both sides are tokenised: a searched surname can itself be compound
+  // ("Gonzalez Pizana"), and the candidate may carry it across fields with a
+  // suffix attached. A single shared surname token is enough to proceed.
+  const searchTokens = normalizeName(searchName?.lastName)
+    .split(/\s+/)
+    .filter((token) => token.length >= SURNAME_FLOOR_MIN_LENGTH);
+  if (searchTokens.length > 0) {
+    const candidateTokens = comparableFullName(candidateName)
+      .split(/\s+/)
+      .filter(Boolean);
+    const carriesSurname =
+      candidateTokens.length === 0 ||
+      candidateTokens.some(
+        (token) =>
+          token.length < SURNAME_FLOOR_MIN_LENGTH ||
+          searchTokens.some(
+            (searchToken) => jaroSimilarity(searchToken, token) >= SURNAME_FLOOR
+          )
+      );
+    if (!carriesSurname) return 0;
+  }
   const score = fullNameSimilarity(searchName, candidateName);
   return score >= Math.max(threshold, FULL_NAME_RESCUE_THRESHOLD) ? score : 0;
 }
@@ -196,7 +257,12 @@ export function calculateNameSimilarity(searchName, sdnName) {
   // stand on its own before any component score counts. This tightens only the
   // wrong-surname case: entries with no comparable surname still fall through to
   // the alias and full-name paths below, which are unchanged.
-  if (sNorm.last && dNorm.last && lastScore < SURNAME_FLOOR) {
+  if (
+    sNorm.last &&
+    dNorm.last &&
+    Math.min(sNorm.last.length, dNorm.last.length) >= SURNAME_FLOOR_MIN_LENGTH &&
+    jaroSimilarity(sNorm.last, dNorm.last) < SURNAME_FLOOR
+  ) {
     return 0;
   }
 

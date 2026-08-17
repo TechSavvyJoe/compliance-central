@@ -52,6 +52,10 @@ const sidepanelScript = readFileSync(
   new URL("../sidepanel.js", import.meta.url),
   "utf8"
 );
+const datePickerScript = readFileSync(
+  new URL("../src/sidepanel/date-picker.js", import.meta.url),
+  "utf8"
+);
 const sidepanelCss = readFileSync(
   new URL("../sidepanel.css", import.meta.url),
   "utf8"
@@ -814,4 +818,20 @@ test("the birthdate hint uses a styled element", () => {
   assert.match(sidepanelCss, /\.sos-control small/);
   // Hiding the control for a business relies on this rule existing.
   assert.match(sidepanelCss, /\.sos-control\[hidden\]\s*{\s*display:\s*none/);
+});
+
+// A typed "08081985" used to stay raw in the SOS workbench and fail validation,
+// because those inputs carry no picker shell and so had no mask.
+test("SOS date fields format a typed date and default the purchase date", () => {
+  assert.match(sidepanelScript, /function attachDateMask\(input\)/);
+  assert.match(sidepanelScript, /attachDateMask\(elements\.sosOwnerBirthdate\)/);
+  assert.match(sidepanelScript, /attachDateMask\(elements\.sosPurchaseDate\)/);
+  // Masking on blur as well as input tidies a pasted value.
+  assert.match(sidepanelScript, /input\.addEventListener\("blur", apply\)/);
+  // The mask itself is the picker's, not a second copy of date logic.
+  assert.match(sidepanelScript, /maskDateText/);
+  assert.match(datePickerScript, /export function maskDateText/);
+  // Michigan falls back to today; the quote should say so rather than imply it.
+  assert.match(sidepanelScript, /function prefillSosPurchaseDate\(\)/);
+  assert.match(sidepanelScript, /prefillSosPurchaseDate\(\)/);
 });

@@ -569,7 +569,12 @@ function clampMonth(date, minDate, maxDate) {
   return monthDate;
 }
 
-function maskDateText(value) {
+/**
+ * Progressive MM/DD/YYYY mask. Exported so plain date inputs that do not carry
+ * a full picker shell (the SOS workbench fields) format identically to the ones
+ * that do, instead of leaving a typed "08081985" to fail validation.
+ */
+export function maskDateText(value) {
   const digits = value.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;

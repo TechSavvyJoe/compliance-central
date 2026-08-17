@@ -30,6 +30,7 @@ import {
 import {
   initDatePickers,
   setDateInputValue,
+  maskDateText,
 } from "./src/sidepanel/date-picker.js";
 import {
   calculateFinalDecision,
@@ -1226,6 +1227,37 @@ async function cancelSosFeeRequest() {
  * for a birthdate when the owner is a person. Hiding the field for a business
  * keeps it out of both the form and validation.
  */
+/**
+ * Format a plain date input as it is typed, and once more when focus leaves so
+ * a pasted value is tidied too. The SOS workbench fields have no picker shell,
+ * so without this a typed "08081985" stayed raw and failed validation.
+ */
+function attachDateMask(input) {
+  if (!input) return;
+  const apply = () => {
+    const masked = maskDateText(input.value);
+    if (input.value !== masked) input.value = masked;
+  };
+  input.addEventListener("input", apply);
+  input.addEventListener("blur", apply);
+}
+
+/**
+ * Michigan bases the fee on the purchase date and falls back to today when the
+ * field is blank. Writing today's date in makes the quote say which date it
+ * used, rather than leaving the salesperson to infer it from an empty box.
+ */
+function prefillSosPurchaseDate() {
+  const input = elements.sosPurchaseDate;
+  if (!input || input.value.trim()) return;
+  const now = new Date();
+  input.value = [
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    now.getFullYear(),
+  ].join("/");
+}
+
 function syncSosOwnerBirthdateVisibility() {
   const business = selectedRadioValue("sosBusinessRegistration") === "yes";
   if (elements.sosOwnerBirthdateControl) {
@@ -1619,8 +1651,11 @@ function initEventListeners() {
     elements.sosOwnerBirthdate.dataset.touched = "true";
   });
   elements.dob?.addEventListener("change", prefillSosOwnerBirthdate);
+  attachDateMask(elements.sosOwnerBirthdate);
+  attachDateMask(elements.sosPurchaseDate);
   syncSosOwnerBirthdateVisibility();
   prefillSosOwnerBirthdate();
+  prefillSosPurchaseDate();
   syncSosLienCheckButton();
   document.querySelectorAll('input[name="sosQuoteMode"]').forEach((input) => {
     input.addEventListener("change", handleSosQuoteModeChange);

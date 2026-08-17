@@ -102,6 +102,13 @@ export function normalizeName(name) {
 const NAME_SUFFIXES = new Set(["jr", "sr", "ii", "iii", "iv", "v"]);
 const FULL_NAME_RESCUE_THRESHOLD = 95;
 
+// Minimum stand-alone Jaro-Winkler similarity a surname must reach before the
+// weighted component score can qualify as a match. Set below an exact match so
+// ordinary spelling and transliteration variance still screens (Gallant/Gallent
+// = 0.94, Muhammad/Mohammad = 0.89), while unrelated surnames cannot be carried
+// by a matching first name. Component scores are 0-1 here, not 0-100.
+const SURNAME_FLOOR = 0.85;
+
 function comparableFullName(name) {
   return normalizeName(name)
     .split(" ")
@@ -179,6 +186,18 @@ export function calculateNameSimilarity(searchName, sdnName) {
     middleScore = jaroWinkler(sNorm.middle, dNorm.middle);
   } else if (!sNorm.middle || !dNorm.middle) {
     hasMiddle = false;
+  }
+
+  // A surname is the load-bearing part of an identity match. Weighting alone let
+  // a clearly different surname ride in on a strong first name — last 0.80 with
+  // first 1.00 scored 88 and cleared an 85 threshold — which produced obvious
+  // false positives and trained reviewers to dismiss hits. A real SDN match
+  // effectively always shares the surname, so when both sides supply one it must
+  // stand on its own before any component score counts. This tightens only the
+  // wrong-surname case: entries with no comparable surname still fall through to
+  // the alias and full-name paths below, which are unchanged.
+  if (sNorm.last && dNorm.last && lastScore < SURNAME_FLOOR) {
+    return 0;
   }
 
   let totalWeight = 0;

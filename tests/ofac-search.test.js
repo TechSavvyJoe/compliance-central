@@ -193,3 +193,45 @@ test("searchSDNEntries threads DOB into per-match confidence (display-only)", ()
   );
   assert.equal(noDob[0].confidence, "medium");
 });
+
+// A wrong surname used to be carried by a matching first name: last 0.80 with
+// first 1.00 scored 88 and cleared the 85 threshold, producing hits that were
+// obviously not the customer and training reviewers to dismiss real ones.
+test("a clearly different surname cannot be rescued by a matching first name", () => {
+  const score = calculateNameSimilarity(
+    { firstName: "Joseph", middleName: "", lastName: "Gallant" },
+    { firstName: "Joseph", middleName: "", lastName: "Karimov" }
+  );
+  assert.equal(score, 0);
+
+  const match = checkNameMatch(
+    { firstName: "Joseph", middleName: "", lastName: "Gallant", dob: "03/14/1985" },
+    { firstName: "Joseph", middleName: "", lastName: "Karimov", birthDate: "1962" }
+  );
+  assert.equal(match.isMatch, false);
+});
+
+// The floor must not suppress genuine hits with ordinary spelling variance.
+test("surname spelling and transliteration variants still screen as matches", () => {
+  for (const [searched, listed] of [
+    ["Gallant", "Gallent"],
+    ["Muhammad", "Mohammad"],
+    ["Rodriguez", "Rodrigues"],
+  ]) {
+    const match = checkNameMatch(
+      { firstName: "Ivan", middleName: "", lastName: searched },
+      { firstName: "Ivan", middleName: "", lastName: listed }
+    );
+    assert.equal(match.isMatch, true, `${searched} vs ${listed} must still match`);
+  }
+});
+
+// An SDN entry carrying only an alias has no comparable surname, so the floor
+// must not short-circuit the alias/full-name paths that catch those.
+test("alias-only entries are unaffected by the surname floor", () => {
+  const match = checkNameMatch(
+    { firstName: "Viktor", middleName: "", lastName: "Petrov" },
+    { firstName: "", middleName: "", lastName: "", aliases: ["Viktor Petrov"] }
+  );
+  assert.equal(match.isMatch, true);
+});

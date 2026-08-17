@@ -24,9 +24,6 @@ Stores the downloaded OFAC SDN sanctions dataset and bounded device-local report
 alarms —
 Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 
-tabs —
-Creates an inactive, extension-owned public Michigan SOS calculator tab only after the user clicks Calculate SOS fee; closes it after a verified result; and foregrounds the same prefilled tab only if the user explicitly clicks Finish on Michigan SOS after automatic attempts fail.
-
 Host permission https://sanctionslistservice.ofac.treas.gov/ —
 Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
 

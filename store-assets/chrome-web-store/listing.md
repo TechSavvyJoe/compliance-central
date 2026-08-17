@@ -113,11 +113,10 @@ sidePanel — The entire user interface is a Chrome side panel; this permission 
 storage — Saves preferences and bounded device-local customer/report history (up to 30 days / 50 records) so an authorized dealership user can reopen, re-screen, print, or download a prior record.
 unlimitedStorage — Stores the downloaded OFAC SDN dataset and bounded device-local report history, including captured state-site evidence images. SOS credentials and authentication tokens are not stored in History.
 alarms — Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
-tabs — Creates an inactive public SOS calculator tab only after Calculate SOS fee, closes it after a verified result, and foregrounds the same prefilled tab only after a separate Finish on Michigan SOS click.
 Host permission https://sanctionslistservice.ofac.treas.gov/ — Downloads the official U.S. Treasury OFAC SDN list used for on-device sanctions screening.
 Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/ — Allows Treasury's signed OFAC-list download redirect to its dedicated AWS GovCloud file host.
 Host permission https://compliance-central-api.fly.dev/ — Performs Repeat Offender and Title/Lien checks and relays the optional end-to-end encrypted phone scan package, which the backend cannot read.
-Host permission https://dsvsesvc.sos.state.mi.us/ — Runs the public Michigan SOS fee calculator after an explicit action and returns a session-only verified result plus the actual official result-page capture.
+Host permission https://dsvsesvc.sos.state.mi.us/ — Loads official Michigan plate artwork shown in the side panel. The public SOS fee calculator itself runs on the backend after an explicit action, returning a session-only verified result plus the actual official result-page capture.
 Host permission https://vpic.nhtsa.dot.gov/ — Runs an optional user-requested VIN or partial-VIN decode to fill supported local vehicle fields.
 
 (No remote code is executed; all extension code is bundled. No broad host permissions are requested.)

@@ -297,10 +297,15 @@ export function buildSosSubmission(values) {
   );
   if (String(values.purchaseDate || "").trim()) {
     submission.push(
-      field("Enter the date you plan to purchase the plate", "text", {
+      // The state's own wording is "Please enter the date the plate will be
+      // purchased (if no date is entered…)". Matching on "date you plan to
+      // purchase the plate" never found it, and because the question is
+      // optional the value was dropped in silence — the salesperson set a
+      // purchase date and Michigan quietly priced the plate for today instead.
+      field("Please enter the date the plate will be purchased", "text", {
         value: values.purchaseDate,
         optional: true,
-        labelIncludes: "date you plan to purchase the plate",
+        labelIncludes: "date the plate will be purchased",
       })
     );
   }

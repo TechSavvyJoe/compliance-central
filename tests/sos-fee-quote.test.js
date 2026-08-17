@@ -835,3 +835,22 @@ test("SOS date fields format a typed date and default the purchase date", () => 
   assert.match(sidepanelScript, /function prefillSosPurchaseDate\(\)/);
   assert.match(sidepanelScript, /prefillSosPurchaseDate\(\)/);
 });
+
+// The state calls this "Please enter the date the plate will be purchased".
+// Matching on "date you plan to purchase the plate" never found the field, and
+// because the question is optional the value was dropped in silence: a future
+// purchase date quoted as today, verified live as $179 instead of $349.
+test("the purchase date is labelled the way Michigan labels it", () => {
+  const fields = buildSosSubmission(newPlateValues({ purchaseDate: "12/01/2026" }));
+  const purchase = fields.find((f) => /purchas/i.test(f.label));
+  assert.ok(purchase, "a purchase date must be submitted when one is set");
+  assert.equal(purchase.value, "12/01/2026");
+  // Must be a real substring of the state's own question.
+  const stateLabel =
+    "Please enter the date the plate will be purchased (if no date is entered, " +
+    "the registration fees will be calculated based on today's date).";
+  assert.ok(
+    stateLabel.toLowerCase().includes(purchase.labelIncludes.toLowerCase()),
+    `labelIncludes "${purchase.labelIncludes}" is not in the state's wording`
+  );
+});

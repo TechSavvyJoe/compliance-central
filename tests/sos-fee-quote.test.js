@@ -75,6 +75,9 @@ function newPlateValues(overrides = {}) {
     msrp: "42500",
     firstTitle: "no",
     businessRegistration: "no",
+    // Michigan expires a passenger plate on the owner's birthday, so the
+    // official calculator will not return any total without this.
+    ownerBirthdate: "03/14/1985",
     plateType: "PAS",
     plateDesign: "pure_michigan",
     recreationPassport: "no",
@@ -695,4 +698,47 @@ test("a fee breakdown must reconcile exactly to the state total", () => {
   assert.match(apiClient, /breakdownTotal !== quote\.feeCents/);
   // Any labelled, non-negative integer row is acceptable; only the sum decides.
   assert.doesNotMatch(apiClient, /fee\|registration\|plate/);
+});
+
+// Michigan reads a passenger plate's expiration from the owner's birthday. The
+// official calculator asks on every flow, not just the commercial one, and
+// omitting these left the state form silently unanswered — no total was ever
+// produced and the salesperson was pushed onto the SOS site to finish by hand.
+test("every new-plate batch answers registered-to and the owner birthdate", () => {
+  const submission = buildSosSubmission(newPlateValues());
+  const business = submission.find((f) => f.label === "Is this for a business?");
+  const birthdate = submission.find((f) => /birthdate/i.test(f.label));
+  assert.equal(business?.value, "No");
+  assert.equal(birthdate?.value, "03/14/1985");
+  assert.equal(validSosSubmissionFields(submission), true);
+});
+
+test("a business registration is never asked for a birthdate", () => {
+  const values = newPlateValues({ businessRegistration: "yes", ownerBirthdate: "" });
+  assert.deepEqual(validateSosLocalValues(values), []);
+  const submission = buildSosSubmission(values);
+  assert.equal(submission.find((f) => f.label === "Is this for a business?").value, "Yes");
+  assert.equal(submission.some((f) => /birthdate/i.test(f.label)), false);
+});
+
+test("a person registration requires a real birthdate", () => {
+  for (const bad of ["", "3/14/1985", "13/01/1990", "02/31/1990", "03/14/2999"]) {
+    const issues = validateSosLocalValues(newPlateValues({ ownerBirthdate: bad }));
+    assert.ok(
+      issues.some((i) => i.id === "sosOwnerBirthdate"),
+      `${bad || "(empty)"} must be rejected`
+    );
+  }
+  // While registered-to is still unanswered, that question owns the error.
+  const unanswered = validateSosLocalValues(
+    newPlateValues({ businessRegistration: "", ownerBirthdate: "" })
+  );
+  assert.equal(unanswered.some((i) => i.id === "sosOwnerBirthdate"), false);
+});
+
+test("the birthdate field is present and explains why it is asked", () => {
+  assert.match(sidepanelHtml, /id="sosOwnerBirthdate"/);
+  assert.match(sidepanelHtml, /expire on the owner's birthday/i);
+  // Registered-to drives the birthdate, so it can no longer start hidden.
+  assert.doesNotMatch(sidepanelHtml, /id="sosBusinessRegistration"[^>]*hidden/);
 });

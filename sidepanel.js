@@ -106,7 +106,6 @@ import {
 import {
   bodyOptionsForVehicle,
   buildSosSubmission,
-  isCommercialUse,
   localSosVinFields,
   plateDesignByValue,
   plateDesignOptionsForType,
@@ -174,6 +173,8 @@ const elements = {
   sosModelYear: $("sosModelYear"),
   sosMsrp: $("sosMsrp"),
   sosBusinessRegistration: $("sosBusinessRegistration"),
+  sosOwnerBirthdate: $("sosOwnerBirthdate"),
+  sosOwnerBirthdateControl: $("sosOwnerBirthdateControl"),
   sosPlateType: $("sosPlateType"),
   sosPlateDesign: $("sosPlateDesign"),
   sosPlateDesignControl: $("sosPlateDesignControl"),
@@ -750,6 +751,7 @@ function localSosValues() {
     msrp: elements.sosMsrp?.value.trim() || "",
     firstTitle: selectedRadioValue("sosFirstTitle"),
     businessRegistration: selectedRadioValue("sosBusinessRegistration"),
+    ownerBirthdate: elements.sosOwnerBirthdate?.value.trim() || "",
     plateType: elements.sosPlateType?.value || "",
     plateDesign: elements.sosPlateDesign?.value || "",
     recreationPassport: selectedRadioValue("sosRecreationPassport"),
@@ -1209,6 +1211,31 @@ async function cancelSosFeeRequest() {
   }
 }
 
+/**
+ * A business registration expires on a fixed schedule, so the state only asks
+ * for a birthdate when the owner is a person. Hiding the field for a business
+ * keeps it out of both the form and validation.
+ */
+function syncSosOwnerBirthdateVisibility() {
+  const business = selectedRadioValue("sosBusinessRegistration") === "yes";
+  if (elements.sosOwnerBirthdateControl) {
+    elements.sosOwnerBirthdateControl.hidden = business;
+  }
+}
+
+/**
+ * The buyer's date of birth is already captured on the Screening tab, and a
+ * Michigan passenger plate expires on that same birthday. Prefill it rather
+ * than making the salesperson retype it, but never overwrite a value they have
+ * already edited here — the registered owner is not always the buyer.
+ */
+function prefillSosOwnerBirthdate() {
+  const input = elements.sosOwnerBirthdate;
+  if (!input || input.value.trim() || input.dataset.touched === "true") return;
+  const dob = String(elements.dob?.value || "").trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) input.value = dob;
+}
+
 function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   const vehicleType = elements.sosVehicleType?.value || "Passenger";
   const previousBody = resetDependentValues ? "" : elements.sosBodyStyle?.value;
@@ -1220,10 +1247,11 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   const previousPlate = elements.sosPlateType?.value;
   replaceSosOptions(elements.sosPlateType, plateOptionsForUse(vehicleUse), previousPlate);
 
-  const commercial = isCommercialUse(vehicleUse);
-  if (elements.sosBusinessRegistration) {
-    elements.sosBusinessRegistration.hidden = !commercial;
-  }
+  // "Registered to" is asked by every official calculator, not just the
+  // commercial one, and Michigan reads a passenger plate's expiration from the
+  // owner's birthday — so both stay visible. Only a business registration drops
+  // the birthdate, because the state expires those on a fixed schedule instead.
+  syncSosOwnerBirthdateVisibility();
   const designOptions = plateDesignOptionsForType(elements.sosPlateType?.value);
   const previousDesign = elements.sosPlateDesign?.value;
   replaceSosOptions(elements.sosPlateDesign, designOptions, previousDesign);
@@ -1557,6 +1585,23 @@ function initEventListeners() {
   window.addEventListener("pagehide", disposeSosPlateImages, { once: true });
   elements.checkSosLienBtn?.addEventListener("click", handleSosLienCheck);
   elements.sosVinLookupInput?.addEventListener("input", handleSosVinInput);
+  // Registered-to drives whether the state asks for a birthdate at all.
+  document
+    .querySelectorAll('input[name="sosBusinessRegistration"]')
+    .forEach((input) =>
+      input.addEventListener("change", () => {
+        syncSosOwnerBirthdateVisibility();
+        prefillSosOwnerBirthdate();
+      })
+    );
+  // Once the salesperson types here, the registered owner is theirs to control
+  // and the Screening DOB must never silently overwrite it.
+  elements.sosOwnerBirthdate?.addEventListener("input", () => {
+    elements.sosOwnerBirthdate.dataset.touched = "true";
+  });
+  elements.dob?.addEventListener("change", prefillSosOwnerBirthdate);
+  syncSosOwnerBirthdateVisibility();
+  prefillSosOwnerBirthdate();
   syncSosLienCheckButton();
   document.querySelectorAll('input[name="sosQuoteMode"]').forEach((input) => {
     input.addEventListener("change", handleSosQuoteModeChange);

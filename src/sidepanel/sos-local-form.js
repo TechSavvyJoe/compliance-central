@@ -219,10 +219,23 @@ export function buildSosSubmission(values) {
   if (plateDesign?.plateType === values.plateType) {
     submission.push(...plateSubmissionFields(plateDesign));
   }
-  if (isCommercialUse(values.vehicleUse)) {
+  // Michigan sets a passenger plate's expiration from the owner's birthday, so
+  // the official calculator asks who owns the vehicle before it will produce
+  // any total. These live on every calculator, not just the commercial one:
+  // omitting them left the state form silently unanswered, which is why a quote
+  // could never be reconciled and the salesperson was pushed to the SOS site.
+  const isBusiness = values.businessRegistration === "yes";
+  submission.push(
+    field("Is this for a business?", "radio", {
+      value: isBusiness ? "Yes" : "No",
+      labelIncludes: "for a business",
+    })
+  );
+  if (!isBusiness) {
     submission.push(
-      field("Is this for a business?", "radio", {
-        value: values.businessRegistration === "yes" ? "Yes" : "No",
+      field("Please enter the owner's birthdate", "text", {
+        value: values.ownerBirthdate,
+        labelIncludes: "birthdate",
       })
     );
   }
@@ -277,6 +290,33 @@ export function validateSosLocalValues(values, now = new Date()) {
   const msrp = String(values?.msrp || "").replace(/[$,\s]/g, "");
   if (!/^\d{1,7}(?:\.\d{1,2})?$/.test(msrp) || Number(msrp) <= 0) {
     errors.push({ id: "sosMsrp", message: "Enter the vehicle MSRP." });
+  }
+
+  // A Michigan passenger registration expires on the owner's birthday, so the
+  // state calculator cannot return any total without it. Business registrations
+  // expire on a fixed schedule and are not asked for a birthdate.
+  // Only once the registration is known to belong to a person. While that
+  // question is still unanswered its own error is the useful one; asking for a
+  // birthdate the state may not even want would just be noise.
+  if (values?.businessRegistration === "no") {
+    const birthdate = String(values?.ownerBirthdate || "").trim();
+    const parts = birthdate.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const parsed = parts
+      ? new Date(Date.UTC(Number(parts[3]), Number(parts[1]) - 1, Number(parts[2])))
+      : null;
+    const valid =
+      parts &&
+      parsed.getUTCFullYear() === Number(parts[3]) &&
+      parsed.getUTCMonth() === Number(parts[1]) - 1 &&
+      parsed.getUTCDate() === Number(parts[2]) &&
+      parsed.getTime() <= now.getTime() &&
+      Number(parts[3]) >= now.getUTCFullYear() - 120;
+    if (!valid) {
+      errors.push({
+        id: "sosOwnerBirthdate",
+        message: "Enter the owner's birthdate as MM/DD/YYYY.",
+      });
+    }
   }
   const plateTypeAllowed = plateOptionsForUse(values?.vehicleUse).some(
     ([value]) => value === values?.plateType

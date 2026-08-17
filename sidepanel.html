@@ -344,11 +344,16 @@
                 <label><input type="radio" name="sosFirstTitle" value="yes" /><span>New</span></label>
                 <label><input type="radio" name="sosFirstTitle" value="no" checked /><span>Used</span></label>
               </fieldset>
-              <fieldset id="sosBusinessRegistration" class="sos-control sos-segmented-field" hidden>
+              <fieldset id="sosBusinessRegistration" class="sos-control sos-segmented-field">
                 <legend>Registered to</legend>
                 <label><input type="radio" name="sosBusinessRegistration" value="yes" /><span>Business</span></label>
                 <label><input type="radio" name="sosBusinessRegistration" value="no" checked /><span>Person</span></label>
               </fieldset>
+              <div id="sosOwnerBirthdateControl" class="sos-control">
+                <label for="sosOwnerBirthdate">Owner birthdate</label>
+                <input id="sosOwnerBirthdate" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="MM/DD/YYYY" aria-describedby="sosOwnerBirthdateHint" />
+                <p id="sosOwnerBirthdateHint" class="sos-hint">Michigan plates expire on the owner's birthday.</p>
+              </div>
               <div class="sos-control sos-control-wide">
                 <label for="sosPlateType">Plate type</label>
                 <select id="sosPlateType"></select>

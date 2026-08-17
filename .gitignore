@@ -7,6 +7,9 @@ Thumbs.db
 node_modules/
 npm-debug.log
 
+# Local tooling artifacts
+.playwright-mcp/
+
 # Extension Builds
 *.zip
 *.crx

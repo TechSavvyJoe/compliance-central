@@ -3662,6 +3662,39 @@ body {
   color: var(--design-warning);
 }
 
+/* The heading is a nowrap flex row, so a third action in a 400px panel leaves
+   the visible "Evidence" kicker nothing to shrink into. Letting the row wrap and
+   giving the label a floor keeps it readable. (The h2 beside it is deliberately
+   visually hidden — it is the section's aria-labelledby target — so it is not
+   what needs the space.) */
+.evidence-heading {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.evidence-heading > div:first-child {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.evidence-heading-actions {
+  flex-wrap: wrap;
+}
+
+/* Starting the next customer is an action, not another export, so it reads
+   distinctly from PDF all / Print all sitting beside it. */
+.evidence-new-customer {
+  border-color: var(--design-navy);
+  background: var(--design-navy);
+  color: #fff;
+}
+
+.evidence-new-customer:hover,
+.evidence-new-customer:focus-visible {
+  background: var(--design-navy-soft);
+  border-color: var(--design-navy-soft);
+}
+
 .evidence-kicker,
 .workspace-eyebrow,
 .sos-eyebrow {

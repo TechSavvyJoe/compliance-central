@@ -930,3 +930,24 @@ test("official SOS evidence prints portrait", () => {
   assert.match(exportSource, /createPdfContext\("portrait"\)/);
   assert.doesNotMatch(exportSource, /createPdfContext\("landscape"\)/);
 });
+
+// The action row sits above the results in the DOM, and position:sticky only
+// pins inside its own section, so once results render the Clear control has
+// scrolled out of reach. The same handler is offered where the salesperson
+// actually is when a screening finishes.
+test("a finished screening can be cleared from the results header", () => {
+  assert.match(sidepanelHtml, /id="newCustomerBtn"/);
+  // It lives in the results evidence header, not the form's action row.
+  const results = sidepanelHtml.slice(sidepanelHtml.indexOf('id="resultsSection"'));
+  assert.ok(
+    results.indexOf('id="newCustomerBtn"') > -1,
+    "New customer must live inside the results section"
+  );
+  // Same handler as Clear form, so the two cannot drift apart.
+  assert.match(
+    sidepanelScript,
+    /elements\.newCustomerBtn\?\.addEventListener\("click", handleClear\)/
+  );
+  // The heading must be able to wrap, or a third action squeezes the label.
+  assert.match(sidepanelCss, /\.evidence-heading \{[^}]*flex-wrap:\s*wrap/);
+});

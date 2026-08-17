@@ -147,6 +147,7 @@ const elements = {
   // Buttons
   runAllChecksBtn: $("runAllChecksBtn"),
   clearBtn: $("clearBtn"),
+  newCustomerBtn: $("newCustomerBtn"),
   runOfacBtn: $("runOfacBtn"),
   runRepeatOffenderBtn: $("runRepeatOffenderBtn"),
   runTitleBtn: $("runTitleBtn"),
@@ -1646,6 +1647,10 @@ function displayStoredIndividualResult(results) {
 function initEventListeners() {
   elements.runAllChecksBtn.addEventListener("click", handleRunAllChecks);
   elements.clearBtn.addEventListener("click", handleClear);
+  // Once results render, the action row above them has scrolled out of reach —
+  // sticky only pins inside its own section — so the same Clear lives here,
+  // where the salesperson actually is when they finish a customer.
+  elements.newCustomerBtn?.addEventListener("click", handleClear);
   elements.runOfacBtn.addEventListener("click", handleRunOfac);
   elements.runRepeatOffenderBtn.addEventListener("click", handleRunRepeatOffender);
   elements.runTitleBtn.addEventListener("click", handleRunTitle);

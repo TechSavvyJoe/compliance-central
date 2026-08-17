@@ -285,8 +285,14 @@
       .filter((cells) => cells.some(Boolean));
     if (!rows.length) return null;
 
+    // Any labelled money row counts. Keying on "fee|registration|plate" dropped
+    // legitimate SOS line items that carry none of those words — "Recreation
+    // Passport" is the common one — and a single unmatched row failed the whole
+    // parse, so a valid calculation degraded to manual handoff. The exact-sum
+    // check below remains the integrity guard: a row we misread cannot slip
+    // through, because the breakdown must still reconcile to the official total.
     const breakdown = rows.map((cells) => {
-      if (cells.length !== 2 || !/\b(?:fee|registration|plate)\b/i.test(cells[0])) {
+      if (cells.length !== 2 || !cells[0]) {
         return null;
       }
       const feeCents = cents(cells[1]);

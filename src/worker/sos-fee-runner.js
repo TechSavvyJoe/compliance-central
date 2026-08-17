@@ -73,14 +73,19 @@ export function validSosSubmissionFields(fields) {
   });
 }
 
+// The official-page capture is supporting evidence, not the result itself. It
+// can fail for reasons that say nothing about the fee — html2canvas tainting on
+// a cross-origin plate image, or an oversized page exceeding the encode budget.
+// Treating a failed screenshot as a failed calculation threw away a correct,
+// fully parsed SOS total and pushed the salesperson back onto the state site for
+// a number we already had. Every consumer already degrades without the image:
+// the print/PDF buttons disable (sidepanel.js) and the evidence section renders
+// empty (sos-fee-quote.js), so a quote is verified on the fee alone.
 function verifiedQuote(response, mode) {
   return Boolean(
     response?.success &&
       response?.quote?.calculationMode === mode &&
-      Number.isInteger(response?.quote?.feeCents) &&
-      /^data:image\/(?:png|jpe?g|webp);base64,/i.test(
-        String(response?.quote?.officialPageImage || "")
-      )
+      Number.isInteger(response?.quote?.feeCents)
   );
 }
 

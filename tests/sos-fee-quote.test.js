@@ -632,3 +632,32 @@ test("UI and adapters enforce local edits, explicit handoff, and session-only da
   );
   assert.match(contentScript, /plate number\|\\bVIN\\b\|customer\|name/);
 });
+
+// A failed official-page capture used to invalidate an otherwise correct SOS
+// total, so a fully parsed fee degraded to "finish this on Michigan SOS".
+test("a verified total is accepted when the evidence capture fails", async () => {
+  const withoutImage = verifiedResult();
+  withoutImage.quote.officialPageImage = null;
+  const harness = runnerHarness({ responses: [withoutImage] });
+
+  const response = await harness.runner.calculate(
+    SOS_QUOTE_MODE.newPlate,
+    buildSosSubmission(newPlateValues())
+  );
+
+  assert.equal(response.success, true);
+  assert.equal(response.quote.feeCents, 20500);
+  // One send only: the runner must not burn its retries on a verified fee.
+  assert.equal(harness.messages.length, 1);
+  // The extension-owned calculator tab is still cleaned up.
+  assert.deepEqual(harness.removed, [401]);
+});
+
+// Michigan line items such as "Recreation Passport" carry none of the words the
+// parser used to require, and one unmatched row failed the entire table.
+test("fee table parsing accepts labelled rows that are not named fee/registration/plate", () => {
+  const adapter = readFileSync(new URL("../sos-fee-quote-content.js", import.meta.url), "utf8");
+  assert.doesNotMatch(adapter, /!\/\\b\(\?:fee\|registration\|plate\)\\b\/i\.test\(cells\[0\]\)/);
+  // The exact-sum reconciliation must remain the integrity guard.
+  assert.match(adapter, /breakdown\.reduce\(\(sum, row\) => sum \+ row\.feeCents, 0\) === total/);
+});

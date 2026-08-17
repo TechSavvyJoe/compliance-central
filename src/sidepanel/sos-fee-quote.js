@@ -239,10 +239,10 @@ export function createSosOfficialEvidencePrintHTML(quote) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8" />
   <title>Michigan SOS Registration Fee Calculation</title>
   <style>
-    @page { size: letter landscape; margin: .3in; }
+    @page { size: letter portrait; margin: .3in; }
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; background: #fff; color: #172033; font-family: Arial, Helvetica, sans-serif; }
-    .page { height: 7.9in; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; break-after: avoid; page-break-after: avoid; overflow: hidden; }
+    .page { height: 10.4in; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; break-after: avoid; page-break-after: avoid; overflow: hidden; }
     header { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding-bottom: 7px; border-bottom: 3px solid #00274c; }
     h1 { margin: 0; color: #00274c; font-size: 15px; }
     header p, footer { margin: 0; color: #475569; font-size: 8px; }

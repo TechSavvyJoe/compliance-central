@@ -2234,7 +2234,9 @@ export async function downloadSosOfficialEvidencePDF(quote) {
   }
   let ctx;
   try {
-    ctx = await createPdfContext("landscape");
+    // The capture is a full state web page, which is taller than it is wide, so
+    // portrait matches both the source and every other report this app prints.
+    ctx = await createPdfContext("portrait");
   } catch (err) {
     console.error("jsPDF load error:", err);
     showToast("Could not load the PDF library. Try Print SOS instead.", "error");

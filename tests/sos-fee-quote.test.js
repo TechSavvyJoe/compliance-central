@@ -907,3 +907,24 @@ test("the active tab underline sits inside the tab strip", () => {
   // Rounded both ends; the old 999px/999px/0/0 read upside-down as an underline.
   assert.match(rule, /border-radius:\s*999px;/);
 });
+
+// The capture is a full state web page, taller than it is wide, so both the
+// print sheet and the PDF are portrait — landscape letterboxed it and shrank
+// the text that has to stay readable on paper.
+test("official SOS evidence prints portrait", () => {
+  const sosSource = readFileSync(
+    new URL("../src/sidepanel/sos-fee-quote.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(sosSource, /@page \{ size: letter portrait/);
+  assert.doesNotMatch(sosSource, /size: letter landscape/);
+  // Letter portrait content box at .3in margins is 10.4in tall.
+  assert.match(sosSource, /\.page \{ height: 10\.4in/);
+
+  const exportSource = readFileSync(
+    new URL("../src/sidepanel/export.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(exportSource, /createPdfContext\("portrait"\)/);
+  assert.doesNotMatch(exportSource, /createPdfContext\("landscape"\)/);
+});

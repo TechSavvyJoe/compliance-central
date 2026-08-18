@@ -1999,11 +1999,23 @@ function initEventListeners() {
     if (!btn) return;
     e.stopPropagation();
 
-    const index = parseInt(btn.getAttribute("data-index"), 10);
+    // Look the record up by audit id. The list is rendered once from a
+    // snapshot, but storage is re-read on every click and a run finishing in
+    // the background inserts a newer record at the top — so a positional index
+    // captured at render time can resolve to a different customer than the row
+    // that was clicked.
+    const auditId = btn.dataset.audit || "";
+    if (!auditId) return;
     const { [STORAGE_KEYS.complianceHistory]: history = [] } =
       await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
-    if (index < 0 || index >= history.length) return;
-    const entry = history[index];
+    const entry = history.find((record) => record?.auditId === auditId);
+    if (!entry) {
+      showToast(
+        "That record is no longer saved. Reopen History for the current list.",
+        "warning"
+      );
+      return;
+    }
     const results = entry?.savedResults;
     if (!results?.customer || !results?.checks) {
       showToast(
@@ -2026,8 +2038,6 @@ function initEventListeners() {
     // Deleting one record was only possible by clearing every record: the
     // worker already supported removing a single entry, but nothing exposed it.
     if (btn.classList.contains("history-delete-btn")) {
-      const auditId = btn.dataset.audit || "";
-      if (!auditId) return;
       if (!confirm("Delete this one saved record?\n\nOther records are kept.")) return;
       try {
         const result = await chrome.runtime.sendMessage({

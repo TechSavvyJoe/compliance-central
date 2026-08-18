@@ -1284,22 +1284,89 @@ test("the printed plate is inlined rather than fetched", () => {
 // open the record, switch tab, find the button, run. And a single record could
 // only be removed by clearing every record — the worker already supported
 // removing one entry, nothing exposed it.
-test("a saved record can be re-screened and deleted from its own card", () => {
-  const historySource = readFileSync(
-    new URL("../src/sidepanel/history.js", import.meta.url),
-    "utf8"
+test("every history row action carries an id the worker will accept", async () => {
+  // This test used to assert that the source contained
+  //   data-audit="${sanitizeHTML(item.id || item.reference || "")}"
+  // which is exactly the bug: item.id is a numeric timestamp and
+  // item.reference is CC-YYYYMMDD-NNNNNN, but the worker only accepts an
+  // auditId matching /^(?:run|operation|legacy):/. Delete therefore failed for
+  // every record, and the source-text assertion held the defect in place
+  // instead of catching it. Render the real markup and check the ids against
+  // the real validator instead.
+  const { retainAuditHistory, isValidHistoryAuditId } = await import(
+    "../lib/history-retention.js"
   );
-  assert.match(historySource, /history-rescreen-btn/);
-  assert.match(historySource, /history-delete-btn/);
-  // Delete needs the audit id, not the list position, so it cannot remove the
-  // wrong record if the list re-sorts between render and click.
-  assert.match(historySource, /data-audit="\$\{sanitizeHTML\(item\.id \|\| item\.reference \|\| ""\)\}"/);
+  const { populateHistoryModal } = await import("../src/sidepanel/history.js");
+
+  const stored = retainAuditHistory([
+    {
+      id: Date.now(),
+      reference: "CC-20260818-113802",
+      runId: "abc123def456",
+      timestamp: Date.now(),
+      decision: "APPROVED",
+      runType: "full",
+      customerName: "Marcus Delaney",
+      checks: { ofac: "clear", repeatOffender: "eligible", title: "clear" },
+    },
+    {
+      id: Date.now() - 1000,
+      reference: "CC-20260817-090000",
+      operationId: "op789",
+      timestamp: Date.now() - 86_400_000,
+      decision: "REVIEW",
+      runType: "individual",
+      runLabel: "OFAC only",
+      customerName: "Dana Whitfield",
+      checks: { ofac: "potential_match" },
+    },
+  ]);
+
+  const previousChrome = globalThis.chrome;
+  globalThis.chrome = {
+    storage: { local: { get: async () => ({ complianceHistory: stored }) } },
+  };
+
+  let html = "";
+  try {
+    await populateHistoryModal({
+      set innerHTML(value) {
+        html = value;
+      },
+      get innerHTML() {
+        return html;
+      },
+    });
+  } finally {
+    globalThis.chrome = previousChrome;
+  }
+
+  const emitted = [...html.matchAll(/data-audit="([^"]*)"/g)].map((m) => m[1]);
+  assert.ok(emitted.length > 0, "history rows should carry audit ids");
+
+  // Every id the UI emits must be one the worker's validator accepts, and must
+  // name a record that actually exists.
+  const known = new Set(stored.map((entry) => entry.auditId));
+  for (const id of emitted) {
+    assert.ok(
+      isValidHistoryAuditId(id),
+      `REMOVE_HISTORY_ENTRY would reject "${id}"`
+    );
+    assert.ok(known.has(id), `"${id}" does not match a stored record`);
+  }
+
+  // Positional addressing is what let a background save re-sort storage under
+  // a rendered row and resolve a click to a different customer.
+  assert.doesNotMatch(html, /data-index=/);
+
+  assert.match(html, /history-rescreen-btn/);
+  assert.match(html, /history-delete-btn/);
   // Re-screen only applies to a full run; a partial check has nothing to re-run.
-  assert.match(historySource, /isFull\s*\?\s*`<button class="btn-hist history-rescreen-btn/);
+  assert.equal((html.match(/history-rescreen-btn/g) || []).length, 1);
 
   assert.match(sidepanelScript, /type: "REMOVE_HISTORY_ENTRY"/);
-  assert.match(sidepanelScript, /history-rescreen-btn/);
-  // Deleting one record must confirm, and must say the others are kept.
+  // The click handler must resolve the record by id, not by list position.
+  assert.match(sidepanelScript, /record\?\.auditId === auditId/);
   assert.match(sidepanelScript, /Delete this one saved record\?/);
   assert.match(sidepanelScript, /Other records are kept/);
 });

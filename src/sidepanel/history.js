@@ -272,7 +272,7 @@ export async function populateHistoryModal(historyListEl) {
     historyListEl.innerHTML =
       summary +
       shown
-        .map((item, index) => {
+        .map((item) => {
           const date = new Date(item.timestamp);
           const timeStr = date.toLocaleTimeString([], {
             hour: "2-digit",
@@ -294,6 +294,12 @@ export async function populateHistoryModal(historyListEl) {
                     : ""
                 }>${agoLabel(days)}</span>`
               : "";
+
+          // Rows are addressed by audit id, never by position: the list is
+          // rendered once from a snapshot, but a background run can save a new
+          // record and re-sort storage underneath it. An index would then point
+          // at a different customer than the row the salesperson clicked.
+          const auditId = sanitizeHTML(item.auditId || "");
 
           const dm = decisionMeta(item.decision);
           const decisionItemCls = `decision-${dm.cls.replace("dec-", "")}`;
@@ -354,7 +360,7 @@ export async function populateHistoryModal(historyListEl) {
               : "";
 
           return `
-        <div class="history-item ${decisionItemCls}" data-index="${index}">
+        <div class="history-item ${decisionItemCls}" data-audit="${auditId}">
           <div class="history-item-header">
             <div class="history-id">
               <span class="history-customer">${primaryLabel}</span>
@@ -368,15 +374,15 @@ export async function populateHistoryModal(historyListEl) {
           </div>
           <div class="history-checks">${chips}</div>
           <div class="history-actions">
-            <button class="btn-hist btn-hist-primary history-open-btn" data-index="${index}" title="Restore this customer and the saved results"><span class="btn-hist-ic">${ICONS.play}</span>Open record</button>
-            <button class="btn-hist history-print-btn" data-index="${index}" title="Print the saved reports">Print</button>
-            <button class="btn-hist history-download-btn" data-index="${index}" title="Download the saved reports as one PDF">PDF</button>
+            <button class="btn-hist btn-hist-primary history-open-btn" data-audit="${auditId}" title="Restore this customer and the saved results"><span class="btn-hist-ic">${ICONS.play}</span>Open record</button>
+            <button class="btn-hist history-print-btn" data-audit="${auditId}" title="Print the saved reports">Print</button>
+            <button class="btn-hist history-download-btn" data-audit="${auditId}" title="Download the saved reports as one PDF">PDF</button>
             ${
               isFull
-                ? `<button class="btn-hist history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}" title="Restore this customer and run the checks again">Re-screen</button>`
+                ? `<button class="btn-hist history-rescreen-btn${aging ? " is-aging" : ""}" data-audit="${auditId}" title="Restore this customer and run the checks again">Re-screen</button>`
                 : ""
             }
-            <button class="btn-hist btn-hist-danger history-delete-btn" data-index="${index}" data-audit="${sanitizeHTML(item.id || item.reference || "")}" title="Delete only this record" aria-label="Delete this record">Delete</button>
+            <button class="btn-hist btn-hist-danger history-delete-btn" data-audit="${auditId}" title="Delete only this record" aria-label="Delete this record">Delete</button>
           </div>
         </div>`;
         })

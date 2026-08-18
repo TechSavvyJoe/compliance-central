@@ -4558,3 +4558,318 @@ body {
   width: 16px;
   height: 16px;
 }
+
+/* ---------------------------------------------------------------------------
+ * Density.
+ *
+ * This panel is a narrow column on a single 20-22in monitor, so vertical space
+ * is the scarce resource and every row of padding costs a scroll. The spacing
+ * had accumulated one value at a time — 18/15/14/12px of section padding,
+ * 14/11/9px form gutters, 42px controls in the buyer form and 41px in the
+ * plate calculator — so the same relationship was expressed three ways and
+ * none of it was tuned together. This section puts the whole panel on one
+ * rhythm, shrinks the furniture that took height without carrying information,
+ * and fixes the sizing bugs that only showed up once the values moved.
+ *
+ * The rhythm: 12px inside a panel, 8-10px between panels and between fields,
+ * 38px controls.
+ */
+
+.hub-main {
+  padding: 10px 10px 14px;
+  gap: 8px;
+}
+
+#screeningWorkspace,
+.deal-steps {
+  gap: 8px;
+}
+
+.input-section,
+.action-section,
+.progress-section,
+.results-section,
+.history-workspace,
+.sos-quote-section,
+#inputPanel > .typed-buyer-card:first-child {
+  padding: 12px;
+}
+
+.action-section {
+  gap: 10px;
+}
+
+.section-title {
+  margin-bottom: 10px;
+}
+
+.form-row {
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.form-group,
+.sos-control {
+  gap: 4px;
+}
+
+.sos-local-grid {
+  gap: 8px;
+}
+
+/* One control height everywhere. */
+.form-group input,
+.form-group select,
+.sos-control select,
+.sos-control input[type="text"],
+.sos-vin-controls input {
+  height: 38px;
+  min-height: 38px;
+}
+
+/* The buyer and co-buyer cards pinned their own control height and gutter, so
+   they sat 6px taller per row than every other field in the app. */
+.typed-buyer-card .form-group input,
+.typed-buyer-card .form-group select,
+.cobuyer-section .form-group input,
+.cobuyer-section .form-group select {
+  height: 38px;
+  min-height: 38px;
+}
+
+.typed-buyer-card .form-row,
+.cobuyer-section .form-row {
+  margin-bottom: 9px;
+}
+
+/* Segmented choices are controls too, and read as misaligned next to a 38px
+   select in the same grid row. */
+.sos-segmented-field span {
+  height: 38px;
+}
+
+/* The plate calculator and the evidence list carry their own padding at a
+   higher specificity, so the rhythm has to be restated for them. */
+.sos-local-workbench {
+  padding: 12px;
+}
+
+.sos-vin-lookup,
+.sos-local-workbench,
+#sosTransferFields {
+  margin-bottom: 8px;
+}
+
+.sos-vin-lookup summary {
+  padding: 9px 12px;
+}
+
+.sos-quote-heading {
+  margin: 0 2px 9px;
+}
+
+.evidence-panel .result-card {
+  /* padding-right stays with the rule that reserves room for the save action. */
+  padding-block: 8px;
+  padding-left: 12px;
+}
+
+.evidence-heading {
+  padding: 10px 12px 9px;
+}
+
+/* List rows: the type is the same size, the box around it is not. */
+.check-items {
+  margin-bottom: 10px;
+}
+
+.check-item {
+  padding: 6px 12px;
+}
+
+.completed-step-row {
+  min-height: 52px;
+  padding: 8px 12px;
+}
+
+.result-card {
+  padding: 10px 12px;
+}
+
+.report-selection {
+  margin-top: 10px;
+  padding: 12px;
+}
+
+/* The header is sticky, so its height comes out of every screen in the app. */
+.hub-header {
+  padding: 10px 12px 11px;
+}
+
+.command-shell {
+  margin-top: 9px;
+}
+
+/* The action bar is pinned to the foot of the panel, so its height is taken
+   out of the visible area on every screen, not just the tall ones. At 24px of
+   padding the primary button alone stood 70px. */
+.btn-large {
+  padding: 12px 18px;
+  font-size: 1rem;
+}
+
+.main-actions {
+  /* Matches .action-section padding — the previous -14px overhung it by 2px. */
+  margin: 0 -12px -12px;
+  padding: 9px 12px calc(9px + env(safe-area-inset-bottom, 0px));
+}
+
+/* These groups were laid out as rows, but the labels are wider than a third of
+   a 400px panel, so every one of them wrapped to a full-height column. Two per
+   row fits the labels without truncating them. */
+.all-actions,
+.individual-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.all-actions button,
+.individual-checks button {
+  flex: none;
+  min-width: 0;
+}
+
+.all-actions button:last-child:nth-child(odd),
+.individual-checks button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* The hero is five stacked lines of type; the gaps between them were doing
+   more work than the type. Its negative margin bleeds to the panel edge, so it
+   has to track .hub-main's padding. */
+.first-run-hero {
+  margin: -10px -10px 2px;
+  padding: 8px 16px 10px;
+}
+
+.first-run-hero h2,
+.first-run-hero > p {
+  margin-top: 2px;
+}
+
+.first-run-actions {
+  margin-top: 6px;
+}
+
+.first-run-hint {
+  margin-top: 4px;
+}
+
+/* Workspace intros were capped near 28ch, which broke a two-sentence
+   description into four short lines beside a button that left the width
+   unused. */
+.history-workspace-heading p,
+.sos-heading-copy {
+  max-width: 36ch;
+}
+
+/* Settings was the last thing still on the 24px scale: each of the three rules
+   between its groups cost 48px, so 144px of a 705px sheet was separator. The
+   divider still does its job at 14. */
+.settings-group + .settings-group {
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+/* --- Sizing bugs the density pass surfaced ------------------------------- */
+
+/* .sos-control is a grid, so its auto rows stretched to fill whatever height
+   the tallest cell in the row had. A field beside the owner-birthdate cell
+   (which carries a helper line) had its label box grown by 14px and its
+   control pushed that far below the one it lines up with. */
+.sos-control {
+  align-content: start;
+}
+
+/* The calendar toggle was a fixed 40px square pinned inside a 42px field, so
+   it overhung the shorter control by 3px. Bind it to the shell instead, and it
+   stays correct whatever the field height becomes. */
+.date-picker-toggle {
+  top: 1px;
+  bottom: 1px;
+  width: 38px;
+  height: auto;
+}
+
+.date-input-shell input {
+  padding-right: 42px;
+}
+
+/* "New customer" was meant to read as an action next to the two text links
+   beside it, but it inherited their zero horizontal padding and square
+   corners, so the navy landed as a highlighter stripe behind the words. Give
+   it the chip it was asking for, and clear the 24px minimum target size while
+   we are here — all three sat at 22px. */
+.evidence-download-btn {
+  min-height: 24px;
+  padding: 5px 2px;
+}
+
+.evidence-new-customer {
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+/* Two targets in History were smaller than they looked. The search field is
+   drawn by its 38px shell but the input inside it was 14px tall, so most of
+   the box a salesperson aims at did nothing. The aging filter was a 17px
+   inline row. Both now fill the height they appear to occupy. */
+.history-search-shell {
+  min-height: 38px;
+}
+
+.history-search-shell input {
+  align-self: stretch;
+  height: auto;
+}
+
+.history-aging-filter {
+  min-height: 24px;
+}
+
+/* --- Wide panels --------------------------------------------------------- */
+
+/* Nothing in this stylesheet responded above 380px, so dragging the side panel
+   wider just grew longer columns instead of using the width. */
+@media (min-width: 560px) {
+  .sos-local-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .check-items,
+  .individual-checks,
+  .all-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .check-items {
+    display: grid;
+  }
+
+  .all-actions button:last-child:nth-child(odd),
+  .individual-checks button:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+
+  .results-grid.evidence-rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Plate design spans the row at two columns so its long option names are not
+     truncated; at three it only needs two of them. */
+  #sosPlateDesignControl {
+    grid-column: span 2;
+  }
+}

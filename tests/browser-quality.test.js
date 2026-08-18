@@ -45,6 +45,19 @@ test("data-use disclosure ties remote checks to an affirmative user action", () 
   }
 });
 
+test("the privacy disclosure closes its paragraph inside its disclosure", () => {
+  // The </p> and </details> were transposed, so the browser closed the
+  // paragraph early and emitted a stray empty <p> as a sibling of the
+  // disclosure. Nothing looked wrong, and the consent copy is the one part of
+  // this panel that has to stay exactly as written.
+  const block = sidepanelHtml.match(
+    /<details id="dataUseDetails"[\s\S]*?<\/details>/
+  );
+  assert.ok(block, "the data-use disclosure should be a <details> block");
+  assert.match(block[0], /<p id="dataUseNote"[\s\S]*?<\/p>\s*<\/details>$/);
+  assert.doesNotMatch(sidepanelHtml, /<\/details>\s*<\/p>/);
+});
+
 test("evidence controls are explicit and completed rows identify their own timestamp", () => {
   assert.match(sidepanelHtml, /class="evidence-heading"/);
   assert.match(sidepanelHtml, /Print selected/);

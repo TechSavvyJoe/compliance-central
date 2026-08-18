@@ -960,10 +960,10 @@ test("the scan prompt stays compact above the form", () => {
     sidepanelCss.indexOf(".first-run-hero {"),
     sidepanelCss.indexOf(".first-run-hero {") + 400
   );
-  assert.match(hero, /padding:\s*13px 20px 15px/);
+  assert.match(hero, /padding:\s*9px 20px 11px/);
   // The headline must stay well under the old 2rem cap in a 400px panel.
   const heading = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-hero h2 {"));
-  assert.match(heading, /font-size:\s*clamp\(1\.2rem, 5\.2vw, 1\.4rem\)/);
+  assert.match(heading, /font-size:\s*clamp\(1\.02rem, 4\.4vw, 1\.15rem\)/);
   // Trimming the box must not shrink the tap target below the 44px minimum.
   const scan = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-scan-btn {"));
   assert.match(scan, /min-height:\s*44px/);
@@ -1029,4 +1029,38 @@ test("the birth-date calendar stays on screen when the field sits low", () => {
   assert.match(block, /\.date-picker-popover \{[^}]*position: fixed/);
   // The drop-up must be neutralised inside the sheet, at equal specificity.
   assert.match(block, /\.date-picker-popover\.date-picker-drop-up \{[^}]*bottom: 10px/);
+});
+
+// The two-column grid was scoped to the buyer card, so the co-buyer — the same
+// six fields — stacked full width and read as a different form.
+test("the co-buyer form is laid out like the buyer form", () => {
+  assert.match(sidepanelCss, /\.typed-buyer-card \.form-row,\s*\n\.cobuyer-section \.form-row \{/);
+  assert.match(sidepanelCss, /\.cobuyer-section \.form-row:nth-of-type\(2\)/);
+  // Same label wording, so the two sections read as one form.
+  assert.match(sidepanelHtml, /<label for="cbMiddleName">Middle Name<\/label>/);
+});
+
+// The plate calculator and the trade-in live on different tabs, so the same
+// seventeen characters were retyped by hand — the one input here where a typo
+// is both easy to make and silent.
+test("the plate tab can reuse the trade-in VIN", () => {
+  assert.match(sidepanelHtml, /id="useTradeVinBtn"/);
+  assert.match(sidepanelScript, /function applyTradeVinToPlateTab\(\)/);
+  // Offered only when there is a full VIN that is not already in the field.
+  const sync = sidepanelScript.slice(sidepanelScript.indexOf("function syncUseTradeVinButton()"));
+  assert.match(sync, /vin\.length === CONFIG_VIN_LENGTH && vin !== current/);
+});
+
+// The consent notice must stay verbatim, but it does not need a screen to say
+// it: the operative sentence stays visible and the rest is one click away.
+test("the consent notice is collapsible without losing a word", () => {
+  assert.match(sidepanelHtml, /<details id="dataUseDetails"/);
+  assert.match(sidepanelHtml, /<summary><span>Privacy<\/span>/);
+  for (const phrase of [
+    "OFAC stays on this computer",
+    "Submitted customer fields and completed reports",
+    "Running a check means you agree",
+  ]) {
+    assert.ok(sidepanelHtml.includes(phrase), `the disclosure must keep "${phrase}"`);
+  }
 });

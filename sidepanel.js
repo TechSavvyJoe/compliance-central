@@ -160,6 +160,8 @@ const elements = {
   downloadSosCalculationPdfBtn: $("downloadSosCalculationPdfBtn"),
   clearSosQuoteBtn: $("clearSosQuoteBtn"),
   sosVinLookupInput: $("sosVinLookupInput"),
+  useTradeVinBtn: $("useTradeVinBtn"),
+  useTradeVinValue: $("useTradeVinValue"),
   lookupSosVinBtn: $("lookupSosVinBtn"),
   checkSosLienBtn: $("checkSosLienBtn"),
   sosVinLookupStatus: $("sosVinLookupStatus"),
@@ -1346,6 +1348,7 @@ function renderRescreenBanner(aging = [], staleQuote = false) {
   banner.classList.remove("hidden");
 }
 
+const CONFIG_VIN_LENGTH = 17;
 let rescreenBannerTarget = null;
 
 /** Take the salesperson to whatever the reminder is about. */
@@ -1357,6 +1360,33 @@ function openRescreenTarget() {
     return;
   }
   if (rescreenBannerTarget === "sos") activateWorkspace("sos", { focusTab: true });
+}
+
+/**
+ * Offer the trade-in VIN the screening already captured.
+ *
+ * The plate calculator and the trade-in sit on different tabs, so the same
+ * seventeen characters were being retyped by hand — the one input in this panel
+ * where a typo is both easy and silent.
+ */
+function syncUseTradeVinButton() {
+  const button = elements.useTradeVinBtn;
+  if (!button) return;
+  const vin = (elements.tradeVin?.value || "").trim().toUpperCase();
+  const current = (elements.sosVinLookupInput?.value || "").trim().toUpperCase();
+  // Nothing to offer if there is no trade, or it is already in the field.
+  const offer = vin.length === CONFIG_VIN_LENGTH && vin !== current;
+  button.classList.toggle("hidden", !offer);
+  if (offer && elements.useTradeVinValue) elements.useTradeVinValue.textContent = vin;
+}
+
+function applyTradeVinToPlateTab() {
+  const vin = (elements.tradeVin?.value || "").trim().toUpperCase();
+  if (!elements.sosVinLookupInput || vin.length !== CONFIG_VIN_LENGTH) return;
+  elements.sosVinLookupInput.value = vin;
+  elements.sosVinLookupInput.dispatchEvent(new Event("input", { bubbles: true }));
+  syncUseTradeVinButton();
+  showToast("Trade-in VIN copied from the screening.", "success");
 }
 
 function syncSosOwnerBirthdateVisibility() {
@@ -1738,6 +1768,10 @@ function initEventListeners() {
   window.addEventListener("pagehide", disposeSosPlateImages, { once: true });
   elements.checkSosLienBtn?.addEventListener("click", handleSosLienCheck);
   elements.sosVinLookupInput?.addEventListener("input", handleSosVinInput);
+  elements.sosVinLookupInput?.addEventListener("input", syncUseTradeVinButton);
+  elements.useTradeVinBtn?.addEventListener("click", applyTradeVinToPlateTab);
+  elements.tradeVin?.addEventListener("input", syncUseTradeVinButton);
+  syncUseTradeVinButton();
   // Registered-to drives whether the state asks for a birthdate at all.
   document
     .querySelectorAll('input[name="sosBusinessRegistration"]')

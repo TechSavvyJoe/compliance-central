@@ -2252,7 +2252,7 @@ body.modal-open {
   /* This is a prompt above the form, not a landing page: at 26px/24px with a
      32px headline it filled roughly half a 700px panel before the first field
      was reachable. Tightened so the form starts near the top. */
-  padding: 13px 20px 15px;
+  padding: 9px 20px 11px;
   background: #0d2b4a;
   color: #fff;
 }
@@ -2280,7 +2280,7 @@ body.modal-open {
   margin: 4px 0 0;
   color: #fff;
   font-family: "Bricolage Grotesque", Archivo, sans-serif;
-  font-size: clamp(1.2rem, 5.2vw, 1.4rem);
+  font-size: clamp(1.02rem, 4.4vw, 1.15rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.06;
@@ -2288,17 +2288,17 @@ body.modal-open {
 
 .first-run-hero > p {
   max-width: 310px;
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: #cfe0ef;
-  font-size: 12.5px;
-  line-height: 1.4;
+  font-size: 11.5px;
+  line-height: 1.35;
 }
 
 .first-run-actions {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .first-run-scan-btn {
@@ -3719,6 +3719,76 @@ body {
   color: var(--design-navy);
 }
 
+/* The tab strip is how a salesperson moves between three different jobs, so the
+   active one should be obvious at a glance rather than a weight change and a
+   thin rule. The selected tab now sits on its own raised surface. */
+.workspace-tabs button[aria-selected="true"] {
+  background: var(--design-card);
+  box-shadow: inset 0 -3px 0 var(--design-gold);
+}
+
+.workspace-tabs button:hover:not([aria-selected="true"]) {
+  background: var(--design-line-soft);
+}
+
+/* The consent notice has to stay verbatim, but it does not have to occupy a
+   screen to do it. The operative sentence stays visible; the full disclosure is
+   one click away and still present in the DOM for anyone reading the page. */
+.data-use-details { margin: 0 0 10px; }
+
+.data-use-details > summary {
+  cursor: pointer;
+  padding: 7px 9px;
+  border: 1px solid var(--design-line-soft);
+  border-radius: 7px;
+  background: var(--design-canvas);
+  color: var(--design-slate);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  list-style: none;
+}
+
+.data-use-details > summary::-webkit-details-marker { display: none; }
+
+.data-use-details > summary span {
+  font-weight: 750;
+  color: var(--design-ink);
+  margin-right: 4px;
+}
+
+.data-use-details > summary::after {
+  content: " Read the full notice";
+  color: var(--design-navy);
+  font-weight: 700;
+}
+
+.data-use-details[open] > summary::after { content: " Hide"; }
+.data-use-details > summary:focus-visible { outline: 2px solid var(--design-gold); outline-offset: 2px; }
+.data-use-details[open] .data-use-note { margin-top: 8px; }
+
+/* Reuse the trade-in VIN the screening already captured rather than retyping
+   seventeen characters that are one tab away. */
+.sos-use-trade-vin {
+  margin-top: 5px;
+  padding: 5px 8px;
+  border: 1px dashed var(--design-navy);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--design-navy);
+  font: 700 0.66rem/1.2 inherit;
+  cursor: pointer;
+}
+
+.sos-use-trade-vin:hover,
+.sos-use-trade-vin:focus-visible { background: var(--design-line-soft); outline: none; }
+.sos-use-trade-vin.hidden { display: none; }
+.sos-use-trade-vin span { font-family: ui-monospace, Menlo, monospace; opacity: .75; }
+
+/* The whole co-buyer row already toggles, but nothing said so: it read as a
+   caption with a small control parked on the right. */
+.cobuyer-toggle:hover { border-color: var(--design-navy); }
+.cobuyer-toggle .checkbox-text { text-decoration: underline; text-underline-offset: 2px; }
+
 .rescreen-banner {
   display: flex;
   align-items: center;
@@ -4253,24 +4323,30 @@ body {
   font-size: 0.72rem;
 }
 
-.typed-buyer-card .form-row {
+.typed-buyer-card .form-row,
+.cobuyer-section .form-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-.typed-buyer-card .form-row:nth-of-type(2) {
+.typed-buyer-card .form-row:nth-of-type(2),
+.cobuyer-section .form-row:nth-of-type(2) {
   grid-template-columns: minmax(0, 1fr) minmax(92px, 0.55fr);
 }
 
 .typed-buyer-card .form-group,
-.typed-buyer-card .form-group-small {
+.typed-buyer-card .form-group-small,
+.cobuyer-section .form-group,
+.cobuyer-section .form-group-small {
   min-width: 0;
   width: auto;
 }
 
 @media (max-width: 340px) {
   .typed-buyer-card .form-row,
-  .typed-buyer-card .form-row:nth-of-type(2) {
+  .typed-buyer-card .form-row:nth-of-type(2),
+  .cobuyer-section .form-row,
+  .cobuyer-section .form-row:nth-of-type(2) {
     grid-template-columns: 1fr;
   }
 }

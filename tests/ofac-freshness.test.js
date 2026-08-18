@@ -118,3 +118,38 @@ test("rollback validation runs before the SDN list or timestamps are replaced", 
   assert.ok(validation < saveDownloadedAt);
   assert.ok(validation < savePublishDate);
 });
+
+// Bumping the IndexedDB schema runs an upgrade in every existing user's
+// browser. Deleting the unused searchHistory store must not take the sanctions
+// list with it — an emptied SDN list is the one failure that could turn a real
+// match into a silent pass.
+test("the v2 upgrade drops the unused store and keeps the sanctions list", async () => {
+  const source = readFileSync(
+    new URL("../ofac/storage.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /const DB_VERSION = 2;/);
+  // The upgrade deletes searchHistory...
+  assert.match(source, /deleteObjectStore\(HISTORY_STORE\)/);
+  // ...and never deletes or recreates the store holding the SDN entries.
+  assert.doesNotMatch(source, /deleteObjectStore\(SDN_STORE\)/);
+  assert.doesNotMatch(source, /deleteObjectStore\(SETTINGS_STORE\)/);
+  // The SDN store is still only created when absent, so an existing one is
+  // left untouched by the upgrade.
+  assert.match(
+    source,
+    /if \(!database\.objectStoreNames\.contains\(SDN_STORE\)\)/
+  );
+
+  // The functions that had no callers are gone, not merely unexported.
+  for (const dead of [
+    "saveSearchHistory",
+    "getSearchHistory",
+    "clearSearchHistory",
+    "clearSDNEntries",
+    "storeSDNEntries",
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`function ${dead}\\b`), `${dead} should be gone`);
+  }
+});

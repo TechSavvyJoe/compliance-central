@@ -23,6 +23,7 @@ import {
   plateOptionsForUse,
   validateSosLocalValues,
 } from "../src/sidepanel/sos-local-form.js";
+import { isPlateQuoteStale } from "../src/sidepanel/history.js";
 import {
   lookupVin,
   makeSosVinSuggestions,
@@ -966,4 +967,33 @@ test("the scan prompt stays compact above the form", () => {
   // Trimming the box must not shrink the tap target below the 44px minimum.
   const scan = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-scan-btn {"));
   assert.match(scan, /min-height:\s*44px/);
+});
+
+// A pending delivery was announced by a toast that vanished after seven seconds
+// and could not be clicked, so the one reminder that must not be missed reached
+// only whoever happened to be looking at the panel.
+test("the delivery reminder is a control, not a passing notice", () => {
+  // It must be a button so it is clickable and keyboard reachable.
+  assert.match(sidepanelHtml, /<button[^>]*id="rescreenBanner"/);
+  assert.match(sidepanelScript, /elements\.rescreenBanner\?\.addEventListener\("click", openRescreenTarget\)/);
+  // Clicking it has to land somewhere useful: the saved records, filtered.
+  const open = sidepanelScript.slice(sidepanelScript.indexOf("function openRescreenTarget()"));
+  assert.match(open, /historyAgingOnly.*checked = true/s);
+  assert.match(open, /activateWorkspace\("history"/);
+  // The old fire-and-forget toast must not come back.
+  assert.doesNotMatch(sidepanelScript, /re-screen any open deal before delivery/);
+});
+
+// Michigan prices a registration from the purchase date, so the same vehicle
+// quoted on a different day can carry a different fee — verified live at
+// $179.00 for today against $349.00 for a later date.
+test("a plate fee quoted on an earlier day counts as stale", () => {
+  const now = new Date("2026-08-17T20:00:00Z").getTime();
+  assert.equal(isPlateQuoteStale({ calculatedAt: "2026-08-17T09:00:00Z" }, now), false);
+  assert.equal(isPlateQuoteStale({ calculatedAt: "2026-08-16T23:59:00Z" }, now), true);
+  // Absent or unparseable timestamps must not manufacture a warning.
+  assert.equal(isPlateQuoteStale(null, now), false);
+  assert.equal(isPlateQuoteStale({ calculatedAt: "not a date" }, now), false);
+  // The reminder has to actually consider it.
+  assert.match(sidepanelScript, /isPlateQuoteStale\(currentSosFeeQuote\)/);
 });

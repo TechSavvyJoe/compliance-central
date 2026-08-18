@@ -3684,6 +3684,54 @@ body {
   flex-wrap: wrap;
 }
 
+/* A pending delivery is the one thing a salesperson must not miss, and a toast
+   that disappears after seven seconds cannot carry it. This stays on screen
+   until the deals are dealt with, and opens them when clicked. */
+.rescreen-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 11px 13px;
+  border: 1px solid #f0c98a;
+  border-left: 4px solid var(--design-warning);
+  border-radius: 9px;
+  background: var(--design-warning-bg, #fdf1e3);
+  color: var(--design-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rescreen-banner:hover,
+.rescreen-banner:focus-visible {
+  background: #fbe8cf;
+  outline: none;
+}
+
+.rescreen-banner:focus-visible {
+  box-shadow: 0 0 0 3px rgba(168, 91, 0, 0.28);
+}
+
+.rescreen-banner.hidden { display: none; }
+
+.rescreen-banner-icon { color: var(--design-warning); flex: none; }
+
+.rescreen-banner-copy { display: grid; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.rescreen-banner-copy strong { font-size: 0.78rem; font-weight: 750; }
+.rescreen-banner-copy span { color: var(--design-slate); font-size: 0.7rem; line-height: 1.35; }
+
+.rescreen-banner-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  color: var(--design-warning);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
 /* Starting the next customer is an action, not another export, so it reads
    distinctly from PDF all / Print all sitting beside it. */
 .evidence-new-customer {

@@ -113,6 +113,27 @@ function statusChip(label, fullName, state) {
 }
 
 /**
+ * True when a saved plate quote was calculated on an earlier calendar day.
+ *
+ * Michigan prices a registration from the purchase date, so the same vehicle
+ * quotes differently on a different day — verified live at $179.00 for today
+ * against $349.00 for a later date. A quote carried over from a previous day is
+ * therefore not merely old, it can be wrong, and must be recalculated before it
+ * reaches a customer.
+ */
+export function isPlateQuoteStale(quote, now = Date.now()) {
+  if (!quote?.calculatedAt) return false;
+  const quoted = new Date(quote.calculatedAt);
+  if (Number.isNaN(quoted.getTime())) return false;
+  const today = new Date(now);
+  return (
+    quoted.getFullYear() !== today.getFullYear() ||
+    quoted.getMonth() !== today.getMonth() ||
+    quoted.getDate() !== today.getDate()
+  );
+}
+
+/**
  * Full-run deals (not partial/individual checks) screened at least `days` ago.
  * Used to remind the user to re-screen before delivery. Returns newest first.
  */

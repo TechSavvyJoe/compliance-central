@@ -57,6 +57,7 @@ import {
   populateHistoryModal,
   clearAllHistory,
   findAgingDeals,
+  isPlateQuoteStale,
 } from "./src/sidepanel/history.js";
 import { downloadAuditCsv } from "./src/sidepanel/audit-csv.js";
 import {
@@ -296,6 +297,9 @@ const elements = {
   clearAllHistoryBtn: $("clearAllHistoryBtn"),
   exportAuditLogBtn: $("exportAuditLogBtn"),
   rescreenReminderToggle: $("rescreenReminderToggle"),
+  rescreenBanner: $("rescreenBanner"),
+  rescreenBannerTitle: $("rescreenBannerTitle"),
+  rescreenBannerDetail: $("rescreenBannerDetail"),
 
   // Loading
   loadingOverlay: $("loadingOverlay"),
@@ -1304,6 +1308,57 @@ function resetSosLocalForm() {
   prefillSosPurchaseDate();
 }
 
+/**
+ * Show the pending-delivery reminder as something the salesperson can act on.
+ *
+ * This used to be a toast that vanished after seven seconds and could not be
+ * clicked, so a deal needing a re-screen before delivery was announced once to
+ * whoever happened to be looking and then lost. The banner stays until the work
+ * is done and opens the affected records.
+ */
+function renderRescreenBanner(aging = [], staleQuote = false) {
+  const banner = elements.rescreenBanner;
+  if (!banner) return;
+  rescreenBannerTarget = aging.length ? "history" : staleQuote ? "sos" : null;
+  if (!rescreenBannerTarget) {
+    banner.classList.add("hidden");
+    return;
+  }
+
+  const parts = [];
+  if (aging.length) {
+    parts.push(
+      `${aging.length} screening${aging.length === 1 ? "" : "s"} needing a re-run`
+    );
+  }
+  // A plate quote from an earlier day was priced from that day's purchase date,
+  // so it can be wrong today rather than merely stale.
+  if (staleQuote) parts.push("a plate fee quoted on an earlier date");
+
+  elements.rescreenBannerTitle.textContent = aging.length
+    ? "Re-screen before delivery"
+    : "Recalculate the plate fee";
+  elements.rescreenBannerDetail.textContent = `${parts.join(" and ")}. ${
+    rescreenBannerTarget === "history"
+      ? "Open the saved records to re-run them."
+      : "Michigan prices from the purchase date."
+  }`;
+  banner.classList.remove("hidden");
+}
+
+let rescreenBannerTarget = null;
+
+/** Take the salesperson to whatever the reminder is about. */
+function openRescreenTarget() {
+  if (rescreenBannerTarget === "history") {
+    if (elements.historyAgingOnly) elements.historyAgingOnly.checked = true;
+    activateWorkspace("history", { focusTab: true });
+    filterHistoryWorkspace(elements.historySearchInput?.value || "");
+    return;
+  }
+  if (rescreenBannerTarget === "sos") activateWorkspace("sos", { focusTab: true });
+}
+
 function syncSosOwnerBirthdateVisibility() {
   const business = selectedRadioValue("sosBusinessRegistration") === "yes";
   if (elements.sosOwnerBirthdateControl) {
@@ -1647,6 +1702,7 @@ function displayStoredIndividualResult(results) {
 function initEventListeners() {
   elements.runAllChecksBtn.addEventListener("click", handleRunAllChecks);
   elements.clearBtn.addEventListener("click", handleClear);
+  elements.rescreenBanner?.addEventListener("click", openRescreenTarget);
   // Once results render, the action row above them has scrolled out of reach —
   // sticky only pins inside its own section — so the same Clear lives here,
   // where the salesperson actually is when they finish a customer.
@@ -2633,18 +2689,9 @@ async function openHistory() {
       STORAGE_KEYS.rescreenReminderEnabled,
       STORAGE_KEYS.complianceHistory,
     ]);
-    if (enabled) {
-      const aging = findAgingDeals(history);
-      if (aging.length) {
-        showToast(
-          `${aging.length} audit record${
-            aging.length === 1 ? "" : "s"
-          } from over a week ago — re-screen any open deal before delivery.`,
-          "warning",
-          7000
-        );
-      }
-    }
+    const aging = enabled ? findAgingDeals(history) : [];
+    const staleQuote = enabled && isPlateQuoteStale(currentSosFeeQuote);
+    renderRescreenBanner(aging, staleQuote);
   } catch (e) {
     console.error("Re-screen reminder check failed:", e);
   }

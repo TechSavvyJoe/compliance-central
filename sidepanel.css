@@ -3789,6 +3789,52 @@ body {
 .cobuyer-toggle:hover { border-color: var(--design-navy); }
 .cobuyer-toggle .checkbox-text { text-decoration: underline; text-underline-offset: 2px; }
 
+/* The number a customer is quoted, and what it actually buys them, lead the
+   result. The itemised add-ons stay below as reference rather than competing
+   with it for attention. */
+.sos-quote-headline {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 8px 0 6px;
+  padding: 11px 13px;
+  border: 1px solid var(--design-line);
+  border-left: 4px solid var(--design-navy);
+  border-radius: 9px;
+  background: var(--design-card);
+}
+
+.sos-quote-headline.hidden { display: none; }
+
+.sos-quote-total,
+.sos-quote-term { display: grid; gap: 2px; min-width: 0; }
+
+.sos-quote-total-label,
+.sos-quote-term-label {
+  color: var(--design-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sos-quote-total strong {
+  color: var(--design-navy);
+  font-size: 1.42rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sos-quote-term strong {
+  color: var(--design-ink);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.sos-quote-term strong.is-unstated { color: var(--design-muted); font-weight: 650; }
+
 .rescreen-banner {
   display: flex;
   align-items: center;

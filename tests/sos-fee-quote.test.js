@@ -12,6 +12,7 @@ import {
   normalizeSosFeeQuote,
   sanitizePlatePreviewUrl,
   sanitizeVehicleDescription,
+  registrationTermText,
 } from "../src/sidepanel/sos-fee-quote.js";
 import {
   SOS_FUEL_OPTIONS,
@@ -1064,4 +1065,54 @@ test("the consent notice is collapsible without losing a word", () => {
   ]) {
     assert.ok(sidepanelHtml.includes(phrase), `the disclosure must keep "${phrase}"`);
   }
+});
+
+// The quote used to state a total with no way to say what it buys. The state
+// prints "Registration Period: 8 months" and "Expiration Date: 14-Mar-2027" on
+// the result page — the expiry falls on the owner's birthday.
+test("the quote carries how long the plate runs and when it lapses", () => {
+  const quote = normalizeSosFeeQuote({
+    ...verifiedResult().quote,
+    mode: SOS_QUOTE_MODE.newPlate,
+    source: SOS_QUOTE_SOURCE.calculated,
+    registrationMonths: 8,
+    expiresOn: "2027-03-14",
+  });
+  assert.equal(quote.registrationMonths, 8);
+  assert.equal(quote.expiresOn, "2027-03-14");
+  assert.match(registrationTermText(quote), /8 months/);
+  assert.match(registrationTermText(quote), /expires Mar 14, 2027/);
+});
+
+test("an unusable term is dropped rather than shown", () => {
+  // A fee that reconciled is still a valid quote, but a wrong expiry date on a
+  // customer's paperwork is worse than no date at all.
+  for (const bad of [
+    { registrationMonths: 0, expiresOn: "2027-13-99" },
+    { registrationMonths: 99, expiresOn: "not-a-date" },
+    { registrationMonths: null, expiresOn: null },
+  ]) {
+    const quote = normalizeSosFeeQuote({
+      ...verifiedResult().quote,
+      mode: SOS_QUOTE_MODE.newPlate,
+      source: SOS_QUOTE_SOURCE.calculated,
+      ...bad,
+    });
+    assert.equal(quote.registrationMonths, null);
+    assert.equal(registrationTermText(quote), "");
+  }
+});
+
+// The total and what it buys lead; the itemised add-ons stay below as reference.
+test("the total and term lead the result", () => {
+  assert.match(sidepanelHtml, /id="sosQuoteHeadline"/);
+  assert.match(sidepanelHtml, /id="sosQuoteTotal"/);
+  assert.match(sidepanelHtml, /id="sosQuoteTerm"/);
+  assert.match(sidepanelScript, /registrationTermText\(quote\)/);
+  // The headline must sit above the fee add-ons in the document.
+  assert.ok(
+    sidepanelHtml.indexOf('id="sosQuoteHeadline"') <
+      sidepanelHtml.indexOf("Michigan fee add-ons"),
+    "the total and term must come before the fee glossary"
+  );
 });

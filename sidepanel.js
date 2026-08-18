@@ -102,6 +102,8 @@ import {
   createSosOfficialEvidencePrintHTML,
   loadSosFeeQuote,
   quoteStatusText,
+  registrationTermText,
+  formatMoney,
   saveSosFeeQuote,
   sourceLabel,
 } from "./src/sidepanel/sos-fee-quote.js";
@@ -168,6 +170,9 @@ const elements = {
   sosLienStatus: $("sosLienStatus"),
   sosWorkspaceStatus: $("sosWorkspaceStatus"),
   sosQuoteStatus: $("sosQuoteStatus"),
+  sosQuoteHeadline: $("sosQuoteHeadline"),
+  sosQuoteTotal: $("sosQuoteTotal"),
+  sosQuoteTerm: $("sosQuoteTerm"),
   sosQuoteSource: $("sosQuoteSource"),
   sosNewPlateFields: $("sosNewPlateFields"),
   sosTransferFields: $("sosTransferFields"),
@@ -1160,6 +1165,17 @@ function endSosPlatePan(event) {
 function renderSosFeeQuote() {
   const quote = currentSosFeeQuote;
   if (elements.sosQuoteStatus) elements.sosQuoteStatus.textContent = quoteStatusText(quote);
+  // The total and what it buys lead; the itemised add-ons stay below as
+  // reference rather than competing with the number a customer is quoted.
+  if (elements.sosQuoteHeadline) {
+    elements.sosQuoteHeadline.classList.toggle("hidden", !quote);
+    if (quote) {
+      elements.sosQuoteTotal.textContent = formatMoney(quote.feeCents);
+      const term = registrationTermText(quote);
+      elements.sosQuoteTerm.textContent = term || "Term not stated by SOS";
+      elements.sosQuoteTerm.classList.toggle("is-unstated", !term);
+    }
+  }
   if (elements.sosQuoteSource) {
     elements.sosQuoteSource.textContent = quote
       ? sourceLabel(quote.source)

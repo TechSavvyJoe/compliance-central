@@ -127,6 +127,16 @@ export function normalizeSosFeeQuote(value) {
         ? sanitizePlatePreviewUrl(value.platePreviewUrl)
         : null,
     recreationPassport: normalizedPassport(value.recreationPassport),
+    registrationMonths:
+      Number.isInteger(value.registrationMonths) &&
+      value.registrationMonths > 0 &&
+      value.registrationMonths <= 24
+        ? value.registrationMonths
+        : null,
+    expiresOn:
+      typeof value.expiresOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.expiresOn)
+        ? value.expiresOn
+        : null,
     feeBreakdown,
     officialPageImage: normalizeOfficialPageImage(value.officialPageImage),
   };
@@ -143,6 +153,8 @@ export function createCalculatedQuote(result, mode, now = new Date()) {
     calculatedAt: result?.calculatedAt || now.toISOString(),
     platePreviewUrl: result?.platePreviewUrl,
     recreationPassport: result?.recreationPassport,
+    registrationMonths: result?.registrationMonths,
+    expiresOn: result?.expiresOn,
     feeBreakdown: result?.feeBreakdown,
     officialPageImage: result?.officialPageImage,
   });
@@ -172,6 +184,23 @@ export function quoteStatusText(quote) {
   return `${sourceLabel(quote.source)}: ${formatMoney(quote.feeCents)} for ${modeLabel(quote.mode)}${
     quote.vehicleDescription ? ` · ${quote.vehicleDescription}` : ""
   } · ${when}`;
+}
+
+/** "8 months · expires Mar 14, 2027" — empty when the state gave neither. */
+export function registrationTermText(quote) {
+  const parts = [];
+  if (Number.isInteger(quote?.registrationMonths)) {
+    parts.push(`${quote.registrationMonths} month${quote.registrationMonths === 1 ? "" : "s"}`);
+  }
+  if (typeof quote?.expiresOn === "string") {
+    const on = new Date(`${quote.expiresOn}T00:00:00`);
+    if (!Number.isNaN(on.getTime())) {
+      parts.push(
+        `expires ${on.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+      );
+    }
+  }
+  return parts.join(" · ");
 }
 
 function passportSummary(value) {

@@ -397,8 +397,9 @@
 
             <div class="sos-timing-row">
               <div class="sos-control sos-purchase-date">
-                <label for="sosPurchaseDate">Plate purchase date <span>Changes the fee · defaults to today</span></label>
-                <input id="sosPurchaseDate" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="MM/DD/YYYY" />
+                <label for="sosPurchaseDate">Plate purchase date</label>
+                <input id="sosPurchaseDate" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="MM/DD/YYYY" aria-describedby="sosPurchaseDateHint" />
+                <small id="sosPurchaseDateHint">Changes the fee · defaults to today</small>
               </div>
               <fieldset class="sos-control sos-segmented-field">
                 <legend>Recreation Passport</legend>

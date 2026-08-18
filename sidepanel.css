@@ -319,9 +319,9 @@ body.modal-open {
 .sos-plate-viewer-tools button:hover:not(:disabled), .sos-plate-viewer-tools button:focus-visible { background: rgba(255,203,5,.16); color: var(--gold); outline: none; }
 .sos-plate-viewer-tools button:disabled { opacity: .32; cursor: default; }
 .sos-plate-viewer-tools .sos-plate-zoom-value { color: #ffe173; font-size: .58rem; }
-.sos-timing-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 7px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.sos-timing-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 7px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
 .sos-purchase-date > label { color: #fff; }
-.sos-purchase-date > label span { display: block; margin-top: 1px; color: var(--gold); font-size: .52rem; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.sos-purchase-date > small { color: var(--design-warning); font-size: .58rem; line-height: 1.3; }
 .sos-purchase-date input { border-color: rgba(255,203,5,.38); }
 .sos-workspace-status { min-height: 16px; margin: 8px 1px 0; color: var(--text-muted); font-size: .66rem; line-height: 1.35; }
 .sos-workspace-status.is-error { color: #fecaca; }
@@ -4001,8 +4001,13 @@ body {
   gap: 5px;
 }
 
-.sos-control-wide {
-  grid-column: span 1;
+/* Plate design carries the longest option text and was the odd cell out in a
+   two-column grid, leaving an empty square beside it. Spanning the row closes
+   that gap and stops the design names being truncated. Scoped to this one
+   control: applying it to every "wide" control gave each its own row and made
+   the form taller, which is the opposite of what the panel needs. */
+#sosPlateDesignControl {
+  grid-column: 1 / -1;
 }
 
 .sos-segmented-field span {

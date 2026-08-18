@@ -258,9 +258,10 @@ test("local form builds one semantic SOS batch and validates commercial details"
     validateSosLocalValues({ ...values, purchaseDate: "02/31/2026" }).at(-1).id,
     "sosPurchaseDate"
   );
-  // The field prefills to today, so "today if blank" no longer described the
-  // behaviour; the note now says what the date actually does.
-  assert.match(sidepanelHtml, /Plate purchase date <span>Changes the fee · defaults to today<\/span>/);
+  // The caption moved out of the label and under the input: inside the label it
+  // wrapped to two lines and made its cell taller than the control beside it.
+  assert.match(sidepanelHtml, /<label for="sosPurchaseDate">Plate purchase date<\/label>/);
+  assert.match(sidepanelHtml, /<small id="sosPurchaseDateHint">Changes the fee · defaults to today<\/small>/);
   assert.doesNotMatch(sidepanelHtml, /Passport &amp; purchase date/);
 });
 

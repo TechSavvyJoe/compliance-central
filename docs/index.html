@@ -247,7 +247,7 @@
     <header class="policy-header" id="privacy-policy">
         <h2>Privacy Policy</h2>
         <p>How Compliance Central handles customer and dealership data.</p>
-        <p class="last-updated">Effective: August 14, 2026</p>
+        <p class="last-updated">Effective: August 18, 2026</p>
     </header>
 
     <div class="section data-summary">
@@ -294,8 +294,8 @@
         <h3>4. SOS Fee Quote and VIN Helper</h3>
         <p>The SOS Fee Quote workspace is a convenience layer over the public Michigan SOS calculators; Michigan SOS remains the source of truth for the final fee and eligibility.</p>
         <ul>
-            <li>The extension displays its bounded dealership form and official Michigan plate artwork locally. Clicking the selected plate opens an instant in-sidebar viewer with zoom and drag-to-pan controls, without opening a new window or the SOS website. It opens the selected public calculator only in an inactive extension-owned tab after an explicit Calculate SOS fee action, verifies and applies the completed choices as one batch, and returns the fee plus an actual image of the official result page.</li>
-            <li>If the calculator does not produce a verified fee and page capture after three attempts, the extension keeps the partially completed SOS form inactive and offers a separate Finish on Michigan SOS action. Only that explicit action brings the prefilled state tab forward for review.</li>
+            <li>The extension displays its bounded dealership form and official Michigan plate artwork locally. Clicking the selected plate opens an instant in-sidebar viewer with zoom and drag-to-pan controls, without opening a new window or the SOS website. After an explicit Calculate SOS fee action, the vehicle and plate choices you selected are sent to the Compliance Central service, which runs the public Michigan SOS calculator and returns the fee plus an actual image of the official result page. <strong>Nothing opens on your computer</strong>, and the extension has no permission to open or read browser tabs.</li>
+            <li>If the calculator does not produce a verified fee and page capture, the extension reports the failure and quotes nothing. It never presents an unverified number as an official fee.</li>
             <li>The extension does not read or send SOS credentials, cookies, authentication tokens, or account information. It does not submit a filing, issue a BFS-4, transfer a title, or complete an RD-108.</li>
             <li>When you explicitly use the VIN helper, the VIN goes directly from the extension to NHTSA's public vPIC service to obtain vehicle basics. The raw VIN is not kept in the decoder response, sent to SOS, or written to extension storage.</li>
             <li>When you explicitly use Check title/lien, a full 17-character VIN is sent to the existing MDOS backend as described above. The SOS workspace displays only a bounded live result and does not save the VIN, screenshot, or result to audit history.</li>
@@ -309,7 +309,7 @@
             <li><strong>Scanning and parsing happen on your phone</strong> &mdash; the barcode on the back of the license is read and decoded in your phone's browser. The <strong>license image is never uploaded or transmitted</strong>.</li>
             <li>Only the parsed text fields (<strong>name, date of birth, and license/ID number</strong>) travel to your computer, and they are <strong>end-to-end encrypted</strong>: the desktop extension generates a one-time key that exists only inside the QR code, your phone encrypts the fields with it, and our backend merely relays an <strong>encrypted package it cannot read</strong>.</li>
             <li>That encrypted package is <strong>single-use, expires in about two minutes, and is deleted the moment your computer retrieves it</strong>. It is never written to a database or log.</li>
-            <li>Once the fields autofill, they are handled exactly like manually typed data: used only for the checks you request and kept in the current browser session. Persistent audit history records outcomes without the scanned identity fields.</li>
+            <li>Once the fields autofill, they are handled exactly like manually typed data &mdash; including retention. As described in Section 2, the submitted buyer and co-buyer fields (<strong>name, date of birth, and license/ID number</strong>) are saved with the compliance record in local extension storage for up to 30 days so the deal can be reopened or re-screened, and can be cleared at any time from Settings or History. Scanning changes how the fields are entered, not how long they are kept.</li>
         </ul>
     </div>
 

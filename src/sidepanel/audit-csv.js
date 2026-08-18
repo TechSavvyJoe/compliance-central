@@ -33,9 +33,16 @@ function csvCell(value) {
 
 function stateLabel(kind, value) {
   const labels = {
+    // Every state lib/history-retention.js can store must have a label here.
+    // potential_match, confirmed_match and false_positive were missing, so all
+    // three fell through to the "Review" default — the examiner-facing CSV
+    // could not tell a blocked deal from a routine one.
     ofac: {
       clear: "Clear",
       match: "Potential match",
+      potential_match: "Potential match",
+      confirmed_match: "Confirmed match — blocked",
+      false_positive: "False positive (reviewed)",
       stale: "Stale data — review",
       error: "Unavailable",
       review: "Review",

@@ -50,13 +50,21 @@ export function formatMoney(cents) {
 
 /** Do not retain a VIN even if an unexpected state label included one. */
 export function sanitizeVehicleDescription(value) {
-  return String(value || "")
-    .replace(LABELED_VIN_PATTERN, "")
-    .replace(VIN_PATTERN, "")
-    .replace(/\bVIN\s*[:#-]?\s*/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/^[\s:|-]+|[\s:|-]+$/g, "")
-    .slice(0, 120);
+  return (
+    String(value || "")
+      .replace(LABELED_VIN_PATTERN, "")
+      .replace(VIN_PATTERN, "")
+      .replace(/\bVIN\s*[:#-]?\s*/gi, "")
+      // Removing the VIN leaves whatever joined it to the rest of the
+      // description behind. "2026 Ford F-150 · VIN 1FT..." printed on the
+      // customer worksheet as "2026 Ford F-150 ·", and a parenthesised VIN
+      // left an empty "()". Drop separators and brackets that now enclose
+      // nothing, then trim the full separator set rather than only :|- .
+      .replace(/[([{]\s*[)\]}]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s:|,;·•—–-]+|[\s:|,;·•—–-]+$/g, "")
+      .slice(0, 120)
+  );
 }
 
 /** Allow only a static, official SOS plate-design image with no query data. */

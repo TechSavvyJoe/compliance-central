@@ -83,3 +83,73 @@ test("buildAuditCsv handles empty history (header only)", () => {
   assert.equal(buildAuditCsv([]).split("\r\n").length, 1);
   assert.equal(buildAuditCsv(undefined).split("\r\n").length, 1);
 });
+
+// The audit trail is the surface that must never soften a result. Three ways
+// it disagreed with the decision the salesperson actually saw:
+test("the stored record and the CSV agree with the live decision", async () => {
+  const { retainAuditHistory } = await import("../lib/history-retention.js");
+  const { classifyOfacResult, classifyRepeatOffenderResult } = await import(
+    "../src/sidepanel/checks.js"
+  );
+
+  const store = (checks) =>
+    retainAuditHistory([
+      {
+        runId: "r1",
+        timestamp: Date.now(),
+        decision: "X",
+        runType: "full",
+        fullResults: { customer: { firstName: "A" }, checks },
+      },
+    ]);
+
+  // A confirmed match found against a cached list was recorded as merely
+  // "stale" — DENIED on screen, "list was out of date" in the record.
+  const staleConfirmed = {
+    passed: false,
+    disposition: "confirmed_match",
+    stale: true,
+    matches: [{ name: "X" }],
+  };
+  assert.equal(classifyOfacResult(staleConfirmed).state, "confirmed_match");
+  assert.equal(store({ ofac: staleConfirmed })[0].checks.ofac, "confirmed_match");
+
+  // A still-stale clear result must keep reporting stale.
+  assert.equal(
+    store({ ofac: { passed: true, stale: true } })[0].checks.ofac,
+    "stale"
+  );
+
+  // A contradictory repeat-offender response recorded as a green "eligible"
+  // while the report printed REVIEW REQUIRED. The audit trail failed open.
+  const contradictory = { status: "eligible", passed: false };
+  assert.equal(classifyRepeatOffenderResult(contradictory).state, "review");
+  assert.equal(
+    store({ repeatOffender: contradictory })[0].checks.repeatOffender,
+    "review"
+  );
+  // An uncontradicted eligible result is still eligible.
+  assert.equal(
+    store({ repeatOffender: { status: "eligible", passed: true } })[0].checks
+      .repeatOffender,
+    "eligible"
+  );
+
+  // Three OFAC states had no CSV label and fell through to "Review", so the
+  // examiner-facing export could not tell a blocked deal from a routine one.
+  for (const [disposition, expected] of [
+    ["confirmed_match", "Confirmed match — blocked"],
+    ["false_positive", "False positive (reviewed)"],
+  ]) {
+    const csv = buildAuditCsv(
+      store({
+        ofac: { passed: false, disposition, matches: [{ name: "X" }] },
+      })
+    );
+    assert.ok(
+      csv.includes(expected),
+      `CSV should label ${disposition} as "${expected}"`
+    );
+    assert.ok(!/,Review,/.test(csv), `${disposition} must not export as Review`);
+  }
+});

@@ -18,8 +18,7 @@ zip -r -X "$OUT" \
   service-worker.js \
   sidepanel.html sidepanel.js sidepanel.css \
   print-runner.html print-runner.js \
-  src lib ofac \
-  assets/fonts \
+  src lib ofac assets \
   icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png \
   -x "**/.DS_Store" >/dev/null
 

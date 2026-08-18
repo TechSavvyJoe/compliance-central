@@ -220,6 +220,19 @@ function passportSummary(value) {
 }
 
 /** Printable customer handoff. It intentionally never impersonates SOS. */
+/**
+ * Only an image we produced ourselves may be drawn on a customer's sheet.
+ * Accepts a packaged extension asset or an inlined data image, and nothing
+ * remote — a printed worksheet should never depend on a third-party fetch.
+ */
+export function sanitizeDealerLogo(value) {
+  const url = String(value ?? "").trim();
+  if (/^data:image\/(?:png|jpe?g|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(url)) {
+    return url;
+  }
+  return /^chrome-extension:\/\/[a-z0-9-]+\/assets\/[\w.-]+$/i.test(url) ? url : "";
+}
+
 export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   const normalized = normalizeSosFeeQuote(quote);
   if (!normalized) return "";
@@ -228,6 +241,7 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   const term = registrationTermText(normalized);
   const plate = sanitizePlatePreviewUrl(normalized.platePreviewUrl);
   const dealer = String(branding.dealerName || "").trim().slice(0, 80);
+  const logo = sanitizeDealerLogo(branding.logoUrl);
 
   const officialRows = normalized.feeBreakdown
     .map(
@@ -244,7 +258,9 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
     * { box-sizing: border-box; }
     body { margin: 0; color: #172033; background: #fff; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .sheet { border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; }
-    header { padding: 18px 26px; background: #00274c; color: #fff; }
+    header { display: flex; align-items: center; gap: 16px; padding: 16px 26px; background: #00274c; color: #fff; }
+    header img { flex: none; max-height: 52px; max-width: 210px; object-fit: contain; background: #fff; padding: 6px 9px; border-radius: 7px; }
+    .head-copy { min-width: 0; }
     h1 { margin: 0; font-size: 21px; letter-spacing: -0.2px; }
     .sub { margin: 4px 0 0; color: #dbeafe; font-size: 11px; }
     main { padding: 20px 26px 8px; }
@@ -270,8 +286,11 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   </style></head><body>
   <section class="sheet">
     <header>
-      <h1>Customer Registration Cost Summary</h1>
-      <p class="sub">${dealer ? `${sanitizeHTML(dealer)} · ` : ""}Sales-desk worksheet · Not a Michigan SOS document</p>
+      ${logo ? `<img src="${sanitizeHTML(logo)}" alt="${sanitizeHTML(dealer || "Dealership")}" />` : ""}
+      <div class="head-copy">
+        <h1>Customer Registration Cost Summary</h1>
+        <p class="sub">${dealer ? `${sanitizeHTML(dealer)} · ` : ""}Sales-desk worksheet · Not a Michigan SOS document</p>
+      </div>
     </header>
     <main>
       <span class="status">${sanitizeHTML(sourceLabel(normalized.source))}</span>

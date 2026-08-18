@@ -1369,6 +1369,34 @@ const CONFIG_VIN_LENGTH = 17;
 // A logo would need an asset this repository does not ship, so the name carries
 // the branding until one is supplied.
 const DEALER_NAME = "Bob Maxey Ford of Howell";
+const DEALER_LOGO_ASSET = "assets/dealer-logo.webp";
+let dealerLogoDataUrl = null;
+
+/**
+ * The packaged dealership mark, inlined for print.
+ *
+ * A printed sheet is rendered in about:blank, an iframe, or the print runner
+ * depending on which path succeeds, and a chrome-extension:// URL does not
+ * resolve in all three. Inlining sidesteps that entirely, and it is read once
+ * and cached. A failure here must never block the quote from printing, so it
+ * resolves to an empty string and the sheet falls back to the name alone.
+ */
+async function loadDealerLogo() {
+  if (dealerLogoDataUrl !== null) return dealerLogoDataUrl;
+  try {
+    const response = await fetch(chrome.runtime.getURL(DEALER_LOGO_ASSET));
+    const blob = await response.blob();
+    dealerLogoDataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    dealerLogoDataUrl = "";
+  }
+  return dealerLogoDataUrl;
+}
 let rescreenBannerTarget = null;
 
 /** Take the salesperson to whatever the reminder is about. */
@@ -1709,7 +1737,10 @@ async function handleSosQuoteModeChange() {
 }
 
 async function printSosFeeQuote() {
-  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, { dealerName: DEALER_NAME });
+  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, {
+    dealerName: DEALER_NAME,
+    logoUrl: await loadDealerLogo(),
+  });
   if (!html) {
     showToast("Calculate an official fee before printing the customer summary.", "info");
     return;

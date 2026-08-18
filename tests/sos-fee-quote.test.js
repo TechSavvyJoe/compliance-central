@@ -13,6 +13,7 @@ import {
   sanitizePlatePreviewUrl,
   sanitizeVehicleDescription,
   registrationTermText,
+  sanitizeDealerLogo,
 } from "../src/sidepanel/sos-fee-quote.js";
 import {
   SOS_FUEL_OPTIONS,
@@ -1183,4 +1184,51 @@ test("the fee add-ons sit below the result they annotate", () => {
       sidepanelHtml.indexOf("Michigan fee add-ons"),
     "the breakdown summary must precede the fee glossary"
   );
+});
+
+// The dealership mark is drawn on a sheet handed to a customer, so only an
+// image we ship or inline ourselves may appear on it — never a remote fetch.
+test("only our own image can be printed as the dealership logo", () => {
+  const inlined = "data:image/webp;base64,UklGRh4AAABXRUJQ";
+  assert.equal(sanitizeDealerLogo(inlined), inlined);
+  assert.equal(
+    sanitizeDealerLogo("chrome-extension://abcdef/assets/dealer-logo.webp"),
+    "chrome-extension://abcdef/assets/dealer-logo.webp"
+  );
+  for (const bad of [
+    "https://example.com/logo.png",
+    "javascript:alert(1)",
+    "chrome-extension://abcdef/../manifest.json",
+    "data:text/html;base64,PHNjcmlwdD4=",
+    "",
+    null,
+  ]) {
+    assert.equal(sanitizeDealerLogo(bad), "", `${bad} must be refused`);
+  }
+});
+
+test("the worksheet prints the logo, and reads without one", () => {
+  const quote = createCalculatedQuote(
+    {
+      calculationMode: SOS_QUOTE_MODE.newPlate,
+      feeCents: 19500,
+      feeBreakdown: [{ label: "MSRP Based Reg Fee", feeCents: 19500 }],
+      calculatedAt: "2026-08-17T12:00:00.000Z",
+    },
+    SOS_QUOTE_MODE.newPlate
+  );
+  const withLogo = createSosFeeQuotePrintHTML(quote, {
+    dealerName: "Bob Maxey Ford of Howell",
+    logoUrl: "data:image/webp;base64,UklGRh4AAABXRUJQ",
+  });
+  assert.match(withLogo, /<img src="data:image\/webp;base64,[^"]+" alt="Bob Maxey Ford of Howell"/);
+
+  // A logo that could not be loaded must never block the quote from printing.
+  const without = createSosFeeQuotePrintHTML(quote, { dealerName: "Bob Maxey Ford of Howell" });
+  assert.doesNotMatch(without, /<img src="data:/);
+  assert.match(without, /Bob Maxey Ford of Howell/);
+});
+
+test("the dealership asset ships in the package", () => {
+  assert.match(packageScript, /src lib ofac assets/);
 });

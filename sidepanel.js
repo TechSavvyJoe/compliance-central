@@ -530,6 +530,28 @@ function filterHistoryWorkspace(query = "") {
 function initWorkspaceNavigation() {
   activateWorkspace("screening");
 
+  // A roving tabindex puts every inactive tab at -1, so without arrow keys the
+  // Plate Calculator and History tabs could not be reached from the keyboard
+  // at all — two thirds of the app was mouse-only. This is the ARIA tablist
+  // pattern: Left/Right move and activate, Home/End jump to the ends.
+  const tabStrip = document.querySelector(".workspace-tabs");
+  tabStrip?.addEventListener("keydown", (event) => {
+    const tabs = [...tabStrip.querySelectorAll('[role="tab"]')];
+    const current = tabs.indexOf(document.activeElement);
+    if (current === -1) return;
+
+    let next = null;
+    if (event.key === "ArrowRight") next = (current + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (current - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    if (next === null) return;
+
+    event.preventDefault();
+    const target = tabs[next]?.dataset.workspaceTarget;
+    if (target) activateWorkspace(target, { focusTab: true });
+  });
+
   elements.screeningTabBtn?.addEventListener("click", () =>
     activateWorkspace("screening")
   );
@@ -2428,6 +2450,21 @@ function syncFirstRunPresentation() {
 }
 
 // Returns the panel to its pristine first-use state: form open, no summary bar.
+// Speak the decision once the results are actually visible. Writing into a
+// live region that is still display:none announces nothing, and revealing it
+// afterwards does not announce it either.
+function announceVerdict() {
+  const announcer = document.getElementById("verdictAnnouncer");
+  if (!announcer || !elements.finalDecision) return;
+  const verdict = elements.finalDecision.innerText.trim().replace(/\s+/g, " ");
+  if (!verdict) return;
+  // Re-writing identical text does not re-announce, so clear first.
+  announcer.textContent = "";
+  requestAnimationFrame(() => {
+    announcer.textContent = verdict;
+  });
+}
+
 function resetInputPanel() {
   if (!elements.inputPanel || !elements.inputSummaryBar) return;
   elements.inputPanel.classList.remove("hidden");
@@ -3096,6 +3133,7 @@ function handleSearchStatusChange(changes) {
       completeRevealTimer = null;
       elements.progressSection.classList.add("hidden");
       elements.resultsSection.classList.remove("hidden");
+      announceVerdict();
     }, 350);
     return;
   }

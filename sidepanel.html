@@ -51,6 +51,13 @@
       </nav>
 
       <main id="main-content" class="hub-main" role="main">
+        <!-- The verdict is written into #finalDecision while #resultsSection is
+             still display:none and revealed 350ms later, so a live region
+             inside it is never announced. This one is always in the DOM and
+             outside every toggled panel, and receives the decision after the
+             reveal — otherwise a screen-reader user runs the compliance checks
+             and is never told the result. -->
+        <p id="verdictAnnouncer" class="visually-hidden" role="status" aria-live="polite"></p>
         <div id="screeningWorkspace" class="workspace-pane" role="tabpanel" aria-labelledby="screeningTabBtn" data-workspace-panel="screening">
         <section id="firstRunHero" class="first-run-hero" aria-labelledby="firstRunTitle">
           <span class="first-run-eyebrow">Start a deal</span>
@@ -698,7 +705,7 @@
           </div>
           </div>
 
-          <div id="completedStepsPanel" class="completed-steps-panel" aria-label="Deal steps">
+          <div id="completedStepsPanel" class="completed-steps-panel" role="group" aria-label="Deal steps">
             <button type="button" id="editCompletedBuyerBtn" class="completed-step-row">
               <span class="completed-step-icon completed" aria-hidden="true">&#10003;</span>
               <span class="completed-step-copy"><strong>Buyer</strong><small id="completedBuyerSummary">Customer details</small></span>
@@ -781,6 +788,7 @@
           </div>
           <div class="history-search-shell">
             <span class="command-search" aria-hidden="true"></span>
+            <label class="visually-hidden" for="historySearchInput">Search saved records</label>
             <input id="historySearchInput" type="search" placeholder="Search by name, vehicle or date" autocomplete="off" />
           </div>
           <label class="history-aging-filter">

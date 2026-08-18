@@ -1,16 +1,32 @@
-I need help finishing a Chrome Web Store listing submission. Everything you need is in this message. Please complete it.
+I need help updating a Chrome Web Store listing that is already published. Everything you need is in this message. Please complete it.
 
 WHAT THIS IS
-- Extension: "Compliance Central - Michigan Dealer Compliance Hub", version 1.3.1. A Chrome Manifest V3 side-panel tool for Michigan auto dealers that runs three compliance screenings: OFAC sanctions (local), MDOS Repeat Offender, and Title/Lien (via a secure backend).
-- The item already exists in my Chrome Web Store Developer Dashboard (Status: Published - public, with a draft in progress). I am logged in as the developer, and the "Store listing" edit page is open in Chrome.
+- Extension: "Compliance Central - Michigan Dealer Compliance Hub". A Chrome Manifest V3 side-panel tool for Michigan auto dealers. It does five things: OFAC sanctions screening (on-device), MDOS Repeat Offender and Title/Lien checks (through the extension's own backend), a Michigan SOS registration and plate fee workspace, and an optional phone license scan that pairs over a one-time code.
+- The listing is LIVE on the Web Store at version 1.3.1. The repo is at 1.6.0, so this is an UPDATE to the existing item, not a first submission. Versions 1.3.2 through 1.5.1 were built but never uploaded, so the "What's new" below covers all of them at once.
+- I am logged in as the developer, and the "Store listing" edit page is open in Chrome.
 
 WHAT I NEED YOU TO DO
-Fill in two tabs of the listing draft with the exact text below, then click "Save draft". DO NOT click "Submit for review" until I explicitly tell you to.
+Upload the new package, then fill in two tabs of the listing draft with the exact text below, then click "Save draft". DO NOT click "Submit for review" until I explicitly tell you to.
 
 IMPORTANT TECHNICAL CONSTRAINT
 Google Chrome blocks browser EXTENSIONS from scripting the Web Store dashboard (any URL on chrome.google.com/webstore). Extension-based browser automation will fail with the error "The extensions gallery cannot be scripted."
 - If you can control my computer's screen/mouse/keyboard directly (computer use), operate the dashboard that way — it is not subject to that restriction.
 - If you cannot control my screen, then give me precise, numbered, click-by-click instructions for each field and I will perform them. Confirm each section as we go.
+
+=====================================================================
+STEP 0 — "Package" tab: upload the new build
+=====================================================================
+
+Upload this file as the new package version:
+  /Users/joegallant/AI App Development Projects/compliance-central/compliance-central-1.6.0.zip
+
+If it is missing or out of date, I can rebuild it by running `npm run package` in
+/Users/joegallant/AI App Development Projects/compliance-central.
+
+The manifest declares only sidePanel, storage, alarms, and unlimitedStorage, plus five
+named host permissions. It does NOT request "tabs" — the extension never opens or reads a
+browser tab. If a reviewer asks, that is verifiable: there are zero chrome.tabs calls in
+the package.
 
 =====================================================================
 TAB 1 — "Store listing"
@@ -26,33 +42,33 @@ Select all existing text in the Description box, delete it, and replace it with 
 -----BEGIN DESCRIPTION-----
 Compliance Central — Michigan Dealer Compliance in One Side Panel
 
-Compliance Central brings common Michigan dealership screening and registration-fee tasks into Chrome's side panel: OFAC screening, MDOS Repeat Offender and Title/Lien checks, and the public Michigan SOS fee calculator.
+Compliance Central puts five Michigan dealership tasks in Chrome's side panel: OFAC sanctions screening, MDOS Repeat Offender and Title/Lien checks, an SOS registration and plate fee workspace, and an optional phone license scan.
 
-Enter customer and trade-in information once, choose the checks you need, and review the returned outcomes without leaving your current browser tab.
+Enter customer and trade-in information once, choose the checks you need, and review the outcomes without leaving your current tab.
 
 Key Features:
 
 ✅ Unified Compliance Dashboard — Run one check or all available checks from one interface.
 
-✅ On-Device OFAC SDN Name Screening — Screens names against the locally downloaded U.S. Treasury SDN list, attempts a daily refresh, and warns when freshness cannot be confirmed. Customer information stays on your computer for this check; fuzzy and alias matching helps human review.
+✅ On-Device OFAC SDN Name Screening — Screens names against the local U.S. Treasury SDN list, attempts a daily refresh, and warns when freshness cannot be confirmed. Customer information stays on your computer for this check; fuzzy and alias matching helps human review.
 
-✅ Repeat Offender Check — Sends the required name, date of birth, and Michigan DLN/PID over HTTPS to the Compliance Central service, which requests the MDOS portal result and returns the actual captured Michigan state page as current-run evidence. Potential, unavailable, or unexpected results require human review.
+✅ Repeat Offender Check — Sends the required name, date of birth, and Michigan DLN/PID over HTTPS to the Compliance Central service, which requests the MDOS portal result and returns the actual captured Michigan state page as evidence. Potential, unavailable, or unexpected results require human review.
 
-✅ Title & Lien Check — Sends the required customer fields and trade-in VIN over HTTPS and displays the details returned by the MDOS portal, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the actual captured Michigan state page; missing or uncertain results are labeled for review.
+✅ Title & Lien Check — Sends the required customer fields and trade-in VIN over HTTPS and displays what the MDOS portal returns, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the actual captured Michigan state page; missing or uncertain results are labeled for review.
 
-✅ SOS Registration Fee Quote — Complete common passenger or commercial vehicle, fuel, use, and plate choices locally. Inspect official plate artwork in an instant in-sidebar zoom viewer. One explicit Calculate action runs the public SOS calculator in an inactive background tab with a sales-tab focus guard and returns the verified fee plus the actual captured SOS result page for one-page printing or PDF download.
+✅ SOS Registration & Plate Fee Workspace — Complete passenger or commercial vehicle, fuel, use, and plate choices locally, and inspect official Michigan plate artwork in a zoomable viewer. One explicit Calculate action sends your completed choices to the Compliance Central service, which runs the public Michigan SOS calculator and returns the verified fee plus a capture of the official result page. Nothing opens on your computer. Print or download the verified total, or hand the customer a plain-language fee worksheet.
 
 ✅ VIN Assist — An explicit NHTSA vPIC lookup fills supported vehicle type, body, fuel, and model-year fields locally for review. The raw VIN is not stored in quote history or passed to SOS.
 
 ✅ Scan a License with Your Phone — Use a one-time pairing code to scan the barcode on a driver's license or state ID. Approved text fields are encrypted and sent to your computer; the license image stays on the phone.
 
-✅ Printable Deal Jacket Screening Records — Print or download a timestamped summary of the current results. Reports record what the extension returned; they are not a legal certification. Downloaded files remain wherever you choose to save them.
+✅ Printable Deal Jacket Screening Records — Print or download a timestamped summary of the results. Reports record what the extension returned; they are not a legal certification. Downloaded files remain wherever you choose to save them.
 
 ✅ Privacy-Conscious by Design
-• Compliance History stores customer fields, results, trade VINs, and captured report evidence locally so dealership staff can reopen a record, re-screen, print, or download it later.
-• Local History is limited to 30 days / 50 records and can be cleared at any time. SOS fee choices remain session-only; credentials and authentication tokens are never stored in History.
-• The MDOS service processes requested fields in memory and does not maintain a database of searches.
-• The optional phone scan uses an encrypted, single-use package the relay service cannot read; the license image is not transmitted.
+• Compliance History stores customer fields, results, trade VINs, and report evidence on your device so staff can reopen, re-screen, print, or download a record later.
+• Local History is limited to 30 days / 50 records and can be cleared anytime. SOS fee choices stay session-only; credentials and tokens are never stored.
+• The MDOS service processes requested fields in memory and keeps no database of searches.
+• The optional phone scan uses an encrypted, single-use package the relay cannot read; the license image is not transmitted.
 • No advertising or analytics tracking. Customer data is not sold.
 • Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.
 
@@ -71,13 +87,22 @@ Requirements:
 • Google Chrome. No account, API key, or setup is required.
 -----END DESCRIPTION-----
 
-GRAPHIC ASSETS:
-- Keep the existing store icon, screenshots 01–03, small promo tile, and marquee tile if they already match the files below.
-- Replace the old DOB screenshot with 04-phone-license-scan-1280x800.jpg.
-- Screenshot 04 is visibly labeled as an instructional composite and uses fictional ID artwork; it is not a live scanner capture or a real identity document.
-- Replace the history screenshot with 05-compliance-history-1280x800.jpg so the retention wording is current.
-- Use exactly five screenshots, ordered 01 through 05.
-The current upload-ready files are on this Mac at:
+GRAPHIC ASSETS — READ THIS BEFORE TOUCHING THE IMAGES:
+The five screenshots currently on disk were rendered on 2026-07-22 for version 1.3.1.
+They predate the side-panel redesign AND the SOS registration/plate fee workspace, so they
+no longer show the shipping UI. Do NOT upload them as-is for this update.
+
+  1. Regenerate them first, from the repo root:
+       npm i -D sharp     # required: tools/build-store-assets.mjs imports sharp,
+                          # which is not a declared dependency and is not installed
+       npm run assets
+  2. Look at each regenerated image and confirm it matches the current side panel.
+  3. Then replace screenshots 01–05 in the dashboard, in order.
+  4. If regeneration is not possible right now, STOP and tell me — I would rather ship the
+     text update with the old images left untouched than upload screenshots that show a UI
+     the extension no longer has.
+
+Once regenerated, the upload-ready files are on this Mac at:
   /Users/joegallant/AI App Development Projects/compliance-central/store-assets/upload/
   Store icon: cc-store-icon-128.png
   Screenshots: 01-run-all-approved-1280x800.jpg
@@ -86,6 +111,12 @@ The current upload-ready files are on this Mac at:
                04-phone-license-scan-1280x800.jpg
                05-compliance-history-1280x800.jpg
   Promo tiles: small-promo-440x280.jpg and marquee-promo-1400x560.jpg
+
+Use exactly five screenshots, ordered 01 through 05.
+Screenshot 04 is visibly labeled as an instructional composite and uses fictional ID
+artwork; it is not a live scanner capture or a real identity document.
+Screenshot 05 shows saved Compliance History records, which are identified by customer —
+it is not an anonymized view.
 
 OFFICIAL URL / HOMEPAGE / SUPPORT URL (optional): you may set the Support URL to https://techsavvyjoe.github.io/compliance-central/
 
@@ -103,9 +134,14 @@ PERMISSION JUSTIFICATIONS (there is one box per permission — paste the matchin
 - alarms: Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
 - Host permission https://sanctionslistservice.ofac.treas.gov/: Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
 - Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/: Allows Treasury's signed OFAC-list download redirect to its dedicated AWS GovCloud file host.
-- Host permission https://compliance-central-api.fly.dev/: Performs Repeat Offender and Title/Lien checks and relays the optional end-to-end encrypted phone scan package, which the backend cannot read. The hosting service receives ordinary network request metadata; Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention, and does not write them to a database or application log.
-- Host permission https://dsvsesvc.sos.state.mi.us/: Runs the public Michigan SOS fee calculator after an explicit action and returns a session-only verified result plus the actual official result-page capture.
+- Host permission https://compliance-central-api.fly.dev/: Performs the Repeat Offender and Title/Lien checks, runs the public Michigan SOS fee calculator on the user's explicit request, and relays the optional end-to-end encrypted phone scan package, which the backend cannot read. The hosting service receives ordinary network request metadata; Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention, and does not write them to a database or application log.
+- Host permission https://dsvsesvc.sos.state.mi.us/: Loads official Michigan plate-design artwork displayed beside a fee quote. That image request is the only thing the extension itself sends to the SOS host; the fee calculator is driven server-side and returns a session-only verified result plus a capture of the official result page.
 - Host permission https://vpic.nhtsa.dot.gov/: Runs an optional user-requested VIN or partial-VIN decode to fill supported local vehicle fields.
+
+IF A REVIEWER ASKS WHY THERE IS NO "tabs" PERMISSION: there is nothing to explain — the
+extension does not request it and makes no chrome.tabs calls. Earlier drafts of this copy
+described the fee calculator opening in a background tab. That is no longer how it works
+and the current description above is the accurate one.
 
 ARE YOU USING REMOTE CODE? → No. (All code is bundled in the package; nothing is fetched and executed remotely.)
 
@@ -122,6 +158,17 @@ DATA USAGE (the checkbox form):
    (3) I do not use or transfer user data to determine creditworthiness or for lending purposes.
 - Privacy policy URL: https://techsavvyjoe.github.io/compliance-central/
 - Limited Use disclosure: Compliance Central's use of information received from Google APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.
+
+=====================================================================
+WHAT'S NEW IN THIS UPDATE (for a release-notes field, if one is offered)
+=====================================================================
+- Michigan SOS registration and plate fees are now a full workspace. One Calculate action asks the Compliance Central service to run the public Michigan SOS calculator and return the verified fee plus a capture of the official result page. Nothing opens on the user's computer.
+- A printable customer fee worksheet, with the 2026 fee table checked against the Michigan SOS plates-and-tabs page and the MDOS Dealer Manual (Rev. 07/26), Michigan's partial trade-in sales-tax credit, and the $5 instant-title fee.
+- OFAC screening now requires a stand-alone surname match, measured against a labelled corpus, so a surname that merely shares a prefix no longer produces a false hit.
+- The saved audit trail derives its states from the same code that produced the on-screen decision, so the permanent record can no longer be softer than what the salesperson saw.
+- The re-screen reminder is a persistent banner that opens the saved records already filtered, and it now also flags a plate fee quoted on an earlier day.
+- Redesigned side panel; keyboard-reachable workspace tabs; the compliance verdict is announced to screen readers.
+- A real Content Security Policy on both the extension pages and the phone scan page.
 
 =====================================================================
 SUPPORT / CONTACT EMAIL

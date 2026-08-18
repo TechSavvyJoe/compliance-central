@@ -169,6 +169,7 @@ const elements = {
   sosVinLookupStatus: $("sosVinLookupStatus"),
   sosLienStatus: $("sosLienStatus"),
   sosWorkspaceStatus: $("sosWorkspaceStatus"),
+  sosWorkspaceStatusText: $("sosWorkspaceStatusText"),
   sosQuoteStatus: $("sosQuoteStatus"),
   sosQuoteHeadline: $("sosQuoteHeadline"),
   sosQuoteTotal: $("sosQuoteTotal"),
@@ -728,10 +729,18 @@ function setSosQuoteMode(mode) {
 }
 
 function setSosWorkspaceStatus(message, tone = "") {
-  if (!elements.sosWorkspaceStatus) return;
-  elements.sosWorkspaceStatus.textContent = message;
-  elements.sosWorkspaceStatus.classList.toggle("is-error", tone === "error");
-  elements.sosWorkspaceStatus.classList.toggle("is-busy", tone === "busy");
+  const host = elements.sosWorkspaceStatus;
+  if (!host) return;
+  // The message used to be a line of muted grey text, so a failure mid-quote
+  // read the same as the idle prompt. Each state now looks like what it is.
+  const text = elements.sosWorkspaceStatusText || host;
+  text.textContent = message;
+  host.classList.toggle("is-error", tone === "error");
+  host.classList.toggle("is-busy", tone === "busy");
+  host.classList.toggle("is-ok", tone === "ok");
+  // A failure is the one state a salesperson must not scroll past.
+  if (tone === "error") host.setAttribute("role", "alert");
+  else host.setAttribute("role", "status");
 }
 
 function selectedRadioValue(name) {
@@ -1381,6 +1390,43 @@ let dealerLogoDataUrl = null;
  * and cached. A failure here must never block the quote from printing, so it
  * resolves to an empty string and the sheet falls back to the name alone.
  */
+/** Inline any packaged or allowlisted image for print. Empty string on failure. */
+async function inlineImageForPrint(url) {
+  try {
+    const response = await fetch(url, { cache: "force-cache", credentials: "omit" });
+    if (!response.ok) return "";
+    const blob = await response.blob();
+    if (!/^image\//.test(blob.type) || blob.size > 4_000_000) return "";
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The selected plate artwork, inlined for print.
+ *
+ * Left as a state URL it simply did not appear on the printed sheet: the print
+ * window opens before a remote image can load, so the customer got a broken
+ * frame where their plate should be.
+ */
+async function loadPlateImageForPrint(quote) {
+  const source = quote?.platePreviewUrl;
+  if (!source) return "";
+  try {
+    // Reuse the existing origin check rather than trusting the stored value.
+    const { source: safe } = await materializeSosPlateImage(source);
+    return await inlineImageForPrint(safe);
+  } catch {
+    return "";
+  }
+}
+
 async function loadDealerLogo() {
   if (dealerLogoDataUrl !== null) return dealerLogoDataUrl;
   try {
@@ -1737,15 +1783,20 @@ async function handleSosQuoteModeChange() {
 }
 
 async function printSosFeeQuote() {
+  const [logoUrl, plateImageUrl] = await Promise.all([
+    loadDealerLogo(),
+    loadPlateImageForPrint(currentSosFeeQuote),
+  ]);
   const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, {
     dealerName: DEALER_NAME,
-    logoUrl: await loadDealerLogo(),
+    logoUrl,
+    plateImageUrl,
   });
   if (!html) {
     showToast("Calculate an official fee before printing the customer summary.", "info");
     return;
   }
-  await printHtmlDocument(html);
+  await printHtmlDocument(html, { waitForImages: true });
 }
 
 async function printSosOfficialCalculation() {

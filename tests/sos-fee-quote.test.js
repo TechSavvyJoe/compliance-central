@@ -1232,3 +1232,50 @@ test("the worksheet prints the logo, and reads without one", () => {
 test("the dealership asset ships in the package", () => {
   assert.match(packageScript, /src lib ofac assets/);
 });
+
+// The status was a line of muted grey text at 0.66rem, and its error and busy
+// colours were left over from the dark panel — #fecaca at 1.45:1 and #7dd3fc at
+// 1.67:1 on a white card — so a failure mid-quote read exactly like the idle
+// prompt sitting in the same place.
+test("the workspace status reads as the state it is in", () => {
+  assert.match(sidepanelHtml, /id="sosWorkspaceStatus"/);
+  assert.match(sidepanelHtml, /id="sosWorkspaceStatusText"/);
+  assert.match(sidepanelHtml, /class="sos-status-bar"/);
+  // The old low-contrast tones must not come back.
+  assert.doesNotMatch(sidepanelCss, /\.sos-workspace-status\.is-error \{ color: #fecaca/);
+  assert.doesNotMatch(sidepanelCss, /\.sos-workspace-status\.is-busy \{ color: #7dd3fc/);
+  // A quote takes ten seconds or more, so the busy state moves.
+  assert.match(sidepanelCss, /\.sos-workspace-status\.is-busy \.sos-status-bar \{ display: block/);
+  assert.match(sidepanelCss, /@keyframes sosStatusSlide/);
+  assert.match(sidepanelCss, /prefers-reduced-motion: reduce/);
+  // A failure is the one state that must interrupt rather than wait to be read.
+  assert.match(sidepanelScript, /if \(tone === "error"\) host\.setAttribute\("role", "alert"\)/);
+});
+
+// Left as a state URL the plate simply did not appear: the print window opens
+// before a remote image can load, so the customer got a broken frame.
+test("the printed plate is inlined rather than fetched", () => {
+  assert.match(sidepanelScript, /function loadPlateImageForPrint\(quote\)/);
+  assert.match(sidepanelScript, /plateImageUrl/);
+  // The dialog must not open before the images are on the page.
+  const print = sidepanelScript.slice(sidepanelScript.indexOf("async function printSosFeeQuote()"));
+  assert.match(print.slice(0, 900), /printHtmlDocument\(html, \{ waitForImages: true \}\)/);
+  // An inlined plate is accepted by the sheet, a remote one is not smuggled in.
+  const quote = createCalculatedQuote(
+    {
+      calculationMode: SOS_QUOTE_MODE.newPlate,
+      feeCents: 19500,
+      feeBreakdown: [{ label: "MSRP Based Reg Fee", feeCents: 19500 }],
+      calculatedAt: "2026-08-17T12:00:00.000Z",
+    },
+    SOS_QUOTE_MODE.newPlate
+  );
+  const html = createSosFeeQuotePrintHTML(quote, {
+    plateImageUrl: "data:image/webp;base64,UklGRh4AAABXRUJQ",
+  });
+  assert.match(html, /alt="Selected Michigan plate design"/);
+  assert.doesNotMatch(
+    createSosFeeQuotePrintHTML(quote, { plateImageUrl: "https://evil.example/p.png" }),
+    /evil\.example/
+  );
+});

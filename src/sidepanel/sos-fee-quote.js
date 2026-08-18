@@ -239,7 +239,12 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
 
   const calculatedAt = new Date(normalized.calculatedAt).toLocaleString();
   const term = registrationTermText(normalized);
-  const plate = sanitizePlatePreviewUrl(normalized.platePreviewUrl);
+  // A print window renders in about:blank or an iframe, where a remote image
+  // may never load before the dialog opens — which is how the plate came out
+  // broken on a customer's sheet. An inlined copy is preferred when supplied.
+  const plate =
+    sanitizeDealerLogo(branding.plateImageUrl) ||
+    sanitizePlatePreviewUrl(normalized.platePreviewUrl);
   const dealer = String(branding.dealerName || "").trim().slice(0, 80);
   const logo = sanitizeDealerLogo(branding.logoUrl);
 

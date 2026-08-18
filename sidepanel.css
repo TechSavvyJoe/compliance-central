@@ -324,8 +324,6 @@ body.modal-open {
 .sos-purchase-date > small { color: var(--design-warning); font-size: .58rem; line-height: 1.3; }
 .sos-purchase-date input { border-color: rgba(255,203,5,.38); }
 .sos-workspace-status { min-height: 16px; margin: 8px 1px 0; color: var(--text-muted); font-size: .66rem; line-height: 1.35; }
-.sos-workspace-status.is-error { color: #fecaca; }
-.sos-workspace-status.is-busy { color: #7dd3fc; }
 .sos-primary-actions { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; margin-top: 8px; }
 .sos-primary-actions .btn-primary { grid-column: 1 / -1; }
 .sos-primary-actions .btn-sm { min-height: 34px; justify-content: center; padding: 6px 8px; font-size: .67rem; }
@@ -3834,6 +3832,93 @@ body {
 }
 
 .sos-quote-term strong.is-unstated { color: var(--design-muted); font-weight: 650; }
+
+/* The workspace status was a line of muted grey text at 0.66rem, and its error
+   and busy colours (#fecaca, #7dd3fc) were left over from the dark panel — 1.45:1
+   and 1.67:1 on a white card. A failure mid-quote therefore looked exactly like
+   the idle prompt. Each state now reads as what it is, and the busy state shows
+   that something is actually happening rather than asserting it in prose. */
+.sos-workspace-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 9px 1px 0;
+  padding: 9px 11px;
+  border: 1px solid var(--design-line);
+  border-left: 4px solid var(--design-slate);
+  border-radius: 8px;
+  background: var(--design-canvas);
+  color: var(--design-ink);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.sos-status-icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--design-slate);
+}
+
+.sos-status-bar {
+  display: none;
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(13, 63, 107, 0.16);
+  overflow: hidden;
+}
+
+.sos-status-bar i {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: #0d3f6b;
+  animation: sosStatusSlide 1.15s ease-in-out infinite;
+}
+
+@keyframes sosStatusSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(320%); }
+}
+
+/* A quote takes ten seconds or more against the state site, so the busy state
+   carries a moving bar rather than a sentence that looks frozen. */
+.sos-workspace-status.is-busy {
+  border-color: #bcd6ee;
+  border-left-color: #0d3f6b;
+  background: #e8f1fa;
+  color: #0d3f6b;
+}
+
+.sos-workspace-status.is-busy .sos-status-icon { background: #0d3f6b; }
+.sos-workspace-status.is-busy .sos-status-bar { display: block; }
+
+.sos-workspace-status.is-error {
+  border-color: #f2c3bd;
+  border-left-color: #8f1d14;
+  background: #fdecea;
+  color: #8f1d14;
+  font-weight: 750;
+}
+
+.sos-workspace-status.is-error .sos-status-icon { background: #8f1d14; }
+
+.sos-workspace-status.is-ok {
+  border-color: #b8e0d0;
+  border-left-color: #0f6f50;
+  background: #e7f6f0;
+  color: #0f6f50;
+}
+
+.sos-workspace-status.is-ok .sos-status-icon { background: #0f6f50; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sos-status-bar i { animation: none; width: 100%; }
+}
 
 .rescreen-banner {
   display: flex;

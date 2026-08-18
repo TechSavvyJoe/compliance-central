@@ -427,7 +427,11 @@
             </fieldset>
           </div>
 
-          <p id="sosWorkspaceStatus" class="sos-workspace-status" role="status" aria-live="polite">Complete the fields, then run one official SOS calculation.</p>
+          <div id="sosWorkspaceStatus" class="sos-workspace-status" role="status" aria-live="polite">
+            <span class="sos-status-icon" aria-hidden="true"></span>
+            <span class="sos-status-text" id="sosWorkspaceStatusText">Complete the fields, then run one official SOS calculation.</span>
+            <span class="sos-status-bar" aria-hidden="true"><i></i></span>
+          </div>
 
           <div class="sos-primary-actions" role="group" aria-label="Michigan SOS fee quote actions">
             <button type="button" id="calculateSosFeeBtn" class="btn-primary btn-sm">Calculate SOS fee</button>

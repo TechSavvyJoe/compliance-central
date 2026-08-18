@@ -514,10 +514,11 @@
         </section>
 
         <section class="action-section" data-workspace-panel="screening">
-          <!-- Open by default. Chrome's disclosure policy requires the data
-               notice to be prominent and in the UI before collection, and this
-               panel handles dates of birth and driver's-licence numbers — the
-               substance must not sit behind a "Read the full notice" toggle. -->
+          <!-- Opens for a salesperson who has not seen it, because the
+               disclosure has to be prominent and in the UI before any data is
+               collected. Once it has been read — collapsed by hand, or left
+               alone through a first completed check — it stays closed, so it
+               does not permanently occupy a narrow panel. -->
           <details id="dataUseDetails" class="data-use-details" open>
             <summary><span>Privacy</span> OFAC runs on this computer. Running a check means you agree.</summary>
           <p id="dataUseNote" class="data-use-note">
@@ -812,7 +813,11 @@
             <input id="historyAgingOnly" type="checkbox" />
             <span>Needs re-screen before delivery</span>
           </label>
-          <div class="history-list-panel" id="historyList" aria-live="polite"></div>
+          <!-- Not a live region: populateHistoryModal replaces the whole list in one
+               write, so every record — name, dates, five chips and five buttons —
+               was queued as a single announcement. The count below is the status. -->
+          <div class="history-list-panel" id="historyList"></div>
+          <p id="historyListStatus" class="visually-hidden" role="status" aria-live="polite"></p>
           <button type="button" id="clearAllHistoryBtn" class="btn-secondary btn-ghost btn-full" title="Permanently clear all compliance history">
             <span class="btn-icon icon icon-trash" aria-hidden="true"></span>
             Clear local history

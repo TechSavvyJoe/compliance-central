@@ -205,6 +205,7 @@ function handleInputKeydown(event, state) {
 }
 
 function openPicker(state) {
+  state.toggle?.setAttribute("aria-expanded", "true");
   state.isOpen = true;
   state.input.setAttribute("aria-expanded", "true");
   state.shell.classList.add("date-picker-open");
@@ -213,6 +214,7 @@ function openPicker(state) {
 }
 
 function closePicker(state) {
+  state.toggle?.setAttribute("aria-expanded", "false");
   state.isOpen = false;
   state.input.setAttribute("aria-expanded", "false");
   state.shell.classList.remove("date-picker-open");

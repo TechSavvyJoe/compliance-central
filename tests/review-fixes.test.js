@@ -217,3 +217,60 @@ test("getApiKey ignores retired or injected Settings overrides", async () => {
   };
   assert.equal(await getApiKey(), CONFIG.backend.defaultApiKey);
 });
+
+// Four hardening fixes from an adversarial security review. Each one has a
+// concrete way it went wrong, so each is pinned.
+test("sensitive side-panel entry points bound what they accept", async () => {
+  const { consumePrintPayload } = await import("../lib/print-html.js");
+  const { decryptPayload } = await import("../lib/crypto-pair.js");
+
+  // print-runner.html?id= reached storage.remove() before validation, so any
+  // session key named in the query string was deleted — including the
+  // in-flight run state.
+  const removed = [];
+  const storage = {
+    get: async () => ({}),
+    remove: async (key) => {
+      removed.push(key);
+    },
+  };
+  assert.equal(await consumePrintPayload(storage, "currentResults"), null);
+  assert.equal(await consumePrintPayload(storage, ""), null);
+  assert.equal(await consumePrintPayload(storage, null), null);
+  assert.deepEqual(removed, [], "a non-print key must never be removed");
+  // A correctly prefixed id is still read (and cleaned up) as before.
+  await consumePrintPayload(storage, "ccPrint:abc");
+  assert.deepEqual(removed, ["ccPrint:abc"]);
+
+  // The relay envelope is bounded before decoding, so a hostile relay cannot
+  // make the panel allocate arbitrary memory from a poll response.
+  await assert.rejects(
+    () => decryptPayload("a".repeat(43), { iv: "short", ct: "AQIDBAUGBwgJCgsMDQ4PEA" }),
+    /Invalid payload format/
+  );
+  await assert.rejects(
+    () =>
+      decryptPayload("a".repeat(43), {
+        iv: "AQIDBAUGBwgJCgsM",
+        ct: "A".repeat(64_001),
+      }),
+    /Invalid payload format/
+  );
+
+  // Clearing history must also clear the working copy: a shared showroom
+  // machine kept the last customer in session storage otherwise.
+  const { readFileSync } = await import("node:fs");
+  const workerSource = readFileSync(
+    new URL("../src/worker/history.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(workerSource, /chrome\.storage\.session\.clear\(\)/);
+
+  // The phone scanner's optional SDK loader is pinned to a known origin.
+  const providerSource = readFileSync(
+    new URL("../docs/lib/scanner-provider.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(providerSource, /ALLOWED_SDK_ORIGINS/);
+  assert.match(providerSource, /commercial-sdk-url-not-allowed/);
+});

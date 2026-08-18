@@ -531,7 +531,7 @@ export function displayResults(elements, results) {
   if (elements.reviewGuidancePanel) {
     elements.reviewGuidancePanel.classList.toggle("hidden", !hasRepeatFlag);
     elements.reviewGuidancePanel.innerHTML = hasRepeatFlag
-      ? `<section class="manager-review-card"><span>Waiting on a manager</span><h3>Hold for review</h3><p>Repeat-offender flag. Registration denial reaches any vehicle this person owns or leases.</p><strong>MCL 257.219</strong></section><section class="flag-restrictions"><span>Not allowed while flagged</span><p>No BFS-4 permit or dealer plate</p><p>No delivery before SOS processing</p><p>Eligibility Declaration must be signed</p></section>`
+      ? `<section class="manager-review-card"><span>Waiting on a manager</span><h3>Do not sell to this buyer</h3><p>Repeat-offender flag. The MDOS Dealer Manual is explicit that dealers are not authorized to sell a vehicle to a repeat offender, and that this includes a title-only transaction. Registration denial reaches any vehicle this person owns, co-owns, leases or co-leases, and a person who buys or leases during the denial period commits a crime.</p><strong>MCL 257.219 &middot; Dealer Manual &sect;7-7.2</strong></section><section class="flag-restrictions"><span>Not allowed while flagged</span><p>No sale, lease, or title-only transaction</p><p>No BFS-4 permit or dealer plate</p><p>A 904C paper plate cannot be transferred to another vehicle</p><p>No delivery before SOS processing</p><p>Eligibility Declaration must be signed</p></section>`
       : "";
   }
 
@@ -877,5 +877,17 @@ export function setButtonsDisabled(elements, disabled) {
     elements.inputSummaryBar,
   ]) {
     if (control) control.disabled = disabled;
+  }
+
+  // Disabling the element that currently has focus drops focus to <body>, and
+  // this runs synchronously from the click handler of the very button the user
+  // just pressed — so starting a check silently lost the keyboard's place.
+  // Clear stays enabled as the cancellation control, so it is where focus goes.
+  if (
+    disabled &&
+    typeof document !== "undefined" &&
+    document.activeElement?.disabled
+  ) {
+    elements.clearBtn?.focus({ preventScroll: true });
   }
 }

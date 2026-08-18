@@ -307,6 +307,8 @@ const elements = {
   exportAuditLogBtn: $("exportAuditLogBtn"),
   rescreenReminderToggle: $("rescreenReminderToggle"),
   dealershipNameInput: $("dealershipNameInput"),
+  dataUseDetails: $("dataUseDetails"),
+  historyListStatus: $("historyListStatus"),
   retentionNotice: $("retentionNotice"),
   retentionNoticeAckBtn: $("retentionNoticeAckBtn"),
   dealershipLogoInput: $("dealershipLogoInput"),
@@ -532,6 +534,16 @@ function filterHistoryWorkspace(query = "") {
   } else {
     empty?.remove();
   }
+
+  // The list itself is no longer a live region, so announce the count instead
+  // of the entire contents of every record.
+  if (elements.historyListStatus) {
+    elements.historyListStatus.textContent = items.length
+      ? `${visible} of ${items.length} saved ${
+          items.length === 1 ? "record" : "records"
+        } shown`
+      : "No saved records";
+  }
 }
 
 function initWorkspaceNavigation() {
@@ -577,6 +589,10 @@ function initWorkspaceNavigation() {
     else activateWorkspace(target);
     if (target === "screening") elements.firstName?.focus();
     if (target === "sos") elements.sosVinLookupInput?.focus();
+    // The other two branches move focus out of the closing menu; without this
+    // one, choosing Saved customers left focus on a menu item that had just
+    // been hidden, dropping it to <body>.
+    if (target === "history") elements.historySearchInput?.focus();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -2014,6 +2030,35 @@ function initEventListeners() {
     }
   });
 
+  // The data-use disclosure is open for anyone who has not seen it, then
+  // stays closed. Chrome wants it prominent before collection, but leaving it
+  // permanently expanded costs a narrow panel a block of text on every screen.
+  if (elements.dataUseDetails) {
+    const markDataUseSeen = () => {
+      chrome.storage.local
+        .set({ [STORAGE_KEYS.dataUseNoticeSeen]: true })
+        .catch(() => {});
+    };
+
+    chrome.storage.local
+      .get(STORAGE_KEYS.dataUseNoticeSeen)
+      .then((stored) => {
+        if (stored[STORAGE_KEYS.dataUseNoticeSeen]) {
+          elements.dataUseDetails.open = false;
+        }
+      })
+      .catch(() => {});
+
+    // Collapsing it by hand counts as having read it.
+    elements.dataUseDetails.addEventListener("toggle", () => {
+      if (!elements.dataUseDetails.open) markDataUseSeen();
+    });
+
+    // So does getting as far as running a check with it on screen: the notice
+    // was displayed before any data was collected, which is the point of it.
+    elements.runAllChecksBtn?.addEventListener("click", markDataUseSeen);
+  }
+
   // Show the retention-change notice once per user. Chrome requires a
   // prominent disclosure when data practices change after installation, and
   // saved records went from outcomes-only to holding the submitted customer
@@ -2365,7 +2410,11 @@ function initEventListeners() {
     syncFirstRunPresentation();
     if (step === "coBuyer") {
       elements.hasCoBuyer.checked = true;
-      elements.coBuyerSection?.classList.remove("hidden");
+      // Dispatch rather than toggle by hand: the change listener owns
+      // aria-expanded and the Add/Remove label, and setting .checked in code
+      // does not fire it — so the control announced "collapsed" over a section
+      // that was open.
+      elements.hasCoBuyer.dispatchEvent(new Event("change", { bubbles: true }));
       elements.cbFirstName?.focus();
       return;
     }
@@ -2951,7 +3000,10 @@ async function handleClear() {
   if (elements.cbSuffix) elements.cbSuffix.value = "";
   setDateInputValue(elements.cbDob, "");
   if (elements.cbDlnPid) elements.cbDlnPid.value = "";
-  if (elements.hasCoBuyer) elements.hasCoBuyer.checked = false;
+  if (elements.hasCoBuyer) {
+    elements.hasCoBuyer.checked = false;
+    elements.hasCoBuyer.dispatchEvent(new Event("change", { bubbles: true }));
+  }
   elements.coBuyerSection?.classList.add("hidden");
 
   // Clearing the deal must also drop the SOS registered owner's birthdate.

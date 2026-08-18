@@ -269,6 +269,17 @@ export function clearHistory() {
       STORAGE_KEYS.complianceHistory,
       STORAGE_KEYS.searchHistory,
     ]);
+    // Clearing history is what a salesperson does before handing a shared
+    // showroom machine to the next person, but the session store still held
+    // the last customer — currentResults, the cached form fields, the portal
+    // screenshots — and reopening the panel rehydrated the completed run from
+    // it. Clearing records has to mean clearing the working copy too.
+    try {
+      await chrome.storage.session.clear();
+    } catch {
+      // A blocked session clear must not fail the history clear itself; the
+      // persistent records are already gone by this point.
+    }
     return { success: true, cleared: true };
   });
 }

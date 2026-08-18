@@ -42,8 +42,26 @@ export async function loadScannerConfig(
   }
 }
 
+// The SDK URL comes from scanner-config.json, fetched at runtime. Without an
+// origin allow-list, anyone able to edit that file could point it at their own
+// host and execute arbitrary script on the page holding a decoded driver's
+// licence and the AES pairing key. The page CSP (script-src 'self') already
+// blocks this; the allow-list is the second lock.
+const ALLOWED_SDK_ORIGINS = Object.freeze(["https://cdn.jsdelivr.net"]);
+
+function isAllowedSdkUrl(url) {
+  try {
+    return ALLOWED_SDK_ORIGINS.includes(new URL(url).origin);
+  } catch {
+    return false;
+  }
+}
+
 function loadScript(url) {
   if (!url) return Promise.reject(new Error("commercial-sdk-url-missing"));
+  if (!isAllowedSdkUrl(url)) {
+    return Promise.reject(new Error("commercial-sdk-url-not-allowed"));
+  }
   const existing = document.querySelector(`script[data-scanner-sdk="${url}"]`);
   if (existing && globalThis.Dynamsoft) return Promise.resolve();
 
@@ -52,6 +70,7 @@ function loadScript(url) {
     if (!existing) {
       script.src = url;
       script.async = true;
+      script.crossOrigin = "anonymous";
       script.dataset.scannerSdk = url;
       document.head.appendChild(script);
     }

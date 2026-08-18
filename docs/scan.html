@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- This page decodes a driver's licence and holds the pairing key in its
+       URL fragment, and GitHub Pages serves it from an origin shared with
+       every other project on the account and sends no CSP header of its own. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://compliance-central-api.fly.dev; worker-src 'self' blob:; base-uri 'none'; form-action 'none'" />
+  <meta name="referrer" content="no-referrer" />
   <meta name="description" content="Use your phone to scan the wide barcode on the back of a Michigan driver's license or state ID and securely fill Compliance Central customer fields." />
   <title>Scan License — Compliance Central</title>
   <link rel="icon" href="icons/icon32.png" />

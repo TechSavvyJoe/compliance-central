@@ -23,7 +23,7 @@
     "default_path": "sidepanel.html"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' data: blob: https://dsvsesvc.sos.state.mi.us https://www.michigan.gov"
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; frame-src 'none'; child-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self' https://compliance-central-api.fly.dev https://sanctionslistservice.ofac.treas.gov https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com https://vpic.nhtsa.dot.gov https://dsvsesvc.sos.state.mi.us; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://dsvsesvc.sos.state.mi.us https://www.michigan.gov"
   },
   "background": {
     "service_worker": "service-worker.js",

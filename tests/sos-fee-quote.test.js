@@ -1279,3 +1279,27 @@ test("the printed plate is inlined rather than fetched", () => {
     /evil\.example/
   );
 });
+
+// Re-screening was the entire point of the aging badge, but it took four steps:
+// open the record, switch tab, find the button, run. And a single record could
+// only be removed by clearing every record — the worker already supported
+// removing one entry, nothing exposed it.
+test("a saved record can be re-screened and deleted from its own card", () => {
+  const historySource = readFileSync(
+    new URL("../src/sidepanel/history.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(historySource, /history-rescreen-btn/);
+  assert.match(historySource, /history-delete-btn/);
+  // Delete needs the audit id, not the list position, so it cannot remove the
+  // wrong record if the list re-sorts between render and click.
+  assert.match(historySource, /data-audit="\$\{sanitizeHTML\(item\.id \|\| item\.reference \|\| ""\)\}"/);
+  // Re-screen only applies to a full run; a partial check has nothing to re-run.
+  assert.match(historySource, /isFull\s*\?\s*`<button class="btn-hist history-rescreen-btn/);
+
+  assert.match(sidepanelScript, /type: "REMOVE_HISTORY_ENTRY"/);
+  assert.match(sidepanelScript, /history-rescreen-btn/);
+  // Deleting one record must confirm, and must say the others are kept.
+  assert.match(sidepanelScript, /Delete this one saved record\?/);
+  assert.match(sidepanelScript, /Other records are kept/);
+});

@@ -3920,6 +3920,41 @@ body {
   .sos-status-bar i { animation: none; width: 100%; }
 }
 
+/* Re-screening was the point of the aging badge but took four steps, and a
+   single record could only be removed by clearing every record. Both actions
+   now sit on the card, with delete styled as the destructive one so it is not
+   mistaken for another export. */
+.btn-hist.history-rescreen-btn {
+  border-color: var(--design-navy);
+  color: var(--design-navy);
+  font-weight: 750;
+}
+
+.btn-hist.history-rescreen-btn.is-aging {
+  border-color: var(--design-warning);
+  background: #fdf1e3;
+  color: var(--design-warning);
+}
+
+.btn-hist-danger {
+  margin-left: auto;
+  border-color: #e6c4c0;
+  color: #8f1d14;
+}
+
+.btn-hist-danger:hover,
+.btn-hist-danger:focus-visible {
+  border-color: #8f1d14;
+  background: #fdecea;
+  outline: none;
+}
+
+/* A salesperson scans this list for one deal, so the rows are tightened to put
+   more of them on a 20-inch screen without shrinking the text itself. */
+.history-item { padding: 10px 12px; }
+.history-actions { flex-wrap: wrap; gap: 6px; }
+.history-checks { gap: 4px; }
+
 .rescreen-banner {
   display: flex;
   align-items: center;

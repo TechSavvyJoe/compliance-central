@@ -2023,6 +2023,43 @@ function initEventListeners() {
       await downloadAllReportsPDF(results, keys);
       return;
     }
+    // Deleting one record was only possible by clearing every record: the
+    // worker already supported removing a single entry, but nothing exposed it.
+    if (btn.classList.contains("history-delete-btn")) {
+      const auditId = btn.dataset.audit || "";
+      if (!auditId) return;
+      if (!confirm("Delete this one saved record?\n\nOther records are kept.")) return;
+      try {
+        const result = await chrome.runtime.sendMessage({
+          type: "REMOVE_HISTORY_ENTRY",
+          data: { auditId },
+        });
+        if (!result?.success) {
+          showToast("That record could not be deleted. Try again.", "error");
+          return;
+        }
+        filterHistoryWorkspace(elements.historySearchInput?.value || "");
+        await updateHistoryCount(elements.historyCount);
+        showToast("Record deleted. Other records are unchanged.", "success");
+      } catch (error) {
+        console.error("Delete history entry failed:", error);
+        showToast("That record could not be deleted. Try again.", "error");
+      }
+      return;
+    }
+
+    // Re-screening is the whole point of the aging reminder, but it took four
+    // steps: open the record, switch tab, find the button, run. This does it.
+    if (btn.classList.contains("history-rescreen-btn")) {
+      await handleClear();
+      applyCustomerData(elements, results.customer);
+      updateJurisdictionTags();
+      activateWorkspace("screening");
+      showToast("Customer restored — running the checks again.", "info");
+      await handleRunAllChecks();
+      return;
+    }
+
     if (btn.classList.contains("history-open-btn")) {
       await handleClear();
       applyCustomerData(elements, results.customer);

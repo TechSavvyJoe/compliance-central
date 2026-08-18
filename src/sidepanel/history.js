@@ -371,6 +371,12 @@ export async function populateHistoryModal(historyListEl) {
             <button class="btn-hist btn-hist-primary history-open-btn" data-index="${index}" title="Restore this customer and the saved results"><span class="btn-hist-ic">${ICONS.play}</span>Open record</button>
             <button class="btn-hist history-print-btn" data-index="${index}" title="Print the saved reports">Print</button>
             <button class="btn-hist history-download-btn" data-index="${index}" title="Download the saved reports as one PDF">PDF</button>
+            ${
+              isFull
+                ? `<button class="btn-hist history-rescreen-btn${aging ? " is-aging" : ""}" data-index="${index}" title="Restore this customer and run the checks again">Re-screen</button>`
+                : ""
+            }
+            <button class="btn-hist btn-hist-danger history-delete-btn" data-index="${index}" data-audit="${sanitizeHTML(item.id || item.reference || "")}" title="Delete only this record" aria-label="Delete this record">Delete</button>
           </div>
         </div>`;
         })

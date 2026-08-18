@@ -106,7 +106,6 @@ export function isHistoryEntry(value) {
 }
 
 // Retain the old export name for compatibility with older tests/integrations.
-export const isAnonymousHistoryEntry = isHistoryEntry;
 
 export function validateHistoryMessage(type, data) {
   switch (type) {

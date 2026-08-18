@@ -6,7 +6,7 @@
  */
 
 const DB_NAME = "ComplianceCentralDB";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SDN_STORE = "sdnEntries";
 const HISTORY_STORE = "searchHistory";
 const SETTINGS_STORE = "settings";
@@ -49,14 +49,14 @@ export async function initDB() {
         sdnStore.createIndex("program", "program", { unique: false });
       }
 
-      // Search History Store
-      if (!database.objectStoreNames.contains(HISTORY_STORE)) {
-        const historyStore = database.createObjectStore(HISTORY_STORE, {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        historyStore.createIndex("timestamp", "timestamp", { unique: false });
-        historyStore.createIndex("result", "result", { unique: false });
+      // The search-history store was created but never written to or read
+      // from: `saveSearchHistory`, `getSearchHistory` and `clearSearchHistory`
+      // had no callers anywhere. An empty object store literally named
+      // "searchHistory" sitting in every user's browser is the kind of thing a
+      // reviewer reasonably asks about in an extension that handles ID
+      // numbers, so version 2 removes it.
+      if (database.objectStoreNames.contains(HISTORY_STORE)) {
+        database.deleteObjectStore(HISTORY_STORE);
       }
 
       // Settings Store
@@ -67,58 +67,7 @@ export async function initDB() {
   });
 }
 
-/**
- * Clear all SDN entries from the database
- * @returns {Promise<void>}
- */
-export async function clearSDNEntries() {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SDN_STORE], "readwrite");
-    const store = transaction.objectStore(SDN_STORE);
-    const request = store.clear();
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error("Failed to clear SDN entries"));
-  });
-}
-
-/**
- * Store SDN entries in bulk
- * @param {Array} entries - Array of SDN entry objects
- * @returns {Promise<void>}
- */
-export async function storeSDNEntries(entries) {
-  const database = await initDB();
-  return new Promise((resolve) => {
-    const transaction = database.transaction([SDN_STORE], "readwrite");
-    const store = transaction.objectStore(SDN_STORE);
-
-    let completed = 0;
-    const total = entries.length;
-
-    entries.forEach((entry) => {
-      const request = store.put(entry);
-      request.onsuccess = () => {
-        completed++;
-        if (completed === total) {
-          resolve();
-        }
-      };
-      request.onerror = () => {
-        // Continue with other entries even if one fails
-        completed++;
-        if (completed === total) {
-          resolve();
-        }
-      };
-    });
-
-    if (total === 0) {
-      resolve();
-    }
-  });
-}
 
 /**
  * Atomically replace all SDN entries: clears the store and writes the new set
@@ -185,73 +134,8 @@ export async function getSDNCount() {
   });
 }
 
-/**
- * Save a search to history
- * @param {Object} searchData - Search parameters and result
- * @returns {Promise<number>} - The ID of the saved search
- */
-export async function saveSearchHistory(searchData) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([HISTORY_STORE], "readwrite");
-    const store = transaction.objectStore(HISTORY_STORE);
 
-    const entry = {
-      ...searchData,
-      timestamp: new Date().toISOString(),
-    };
 
-    const request = store.add(entry);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error("Failed to save search history"));
-  });
-}
-
-/**
- * Get search history
- * @param {number} limit - Maximum entries to return
- * @returns {Promise<Array>}
- */
-export async function getSearchHistory(limit = 50) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([HISTORY_STORE], "readonly");
-    const store = transaction.objectStore(HISTORY_STORE);
-    const index = store.index("timestamp");
-
-    const entries = [];
-    const request = index.openCursor(null, "prev");
-
-    request.onsuccess = (event) => {
-      const cursor = event.target.result;
-      if (cursor && entries.length < limit) {
-        entries.push(cursor.value);
-        cursor.continue();
-      } else {
-        resolve(entries);
-      }
-    };
-
-    request.onerror = () => reject(new Error("Failed to get search history"));
-  });
-}
-
-/**
- * Clear search history
- * @returns {Promise<void>}
- */
-export async function clearSearchHistory() {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([HISTORY_STORE], "readwrite");
-    const store = transaction.objectStore(HISTORY_STORE);
-    const request = store.clear();
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error("Failed to clear search history"));
-  });
-}
 
 /**
  * Save a setting

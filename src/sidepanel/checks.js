@@ -389,3 +389,44 @@ export function calculateFinalDecision(checks) {
     warnings: [],
   };
 }
+
+/**
+ * The verdict for a completed run, including the incomplete-checks downgrade.
+ *
+ * calculateFinalDecision judges the checks it is given. It cannot know that a
+ * check is *missing* — that a co-buyer was screened but their OFAC result never
+ * arrived, or that a trade VIN was entered and the title check never ran. The
+ * printed report has always applied that downgrade and the screen never did, so
+ * a restored History record could read APPROVED in the panel and REVIEW
+ * REQUIRED on the legal document printed from the same row. Both call this now.
+ *
+ * A live Run All backfills every expected check, so this only bites records
+ * saved under earlier rules — which is exactly the case where a stale APPROVED
+ * is most misleading.
+ */
+export function finalDecisionForResults(results) {
+  const checks = results?.checks || {};
+  const customer = results?.customer || {};
+  const base = calculateFinalDecision(checks);
+  if (base.level !== "APPROVED") return base;
+
+  const incomplete = [
+    !classifyOfacResult(checks.ofac).complete,
+    !classifyRepeatOffenderResult(checks.repeatOffender).complete,
+    Boolean(customer.coBuyer) && !classifyOfacResult(checks.coBuyerOfac).complete,
+    Boolean(customer.coBuyer) &&
+      !classifyRepeatOffenderResult(checks.coBuyerRepeatOffender).complete,
+    // A trade VIN with no title result, or an errored one, is a missing check.
+    Boolean(customer.tradeVin) &&
+      (!checks.title || Boolean(checks.title.error) || checks.title.status === "error"),
+  ].some(Boolean);
+
+  if (!incomplete) return base;
+  return {
+    approved: false,
+    level: "REVIEW",
+    reason:
+      "One or more required checks are incomplete - review and re-run them before proceeding",
+    warnings: base.warnings || [],
+  };
+}

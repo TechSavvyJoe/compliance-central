@@ -341,3 +341,41 @@ test("history save reports storage failure to its caller", async () => {
     console.error = originalError;
   }
 });
+
+// The panel and the printed report must never disagree about one deal. The
+// report always downgraded APPROVED to REVIEW when a required check was
+// missing; the screen reused whatever verdict was cached on the record. A
+// History row saved under earlier rules therefore read APPROVED in the panel
+// and REVIEW REQUIRED on the document printed from that same row.
+test("the screen and the printed report reach the same verdict", async () => {
+  const { finalDecisionForResults } = await import("../src/sidepanel/checks.js");
+  const { reportDecisionSummary } = await import("../src/sidepanel/export.js");
+
+  const clean = {
+    ofac: { passed: true },
+    repeatOffender: { status: "eligible", passed: true },
+  };
+
+  const cases = [
+    ["co-buyer screened but their OFAC never arrived", { customer: { coBuyer: { firstName: "B" } }, checks: clean }],
+    ["trade VIN entered but no title check", { customer: { tradeVin: "1FTFW1E84PFA10397" }, checks: clean }],
+    ["title check errored", { customer: { tradeVin: "1FTFW1E84PFA10397" }, checks: { ...clean, title: { error: "portal down" } } }],
+  ];
+
+  for (const [label, results] of cases) {
+    const screen = finalDecisionForResults(results);
+    const report = reportDecisionSummary(results).decision;
+    assert.equal(screen.level, "REVIEW", `${label}: screen must not approve`);
+    assert.equal(report.level, "REVIEW", `${label}: report must not approve`);
+    assert.equal(screen.level, report.level, `${label}: surfaces must agree`);
+  }
+
+  // A complete, clean run still approves on both surfaces.
+  const complete = { customer: {}, checks: clean };
+  assert.equal(finalDecisionForResults(complete).level, "APPROVED");
+  assert.equal(reportDecisionSummary(complete).decision.level, "APPROVED");
+
+  // A stored verdict never overrides a recomputed one.
+  const stale = { customer: { tradeVin: "1FTFW1E84PFA10397" }, checks: clean, finalDecision: { level: "APPROVED", approved: true } };
+  assert.equal(finalDecisionForResults(stale).level, "REVIEW");
+});

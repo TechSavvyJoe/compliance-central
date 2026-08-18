@@ -170,17 +170,6 @@ function fullNameSimilarity(searchName, candidateName) {
   return Math.round(bestScore * 100);
 }
 
-/**
- * True when both sides state a comparable surname and they are not the same
- * name. Short surnames are exempt (see SURNAME_FLOOR_MIN_LENGTH).
- */
-export function surnameConflicts(searchLast, candidateLast) {
-  const a = normalizeName(searchLast);
-  const b = normalizeName(candidateLast);
-  if (!a || !b) return false;
-  if (Math.min(a.length, b.length) < SURNAME_FLOOR_MIN_LENGTH) return false;
-  return jaroSimilarity(a, b) < SURNAME_FLOOR;
-}
 
 // The full-name path exists to rescue records whose components we could not
 // parse — an alias held in one field, a comma-reversed order, a compound

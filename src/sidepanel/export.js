@@ -16,7 +16,7 @@ import {
   titlePresentation,
 } from "./title-format.js";
 import {
-  calculateFinalDecision,
+  finalDecisionForResults,
   classifyOfacResult,
   classifyRepeatOffenderResult,
 } from "./checks.js";
@@ -891,16 +891,9 @@ export function reportDecisionSummary(currentResults) {
   rows.push(titleReportRow(checks.title, Boolean(customer.tradeVin)));
 
   const incomplete = rows.filter((row) => row.incomplete);
-  const calculated = calculateFinalDecision(checks);
-  const decision =
-    incomplete.length > 0 && calculated.level === "APPROVED"
-      ? {
-          approved: false,
-          level: "REVIEW",
-          reason:
-            "One or more required checks are incomplete - review and re-run them before proceeding",
-        }
-      : calculated;
+  // The downgrade this report has always applied now lives in checks.js, so
+  // the panel reaches the same verdict from the same record.
+  const decision = finalDecisionForResults(currentResults);
 
   return { decision, rows, incomplete };
 }

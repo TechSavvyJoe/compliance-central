@@ -5,7 +5,7 @@
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
 import {
-  calculateFinalDecision,
+  finalDecisionForResults,
   classifyOfacResult,
   classifyRepeatOffenderResult,
 } from "./checks.js";
@@ -437,9 +437,11 @@ function animateProgress(elements) {
 
 export function displayResults(elements, results) {
   prepareFullResultsView(elements);
-  if (!results.finalDecision) {
-    results.finalDecision = calculateFinalDecision(results.checks);
-  }
+  // Recompute rather than trusting a cached verdict: a record restored from
+  // History carries whatever decision was stored under the rules in force when
+  // it was saved, and the printed report has always recomputed. Two surfaces
+  // disagreeing about one deal is worse than either answer alone.
+  results.finalDecision = finalDecisionForResults(results);
   const decision = results.finalDecision;
 
   const checks = results.checks || {};

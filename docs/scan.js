@@ -1008,19 +1008,40 @@ function renderReview(person) {
 }
 
 /**
- * True when this origin already holds a persisted camera grant, so starting the
- * stream will not raise a prompt.
+ * True when the camera can be opened without raising a prompt.
  *
- * Only Chromium answers `camera` here; Safari and Firefox reject or return
- * undefined, and both are treated as "not known to be granted" so the explicit
- * tap remains — on iOS in particular the gesture is what makes getUserMedia
- * reliable.
+ * Two independent signals, because no single one covers every phone a
+ * salesperson might hold:
+ *
+ *  - `navigator.permissions.query({name:"camera"})` is answered by Chromium —
+ *    Chrome, Edge and Samsung Internet on Android — and is definitive there.
+ *  - Everywhere else, a granted camera is the only reason `enumerateDevices()`
+ *    returns a videoinput whose `label` is non-empty; browsers blank those
+ *    labels until permission exists. That covers Firefox Android, and iOS
+ *    (Safari, and Chrome/Edge/Firefox for iOS, which are all WebKit) within a
+ *    session where access was already granted.
+ *
+ * Both are read-only checks — neither opens the camera or raises a prompt — and
+ * anything unknown falls back to showing the button, which is the safe answer.
  */
 async function cameraAlreadyPermitted() {
   try {
-    if (!navigator.permissions?.query) return false;
-    const status = await navigator.permissions.query({ name: "camera" });
-    return status?.state === "granted";
+    if (navigator.permissions?.query) {
+      const status = await navigator.permissions.query({ name: "camera" });
+      if (status?.state === "granted") return true;
+      // "denied" is definitive; "prompt" means a tap is genuinely needed.
+      if (status?.state) return false;
+    }
+  } catch {
+    // Firefox and WebKit reject an unsupported descriptor: fall through.
+  }
+
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) return false;
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.some(
+      (device) => device.kind === "videoinput" && Boolean(device.label)
+    );
   } catch {
     return false;
   }

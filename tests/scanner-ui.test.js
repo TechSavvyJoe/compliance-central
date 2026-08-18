@@ -138,11 +138,11 @@ test("camera screen keeps only essential visible guidance", () => {
   assert.equal((html.match(/<li class="scan-step/g) || []).length, 3);
   assert.match(
     html,
-    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260722-23" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
+    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260818-24" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
   );
   assert.match(
     html,
-    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260722-23" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
+    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260818-24" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
   );
   assert.match(
     html,
@@ -200,8 +200,8 @@ test("demo ID artwork is lightweight and clearly non-document training media", (
   assert.ok(frontDemoWebp.byteLength + backDemoWebp.byteLength < 50_000);
   assert.deepEqual(vp8Dimensions(frontDemoWebp), { width: 640, height: 404 });
   assert.deepEqual(vp8Dimensions(backDemoWebp), { width: 640, height: 404 });
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-23" width="640" height="404"/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-23" width="640" height="404"/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260818-24" width="640" height="404"/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260818-24" width="640" height="404"/);
 });
 
 test("normal scans do not populate implementation diagnostics", () => {
@@ -217,12 +217,12 @@ test("normal scans do not populate implementation diagnostics", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260722-23");
+  assert.equal(cssVersion, "20260818-24");
   assert.equal(scriptVersion, cssVersion);
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260722-23/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260722-23/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260818-24/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260818-24/);
   assert.match(pairingJs, /new URLSearchParams\(\{ s: sessionId, k: key \}\)/);
-  assert.match(pairingJs, /cb=20260722-23#\$\{fragment\.toString\(\)\}/);
+  assert.match(pairingJs, /cb=20260818-24#\$\{fragment\.toString\(\)\}/);
   assert.doesNotMatch(pairingJs, /debug=1/);
 });
 
@@ -239,4 +239,60 @@ test("scanner styles preserve focus, readable labels, motion preferences, and na
 
 test("scanner secondary text meets WCAG AA contrast on cards", () => {
   assert.ok(contrast(rgb("7f97ae"), rgb("122a45")) >= 4.5);
+});
+
+// The Start camera tap existed only to unlock Web Audio for the success beep.
+// Skipping it needs a permission check that works on every phone a
+// salesperson might hold — not just Chromium, which is the only engine that
+// answers a "camera" permission query.
+test("the camera opens without a tap on every browser that already granted it", async () => {
+  const source = readFileSync(
+    new URL("../docs/scan.js", import.meta.url),
+    "utf8"
+  );
+
+  // Extract the helper and exercise it against each engine's real behaviour.
+  const start = source.indexOf("async function cameraAlreadyPermitted");
+  const end = source.indexOf("/**", start + 10);
+  assert.ok(start > -1 && end > start, "cameraAlreadyPermitted should exist");
+  const body = source
+    .slice(start, end)
+    .replaceAll("navigator.", "nav.")
+    .replace(
+      "async function cameraAlreadyPermitted()",
+      "async function cameraAlreadyPermitted(nav)"
+    );
+  const cameraAlreadyPermitted = new Function(
+    `${body}; return cameraAlreadyPermitted;`
+  )();
+
+  const cam = (label) => [
+    { kind: "videoinput", label },
+    { kind: "audioinput", label: "" },
+  ];
+  const chromium = (state) => ({
+    permissions: { query: async () => ({ state }) },
+    mediaDevices: { enumerateDevices: async () => cam("") },
+  });
+  const webkitOrGecko = (label) => ({
+    permissions: {
+      query: async () => {
+        throw new TypeError("unsupported descriptor");
+      },
+    },
+    mediaDevices: { enumerateDevices: async () => cam(label) },
+  });
+
+  // Chromium (Chrome, Edge, Samsung Internet) answers the query directly.
+  assert.equal(await cameraAlreadyPermitted(chromium("granted")), true);
+  assert.equal(await cameraAlreadyPermitted(chromium("prompt")), false);
+  assert.equal(await cameraAlreadyPermitted(chromium("denied")), false);
+
+  // Firefox and every iOS browser reject the query; a non-empty device label
+  // is the only thing a browser exposes once the camera has been granted.
+  assert.equal(await cameraAlreadyPermitted(webkitOrGecko("Back Camera")), true);
+  assert.equal(await cameraAlreadyPermitted(webkitOrGecko("")), false);
+
+  // Anything unknown must fall back to asking, never to opening the camera.
+  assert.equal(await cameraAlreadyPermitted({}), false);
 });

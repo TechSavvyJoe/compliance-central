@@ -1007,6 +1007,41 @@ function renderReview(person) {
   }
 }
 
+/**
+ * True when this origin already holds a persisted camera grant, so starting the
+ * stream will not raise a prompt.
+ *
+ * Only Chromium answers `camera` here; Safari and Firefox reject or return
+ * undefined, and both are treated as "not known to be granted" so the explicit
+ * tap remains — on iOS in particular the gesture is what makes getUserMedia
+ * reliable.
+ */
+async function cameraAlreadyPermitted() {
+  try {
+    if (!navigator.permissions?.query) return false;
+    const status = await navigator.permissions.query({ name: "camera" });
+    return status?.state === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resume the audio context on the first touch anywhere on the page, so the
+ * success beep works without dedicating a button press to it.
+ */
+function unlockAudioOnFirstGesture() {
+  const unlock = () => {
+    primeScanSuccessFeedback();
+    for (const type of ["pointerdown", "touchstart", "keydown"]) {
+      window.removeEventListener(type, unlock);
+    }
+  };
+  for (const type of ["pointerdown", "touchstart", "keydown"]) {
+    window.addEventListener(type, unlock, { once: false, passive: true });
+  }
+}
+
 async function beginCapture(which, { waitForGesture = false } = {}) {
   capturing = which;
   const gen = ++captureGen;
@@ -1566,7 +1601,13 @@ if (promoteToTopLevelIfNeeded()) {
     .catch(() => {
       wasmReady = false;
     });
-  // One clear tap reliably unlocks Web Audio before the first automatic
-  // capture, so the success beep is available on mobile browsers.
-  beginCapture("buyer", { waitForGesture: true });
+  // The Start camera tap existed only to unlock Web Audio for the success
+  // beep — a guaranteed extra press on every single scan in exchange for a
+  // sound that already has a vibration fallback. Unlock audio from the first
+  // touch anywhere instead, and when the browser has already persisted the
+  // camera grant for this origin, go straight to the viewfinder.
+  unlockAudioOnFirstGesture();
+  cameraAlreadyPermitted().then((granted) => {
+    beginCapture("buyer", { waitForGesture: !granted });
+  });
 }

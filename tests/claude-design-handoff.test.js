@@ -118,7 +118,7 @@ test("the compact fee reference matches current published Michigan amounts", asy
     "$35 ($25 donation + $10 service)",
     "$15 one year · $29 two year",
     "$10 + prorated difference",
-    "Existing digital plates must be replaced with standard metal plates as of Aug. 9, 2026.",
+    "Digital plates are no longer valid in Michigan. Owners were required to replace them with standard metal plates by Aug. 9, 2026.",
   ]) {
     assert.ok(html.includes(copy), `missing fee reference: ${copy}`);
   }

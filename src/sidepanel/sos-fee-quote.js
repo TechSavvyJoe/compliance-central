@@ -336,7 +336,8 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
         <tr><th>Title fee</th><td>$15.00</td></tr>
         <tr><th>Michigan lien recording fee</th><td>$1.00</td></tr>
         <tr class="total"><th>Total title fee</th><td>$16.00</td></tr>
-        <tr><th>Sales tax</th><td>6% of purchase price &mdash; confirm final transaction amount</td></tr>
+        <tr><th>Instant title (if requested)</th><td>$5.00 &mdash; expedited same-day title</td></tr>
+        <tr><th>Sales tax</th><td>6% of the taxable price &mdash; purchase price less the Michigan trade-in credit (up to $12,000 for 2026); confirm final transaction amount</td></tr>
         <tr><th>Optional Recreation Passport</th><td>${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
         <tr><th>Quote time</th><td>${sanitizeHTML(calculatedAt)}</td></tr>
       </table>

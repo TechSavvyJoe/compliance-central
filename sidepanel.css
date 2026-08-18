@@ -2969,7 +2969,10 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   --design-card: #ffffff;
   --design-ink: #101a26;
   --design-slate: #42536a;
-  --design-muted: #5e7187;
+  /* 4.29:1 on the canvas, just under the 4.5 AA minimum, and used by ~50
+     elements — so the miss was systemic rather than one label. Darkened the
+     smallest amount that clears AA on both the white cards and the canvas. */
+  --design-muted: #59697d;
   --design-line: #d6dde6;
   --design-line-soft: #e8edf3;
   --design-success: #0f6f50;
@@ -3687,6 +3690,24 @@ body {
 /* A pending delivery is the one thing a salesperson must not miss, and a toast
    that disappears after seven seconds cannot carry it. This stays on screen
    until the deals are dealt with, and opens them when clicked. */
+/* Two more colours left over from the original dark panel, found by measuring
+   every visible text/background pair rather than by eye. Both sit on white
+   cards where they scored far under the 4.5:1 AA minimum: the required-field
+   asterisk at 2.19:1 and the privacy "Details" link at 1.67:1 — the link a
+   customer would follow to read what data leaves the machine. */
+.required {
+  color: #b3261e;
+}
+
+.data-use-note a {
+  color: #175fa8;
+}
+
+.data-use-note a:hover,
+.data-use-note a:focus-visible {
+  color: var(--design-navy);
+}
+
 .rescreen-banner {
   display: flex;
   align-items: center;

@@ -997,3 +997,22 @@ test("a plate fee quoted on an earlier day counts as stale", () => {
   // The reminder has to actually consider it.
   assert.match(sidepanelScript, /isPlateQuoteStale\(currentSosFeeQuote\)/);
 });
+
+// Found by measuring every visible text/background pair rather than by eye.
+// Both sat on white cards well under the 4.5:1 AA minimum, and both are the
+// same root cause as the earlier progress-bar fix: colours from the original
+// dark panel left behind when the design moved to a light canvas.
+test("required marks and the privacy link are legible", () => {
+  // 2.19:1 before — the mark that tells a salesperson a field is mandatory.
+  assert.match(sidepanelCss, /\.required \{\s*color: #b3261e;/);
+  // 1.67:1 before — the link a customer follows to read what data leaves.
+  assert.match(sidepanelCss, /\.data-use-note a \{\s*color: #175fa8;/);
+});
+
+test("the muted token clears AA on both the cards and the canvas", () => {
+  // 4.29:1 on the canvas is under AA, and roughly fifty elements inherit it,
+  // so the miss was systemic. #59697d is the smallest darkening that passes
+  // against white (5.61) and against the canvas (4.81).
+  assert.match(sidepanelCss, /--design-muted: #59697d;/);
+  assert.doesNotMatch(sidepanelCss, /--design-muted: #5e7187;/);
+});

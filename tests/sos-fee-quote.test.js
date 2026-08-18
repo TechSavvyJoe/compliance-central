@@ -1116,3 +1116,71 @@ test("the total and term lead the result", () => {
     "the total and term must come before the fee glossary"
   );
 });
+
+// The customer worksheet described the vehicle without the MSRP the fee is
+// calculated from, showed no picture of the plate being bought, and stated a
+// $15 title fee that omits Michigan's $1 lien recording fee.
+test("the customer worksheet states the MSRP, the plate and the real title fee", () => {
+  const quote = createCalculatedQuote(
+    {
+      calculationMode: SOS_QUOTE_MODE.newPlate,
+      feeCents: 19500,
+      feeBreakdown: [{ label: "MSRP Based Reg Fee", feeCents: 19500 }],
+      vehicleDescription: "2025 · Car/Mini-Van/SUV · 4 Door",
+      platePreviewUrl: "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.PAS.PM",
+      recreationPassport: false,
+      registrationMonths: 8,
+      expiresOn: "2027-03-14",
+      calculatedAt: "2026-08-17T12:00:00.000Z",
+    },
+    SOS_QUOTE_MODE.newPlate,
+    new Date(),
+    { msrpCents: 4250000 }
+  );
+  assert.equal(quote.msrpCents, 4250000);
+
+  const html = createSosFeeQuotePrintHTML(quote, { dealerName: "Bob Maxey Ford of Howell" });
+  assert.match(html, /Vehicle base MSRP/);
+  assert.match(html, /\$42,500\.00/);
+  // The plate the customer is actually getting.
+  assert.match(html, /<img src="https:\/\/dsvsesvc\.sos\.state\.mi\.us[^"]*"/);
+  // $15 title + $1 lien recording = $16, itemised rather than implied.
+  assert.match(html, /Michigan lien recording fee/);
+  assert.match(html, /<td>\$16\.00<\/td>/);
+  // The SOS breakdown is still itemised above its own total.
+  assert.match(html, /MSRP Based Reg Fee/);
+  assert.match(html, /8 months/);
+  assert.match(html, /Bob Maxey Ford of Howell/);
+});
+
+test("an MSRP that is not a sane amount never reaches the sheet", () => {
+  for (const bad of [0, -1, 99_999_901, 1.5, null]) {
+    const quote = createCalculatedQuote(
+      {
+        calculationMode: SOS_QUOTE_MODE.newPlate,
+        feeCents: 19500,
+        feeBreakdown: [{ label: "MSRP Based Reg Fee", feeCents: 19500 }],
+        calculatedAt: "2026-08-17T12:00:00.000Z",
+      },
+      SOS_QUOTE_MODE.newPlate,
+      new Date(),
+      { msrpCents: bad }
+    );
+    assert.equal(quote.msrpCents, null);
+    assert.doesNotMatch(createSosFeeQuotePrintHTML(quote), /Vehicle base MSRP/);
+  }
+});
+
+// The glossary annotates the result, so it belongs after it.
+test("the fee add-ons sit below the result they annotate", () => {
+  assert.ok(
+    sidepanelHtml.indexOf('id="sosQuoteHeadline"') <
+      sidepanelHtml.indexOf("Michigan fee add-ons"),
+    "the total and term must precede the fee glossary"
+  );
+  assert.ok(
+    sidepanelHtml.indexOf('id="sosQuoteStatus"') <
+      sidepanelHtml.indexOf("Michigan fee add-ons"),
+    "the breakdown summary must precede the fee glossary"
+  );
+});

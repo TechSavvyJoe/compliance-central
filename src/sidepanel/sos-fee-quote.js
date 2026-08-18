@@ -121,6 +121,15 @@ export function normalizeSosFeeQuote(value) {
     source: value.source,
     feeCents,
     vehicleDescription: sanitizeVehicleDescription(value.vehicleDescription),
+    // The MSRP the registration fee is calculated from. It lives only in the
+    // local form, so it never reached the quote and the customer sheet
+    // described the vehicle without the number the fee is based on.
+    msrpCents:
+      Number.isInteger(value.msrpCents) &&
+      value.msrpCents > 0 &&
+      value.msrpCents <= 99_999_900
+        ? value.msrpCents
+        : null,
     calculatedAt: calculatedDate.toISOString(),
     platePreviewUrl:
       value.source === SOS_QUOTE_SOURCE.calculated
@@ -143,10 +152,11 @@ export function normalizeSosFeeQuote(value) {
 }
 
 /** Convert a verified background result into a session-only quote. */
-export function createCalculatedQuote(result, mode, now = new Date()) {
+export function createCalculatedQuote(result, mode, now = new Date(), local = {}) {
   if (result?.calculationMode !== mode) return null;
   return normalizeSosFeeQuote({
     mode,
+    msrpCents: local.msrpCents,
     source: SOS_QUOTE_SOURCE.calculated,
     feeCents: result?.feeCents,
     vehicleDescription: result?.vehicleDescription,
@@ -210,51 +220,96 @@ function passportSummary(value) {
 }
 
 /** Printable customer handoff. It intentionally never impersonates SOS. */
-export function createSosFeeQuotePrintHTML(quote) {
+export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   const normalized = normalizeSosFeeQuote(quote);
   if (!normalized) return "";
 
   const calculatedAt = new Date(normalized.calculatedAt).toLocaleString();
-  const sourceDetail =
-    "The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service.";
+  const term = registrationTermText(normalized);
+  const plate = sanitizePlatePreviewUrl(normalized.platePreviewUrl);
+  const dealer = String(branding.dealerName || "").trim().slice(0, 80);
+
+  const officialRows = normalized.feeBreakdown
+    .map(
+      (row) =>
+        `<tr><th>${sanitizeHTML(row.label)}</th><td>${sanitizeHTML(formatMoney(row.feeCents))}</td></tr>`
+    )
+    .join("");
 
   return `<!doctype html>
   <html lang="en"><head><meta charset="utf-8" />
   <title>Customer Registration Cost Summary</title>
   <style>
-    @page { size: letter; margin: 0.55in; }
+    @page { size: letter; margin: 0.5in; }
     * { box-sizing: border-box; }
     body { margin: 0; color: #172033; background: #fff; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .sheet { border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; }
-    header { padding: 24px 28px; background: #00274c; color: #fff; }
-    h1 { margin: 0; font-size: 23px; letter-spacing: -0.2px; }
-    .sub { margin: 5px 0 0; color: #dbeafe; font-size: 12px; }
-    main { padding: 24px 28px; }
-    .status { display: inline-block; padding: 6px 9px; border-radius: 999px; color: #1e3a5f; background: #e0f2fe; font-size: 12px; font-weight: 700; }
+    header { padding: 18px 26px; background: #00274c; color: #fff; }
+    h1 { margin: 0; font-size: 21px; letter-spacing: -0.2px; }
+    .sub { margin: 4px 0 0; color: #dbeafe; font-size: 11px; }
+    main { padding: 20px 26px 8px; }
+    .status { display: inline-block; padding: 5px 9px; border-radius: 999px; color: #1e3a5f; background: #e0f2fe; font-size: 11px; font-weight: 700; }
     .status.unverified { color: #78350f; background: #fef3c7; }
-    table { width: 100%; border-collapse: collapse; margin: 18px 0 8px; }
-    th, td { padding: 12px 0; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
-    th { width: 59%; color: #475569; font-size: 13px; font-weight: 600; }
-    td { color: #0f172a; font-size: 14px; font-weight: 700; }
-    .fee { color: #00274c; font-size: 22px; }
-    .note { margin-top: 20px; padding: 14px; border-left: 4px solid #ffcb05; background: #fffbeb; color: #4b3b09; font-size: 12px; line-height: 1.5; }
-    footer { padding: 0 28px 22px; color: #64748b; font-size: 10px; line-height: 1.4; }
+    .headline { display: grid; grid-template-columns: 1.05fr 1fr; gap: 14px; margin: 14px 0 4px; padding: 14px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #00274c; border-radius: 10px; }
+    .headline span { display: block; color: #64748b; font-size: 9.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+    .headline strong { display: block; margin-top: 2px; color: #00274c; font-size: 26px; font-weight: 800; }
+    .headline .term { margin-top: 2px; color: #0f172a; font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .plate { display: grid; grid-template-columns: 248px 1fr; align-items: center; gap: 14px; margin: 12px 0 2px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+    .plate img { width: 248px; height: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+    .plate strong { display: block; color: #0f172a; font-size: 14px; }
+    .plate small { display: block; margin-top: 3px; color: #64748b; font-size: 10.5px; line-height: 1.4; }
+    h2 { margin: 16px 0 0; color: #00274c; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; }
+    th, td { padding: 9px 0; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+    th { width: 58%; color: #475569; font-size: 12px; font-weight: 600; }
+    td { color: #0f172a; font-size: 13px; font-weight: 700; }
+    tr.total th, tr.total td { border-bottom: 2px solid #00274c; }
+    tr.total td { color: #00274c; font-size: 16px; }
+    .note { margin: 14px 0 4px; padding: 12px 13px; border-left: 4px solid #ffcb05; background: #fffbeb; color: #4b3b09; font-size: 11px; line-height: 1.5; }
+    footer { padding: 0 26px 18px; color: #64748b; font-size: 9.5px; line-height: 1.4; }
   </style></head><body>
   <section class="sheet">
-    <header><h1>Customer Registration Cost Summary</h1><p class="sub">Compliance Central sales-desk worksheet · Not a Michigan SOS document</p></header>
+    <header>
+      <h1>Customer Registration Cost Summary</h1>
+      <p class="sub">${dealer ? `${sanitizeHTML(dealer)} · ` : ""}Sales-desk worksheet · Not a Michigan SOS document</p>
+    </header>
     <main>
       <span class="status">${sanitizeHTML(sourceLabel(normalized.source))}</span>
+
+      <div class="headline">
+        <div><span>Official SOS total</span><strong>${sanitizeHTML(formatMoney(normalized.feeCents))}</strong></div>
+        <div><span>Registration term</span><div class="term">${sanitizeHTML(term || "Term not stated by SOS")}</div></div>
+      </div>
+
+      ${
+        plate
+          ? `<div class="plate">
+        <img src="${sanitizeHTML(plate)}" alt="Selected Michigan plate design" />
+        <div><strong>Your plate design</strong><small>Official Michigan artwork. Sample characters shown &mdash; your plate number is assigned by the Secretary of State.</small></div>
+      </div>`
+          : ""
+      }
+
+      <h2>What the SOS calculated</h2>
       <table>
         <tr><th>Registration choice</th><td>${sanitizeHTML(modeLabel(normalized.mode))}</td></tr>
         ${normalized.vehicleDescription ? `<tr><th>Vehicle</th><td>${sanitizeHTML(normalized.vehicleDescription)}</td></tr>` : ""}
-        <tr><th>Registration / plate fee total</th><td class="fee">${sanitizeHTML(formatMoney(normalized.feeCents))}</td></tr>
-        ${normalized.feeBreakdown.map((row) => `<tr><th>${sanitizeHTML(row.label)}</th><td>${sanitizeHTML(formatMoney(row.feeCents))}</td></tr>`).join("")}
-        <tr><th>Title transfer fee</th><td>$15.00 standard fee — confirm whether an expedited / instant-title fee applies</td></tr>
-        <tr><th>Sales tax</th><td>6% of purchase price — confirm final transaction amount</td></tr>
+        ${normalized.msrpCents ? `<tr><th>Vehicle base MSRP</th><td>${sanitizeHTML(formatMoney(normalized.msrpCents))}</td></tr>` : ""}
+        ${officialRows}
+        <tr class="total"><th>Registration / plate fee total</th><td>${sanitizeHTML(formatMoney(normalized.feeCents))}</td></tr>
+      </table>
+
+      <h2>Additional costs to expect</h2>
+      <table>
+        <tr><th>Title fee</th><td>$15.00</td></tr>
+        <tr><th>Michigan lien recording fee</th><td>$1.00</td></tr>
+        <tr class="total"><th>Total title fee</th><td>$16.00</td></tr>
+        <tr><th>Sales tax</th><td>6% of purchase price &mdash; confirm final transaction amount</td></tr>
         <tr><th>Optional Recreation Passport</th><td>${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
         <tr><th>Quote time</th><td>${sanitizeHTML(calculatedAt)}</td></tr>
       </table>
-      <div class="note"><strong>Verify before final paperwork.</strong> ${sanitizeHTML(sourceDetail)} Michigan SOS and dealership staff determine the final transaction amount, eligibility, documents, and any additional fees.</div>
+
+      <div class="note"><strong>Verify before final paperwork.</strong> The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service. Title, lien, and tax amounts are reference figures. Michigan SOS and dealership staff determine the final transaction amount, eligibility, documents, and any additional fees.</div>
     </main>
     <footer>Session-only worksheet. It contains no customer name, VIN, plate number, SOS credentials, or account information.</footer>
   </section></body></html>`;

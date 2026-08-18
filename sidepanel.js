@@ -1365,6 +1365,10 @@ function renderRescreenBanner(aging = [], staleQuote = false) {
 }
 
 const CONFIG_VIN_LENGTH = 17;
+// Shown on the customer worksheet so the sheet is identifiably the dealership's.
+// A logo would need an asset this repository does not ship, so the name carries
+// the branding until one is supplied.
+const DEALER_NAME = "Bob Maxey Ford of Howell";
 let rescreenBannerTarget = null;
 
 /** Take the salesperson to whatever the reminder is about. */
@@ -1546,7 +1550,18 @@ async function calculateSosFee() {
     if (!response?.success || !response.quote) {
       throw new Error(response?.error || "Michigan SOS did not return a verified registration fee.");
     }
-    const quote = createCalculatedQuote(response.quote, selectedSosQuoteMode());
+    // The MSRP lives only in the local form, so capture it with the quote
+    // rather than reading the box later, when it may have moved on.
+    const msrpRaw = String(elements.sosMsrp?.value || "").replace(/[$,\s]/g, "");
+    const msrpCents = /^\d{1,7}(?:\.\d{1,2})?$/.test(msrpRaw)
+      ? Math.round(Number(msrpRaw) * 100)
+      : null;
+    const quote = createCalculatedQuote(
+      response.quote,
+      selectedSosQuoteMode(),
+      new Date(),
+      { msrpCents }
+    );
     if (!quote) {
       throw new Error("Michigan SOS returned an incomplete fee result. No quote was created.");
     }
@@ -1694,7 +1709,7 @@ async function handleSosQuoteModeChange() {
 }
 
 async function printSosFeeQuote() {
-  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote);
+  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, { dealerName: DEALER_NAME });
   if (!html) {
     showToast("Calculate an official fee before printing the customer summary.", "info");
     return;

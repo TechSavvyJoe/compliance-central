@@ -103,6 +103,7 @@ import {
   loadSosFeeQuote,
   quoteStatusText,
   registrationTermText,
+  sanitizeDealerLogo,
   formatMoney,
   saveSosFeeQuote,
   sourceLabel,
@@ -305,6 +306,12 @@ const elements = {
   clearAllHistoryBtn: $("clearAllHistoryBtn"),
   exportAuditLogBtn: $("exportAuditLogBtn"),
   rescreenReminderToggle: $("rescreenReminderToggle"),
+  dealershipNameInput: $("dealershipNameInput"),
+  retentionNotice: $("retentionNotice"),
+  retentionNoticeAckBtn: $("retentionNoticeAckBtn"),
+  dealershipLogoInput: $("dealershipLogoInput"),
+  removeDealershipLogoBtn: $("removeDealershipLogoBtn"),
+  dealershipLogoStatus: $("dealershipLogoStatus"),
   rescreenBanner: $("rescreenBanner"),
   rescreenBannerTitle: $("rescreenBannerTitle"),
   rescreenBannerDetail: $("rescreenBannerDetail"),
@@ -1397,11 +1404,20 @@ function renderRescreenBanner(aging = [], staleQuote = false) {
 
 const CONFIG_VIN_LENGTH = 17;
 // Shown on the customer worksheet so the sheet is identifiably the dealership's.
-// A logo would need an asset this repository does not ship, so the name carries
-// the branding until one is supplied.
-const DEALER_NAME = "Bob Maxey Ford of Howell";
-const DEALER_LOGO_ASSET = "assets/dealer-logo.webp";
-let dealerLogoDataUrl = null;
+// The dealership that appears on a printed customer worksheet is a per-install
+// setting. It used to be this one dealership's name and logo compiled into the
+// package, so every installer of a publicly listed extension handed customers a
+// worksheet branded for someone else's store — and carrying that store's
+// manufacturer trade dress.
+
+async function loadDealerName() {
+  try {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.dealershipName);
+    return String(stored[STORAGE_KEYS.dealershipName] || "").trim().slice(0, 80);
+  } catch {
+    return "";
+  }
+}
 
 /**
  * The packaged dealership mark, inlined for print.
@@ -1450,20 +1466,24 @@ async function loadPlateImageForPrint(quote) {
 }
 
 async function loadDealerLogo() {
-  if (dealerLogoDataUrl !== null) return dealerLogoDataUrl;
   try {
-    const response = await fetch(chrome.runtime.getURL(DEALER_LOGO_ASSET));
-    const blob = await response.blob();
-    dealerLogoDataUrl = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(blob);
-    });
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.dealershipLogo);
+    return sanitizeDealerLogo(stored[STORAGE_KEYS.dealershipLogo] || "");
   } catch {
-    dealerLogoDataUrl = "";
+    return "";
   }
-  return dealerLogoDataUrl;
+}
+
+const MAX_DEALER_LOGO_BYTES = 512 * 1024;
+
+/** Read a chosen image as a data URL so the printed sheet never fetches it. */
+function readLogoFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("unreadable"));
+    reader.readAsDataURL(file);
+  });
 }
 let rescreenBannerTarget = null;
 
@@ -1805,12 +1825,13 @@ async function handleSosQuoteModeChange() {
 }
 
 async function printSosFeeQuote() {
-  const [logoUrl, plateImageUrl] = await Promise.all([
+  const [dealerName, logoUrl, plateImageUrl] = await Promise.all([
+    loadDealerName(),
     loadDealerLogo(),
     loadPlateImageForPrint(currentSosFeeQuote),
   ]);
   const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, {
-    dealerName: DEALER_NAME,
+    dealerName,
     logoUrl,
     plateImageUrl,
   });
@@ -1992,6 +2013,94 @@ function initEventListeners() {
       showToast("Could not export the audit log.", "error");
     }
   });
+
+  // Show the retention-change notice once per user. Chrome requires a
+  // prominent disclosure when data practices change after installation, and
+  // saved records went from outcomes-only to holding the submitted customer
+  // fields and captured state evidence for 30 days.
+  if (elements.retentionNotice && elements.retentionNoticeAckBtn) {
+    const NOTICE_VERSION = "1.6.0-retention";
+    chrome.storage.local
+      .get(STORAGE_KEYS.retentionNoticeAckVersion)
+      .then((stored) => {
+        if (stored[STORAGE_KEYS.retentionNoticeAckVersion] === NOTICE_VERSION) return;
+        elements.retentionNotice.classList.remove("hidden");
+      })
+      .catch(() => {});
+
+    elements.retentionNoticeAckBtn.addEventListener("click", () => {
+      elements.retentionNotice.classList.add("hidden");
+      chrome.storage.local
+        .set({ [STORAGE_KEYS.retentionNoticeAckVersion]: NOTICE_VERSION })
+        .catch(() => {});
+    });
+  }
+
+  // Dealership name for printed customer worksheets.
+  if (elements.dealershipNameInput) {
+    chrome.storage.local
+      .get(STORAGE_KEYS.dealershipName)
+      .then((r) => {
+        elements.dealershipNameInput.value = String(
+          r[STORAGE_KEYS.dealershipName] || ""
+        );
+      })
+      .catch(() => {});
+    elements.dealershipNameInput.addEventListener("change", () => {
+      const name = elements.dealershipNameInput.value.trim().slice(0, 80);
+      elements.dealershipNameInput.value = name;
+      chrome.storage.local.set({ [STORAGE_KEYS.dealershipName]: name });
+      showToast(
+        name ? "Dealership name saved." : "Dealership name cleared.",
+        "info"
+      );
+    });
+  }
+
+  // Dealership logo for printed customer worksheets (stored as a data URL so
+  // the printed sheet never depends on a fetch).
+  if (elements.dealershipLogoInput) {
+    const renderLogoState = (hasLogo) => {
+      elements.removeDealershipLogoBtn?.classList.toggle("hidden", !hasLogo);
+      if (elements.dealershipLogoStatus) {
+        elements.dealershipLogoStatus.textContent = hasLogo
+          ? "Logo set. It prints at the top of the customer worksheet."
+          : "No logo set.";
+      }
+    };
+    chrome.storage.local
+      .get(STORAGE_KEYS.dealershipLogo)
+      .then((r) => renderLogoState(Boolean(r[STORAGE_KEYS.dealershipLogo])))
+      .catch(() => {});
+
+    elements.dealershipLogoInput.addEventListener("change", async () => {
+      const file = elements.dealershipLogoInput.files?.[0];
+      elements.dealershipLogoInput.value = "";
+      if (!file) return;
+      if (file.size > MAX_DEALER_LOGO_BYTES) {
+        showToast("That logo is larger than 512 KB. Choose a smaller image.", "error");
+        return;
+      }
+      try {
+        const dataUrl = await readLogoFile(file);
+        if (!sanitizeDealerLogo(dataUrl)) {
+          showToast("That file is not a PNG, JPEG, or WebP image.", "error");
+          return;
+        }
+        await chrome.storage.local.set({ [STORAGE_KEYS.dealershipLogo]: dataUrl });
+        renderLogoState(true);
+        showToast("Dealership logo saved.", "success");
+      } catch {
+        showToast("That logo could not be read. Try another image.", "error");
+      }
+    });
+
+    elements.removeDealershipLogoBtn?.addEventListener("click", async () => {
+      await chrome.storage.local.remove(STORAGE_KEYS.dealershipLogo);
+      renderLogoState(false);
+      showToast("Dealership logo removed.", "info");
+    });
+  }
 
   // Re-screen reminder toggle (persists in chrome.storage.local).
   if (elements.rescreenReminderToggle) {

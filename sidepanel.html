@@ -78,6 +78,19 @@
         </section>
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 
+        <!-- Chrome requires a prominent disclosure when data practices change
+             after installation. Saved records used to hold outcomes only;
+             they now keep the submitted customer fields and the captured state
+             evidence for 30 days so a deal can be reopened and re-screened. -->
+        <div id="retentionNotice" class="retention-notice hidden" role="status">
+          <span class="retention-notice-icon icon icon-info" aria-hidden="true"></span>
+          <div class="retention-notice-copy">
+            <strong>What this saves has changed</strong>
+            <span>Saved records now keep the buyer and co-buyer details you submit, plus the captured state pages, on this device for up to 30 days so a deal can be reopened, re-screened or reprinted. Clear them any time from Settings or History.</span>
+          </div>
+          <button type="button" id="retentionNoticeAckBtn" class="btn-secondary btn-sm">Got it</button>
+        </div>
+
         <button type="button" id="rescreenBanner" class="rescreen-banner hidden">
           <span class="rescreen-banner-icon icon icon-ban" aria-hidden="true"></span>
           <span class="rescreen-banner-copy">
@@ -501,7 +514,11 @@
         </section>
 
         <section class="action-section" data-workspace-panel="screening">
-          <details id="dataUseDetails" class="data-use-details">
+          <!-- Open by default. Chrome's disclosure policy requires the data
+               notice to be prominent and in the UI before collection, and this
+               panel handles dates of birth and driver's-licence numbers — the
+               substance must not sit behind a "Read the full notice" toggle. -->
+          <details id="dataUseDetails" class="data-use-details" open>
             <summary><span>Privacy</span> OFAC runs on this computer. Running a check means you agree.</summary>
           <p id="dataUseNote" class="data-use-note">
             Privacy: OFAC stays on this computer. State checks send the name, birth date,
@@ -818,6 +835,21 @@
               <h3 class="settings-heading"><span class="icon icon-check" aria-hidden="true"></span>Service</h3>
               <p id="serviceStatus" class="settings-status connected">All checks are ready — no setup needed.</p>
               <p class="settings-help">OFAC, Repeat Offender, Title/Lien, and phone scanning are included. There is no account or key to configure.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-heading"><span class="icon icon-file" aria-hidden="true"></span>Dealership</h3>
+              <label class="settings-field-label" for="dealershipNameInput">Name printed on customer worksheets</label>
+              <input type="text" id="dealershipNameInput" maxlength="80" autocomplete="organization" placeholder="Your dealership name" />
+              <p class="settings-help settings-help-muted">
+                Appears at the top of the printed plate-fee worksheet you hand a customer. Leave blank to print the worksheet without a dealership name.
+              </p>
+              <div class="settings-actions">
+                <label class="btn-secondary btn-sm settings-link-button" for="dealershipLogoInput">Choose logo</label>
+                <input type="file" id="dealershipLogoInput" accept="image/png,image/jpeg,image/webp" class="visually-hidden" />
+                <button type="button" id="removeDealershipLogoBtn" class="btn-secondary btn-sm hidden">Remove logo</button>
+              </div>
+              <p id="dealershipLogoStatus" class="settings-help settings-help-muted" aria-live="polite">No logo set.</p>
             </div>
 
             <div class="settings-group">

@@ -1229,8 +1229,51 @@ test("the worksheet prints the logo, and reads without one", () => {
   assert.match(without, /Bob Maxey Ford of Howell/);
 });
 
-test("the dealership asset ships in the package", () => {
+test("the dealership is a per-install setting, not compiled in", () => {
   assert.match(packageScript, /src lib ofac assets/);
+
+  // A publicly listed extension must not hand every installer a worksheet
+  // branded for one specific dealership — that misrepresents the store and
+  // carries its manufacturer's trade dress.
+  assert.doesNotMatch(
+    sidepanelScript,
+    /const DEALER_NAME\s*=/,
+    "the dealership name must come from settings, not a constant"
+  );
+  assert.doesNotMatch(
+    sidepanelScript,
+    /assets\/dealer-logo/,
+    "no dealership logo may ship inside the package"
+  );
+
+  // Both values are read from local storage at print time.
+  assert.match(sidepanelScript, /STORAGE_KEYS\.dealershipName/);
+  assert.match(sidepanelScript, /STORAGE_KEYS\.dealershipLogo/);
+
+  // An uploaded logo is validated before it is stored or printed.
+  assert.match(sidepanelScript, /sanitizeDealerLogo\(dataUrl\)/);
+  assert.match(sidepanelScript, /MAX_DEALER_LOGO_BYTES/);
+});
+
+test("a worksheet prints correctly with no dealership configured", () => {
+  const quote = createCalculatedQuote(
+    {
+      calculationMode: SOS_QUOTE_MODE.newPlate,
+      feeCents: 19500,
+      feeBreakdown: [{ label: "MSRP Based Reg Fee", feeCents: 19500 }],
+      vehicleDescription: "2025 · Car/Mini-Van/SUV · 4 Door",
+      recreationPassport: false,
+      calculatedAt: "2026-08-18T12:00:00.000Z",
+    },
+    SOS_QUOTE_MODE.newPlate,
+    new Date(),
+    {}
+  );
+  // Blank name, no logo — the sheet must still render, without an empty header.
+  const html = createSosFeeQuotePrintHTML(quote, { dealerName: "", logoUrl: "" });
+  assert.ok(html, "a worksheet must print before a dealership is configured");
+  assert.doesNotMatch(html, /<img[^>]*class="worksheet-logo"/);
+  assert.match(html, /Customer Registration Cost Summary/);
 });
 
 // The status was a line of muted grey text at 0.66rem, and its error and busy

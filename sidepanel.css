@@ -2107,6 +2107,17 @@ body.modal-open {
     z-index: 1200;
   }
 
+  /* At this width the calendar is a sheet anchored to the viewport, so it is
+     already fully visible and needs no flipping. The drop-up class is written
+     for the absolutely positioned calendar, where `bottom: 100%` means "above
+     the input"; against a fixed element it means "above the whole viewport",
+     which launched the calendar off-screen whenever the birth date sat low on
+     the page — it opened, invisibly, and looked like it had failed to open. */
+  .date-picker-popover.date-picker-drop-up {
+    top: auto;
+    bottom: 10px;
+  }
+
   .date-day,
   .date-day-spacer {
     height: 36px;

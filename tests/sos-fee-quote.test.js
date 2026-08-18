@@ -1016,3 +1016,17 @@ test("the muted token clears AA on both the cards and the canvas", () => {
   assert.match(sidepanelCss, /--design-muted: #59697d;/);
   assert.doesNotMatch(sidepanelCss, /--design-muted: #5e7187;/);
 });
+
+// Below 520px the calendar becomes a sheet anchored to the viewport, but the JS
+// still adds the drop-up class written for the absolutely positioned calendar.
+// There `bottom: 100%` means "above the input"; against a fixed element it
+// means "above the whole viewport", so whenever the birth date sat low on the
+// page the calendar opened at roughly -391px — invisible, and indistinguishable
+// from failing to open at all.
+test("the birth-date calendar stays on screen when the field sits low", () => {
+  const sheet = sidepanelCss.slice(sidepanelCss.indexOf("@media (max-width: 520px)"));
+  const block = sheet.slice(0, sheet.indexOf("@media (max-width: 360px)"));
+  assert.match(block, /\.date-picker-popover \{[^}]*position: fixed/);
+  // The drop-up must be neutralised inside the sheet, at equal specificity.
+  assert.match(block, /\.date-picker-popover\.date-picker-drop-up \{[^}]*bottom: 10px/);
+});

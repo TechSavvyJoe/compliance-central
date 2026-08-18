@@ -204,14 +204,18 @@ function qualifyingFullNameScore(searchName, candidateName, threshold) {
     const candidateTokens = comparableFullName(candidateName)
       .split(/\s+/)
       .filter(Boolean);
+    // Only a token that actually resembles the searched surname may carry the
+    // rescue. An earlier version also let any SHORT candidate token through,
+    // which meant a short FIRST name — "Min", "Wei", "Ali" — silently exempted
+    // the whole record: Min Park matched Min Parker at 96. The short-name
+    // allowance belongs to the searched surname, and is already applied when
+    // searchTokens is built.
     const carriesSurname =
       candidateTokens.length === 0 ||
-      candidateTokens.some(
-        (token) =>
-          token.length < SURNAME_FLOOR_MIN_LENGTH ||
-          searchTokens.some(
-            (searchToken) => jaroSimilarity(searchToken, token) >= SURNAME_FLOOR
-          )
+      candidateTokens.some((token) =>
+        searchTokens.some(
+          (searchToken) => jaroSimilarity(searchToken, token) >= SURNAME_FLOOR
+        )
       );
     if (!carriesSurname) return 0;
   }

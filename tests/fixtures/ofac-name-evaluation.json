@@ -1,0 +1,32 @@
+{
+  "note": "Synthetic evaluation corpus for OFAC name matching. Names are constructed to exercise matcher mechanics (transliteration, typo, truncation, prefix overlap, compound surnames) and are not assertions about any real person. `expected` is what a correct screener should do; `reason` records why.",
+  "cases": [
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Gallant" }, "expected": "match", "reason": "exact" },
+    { "search": { "firstName": "Jose", "lastName": "Munoz" }, "entry": { "firstName": "José", "lastName": "Muñoz" }, "expected": "match", "reason": "diacritics normalised" },
+    { "search": { "firstName": "Ivan", "lastName": "Qaddafi" }, "entry": { "firstName": "Ivan", "lastName": "Gaddafi" }, "expected": "match", "reason": "transliteration" },
+    { "search": { "firstName": "Ivan", "lastName": "Muhammad" }, "entry": { "firstName": "Ivan", "lastName": "Mohammad" }, "expected": "match", "reason": "transliteration" },
+    { "search": { "firstName": "Ivan", "lastName": "Yusuf" }, "entry": { "firstName": "Ivan", "lastName": "Yousuf" }, "expected": "match", "reason": "transliteration" },
+    { "search": { "firstName": "Ivan", "lastName": "Hussein" }, "entry": { "firstName": "Ivan", "lastName": "Hussain" }, "expected": "match", "reason": "transliteration" },
+    { "search": { "firstName": "Ivan", "lastName": "Abdulla" }, "entry": { "firstName": "Ivan", "lastName": "Abdullah" }, "expected": "match", "reason": "transliteration, differing length" },
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Gallent" }, "expected": "match", "reason": "single-character typo" },
+    { "search": { "firstName": "Ana", "lastName": "Rodriguez" }, "entry": { "firstName": "Ana", "lastName": "Rodrigues" }, "expected": "match", "reason": "single-character typo" },
+    { "search": { "firstName": "Rogelio", "lastName": "Gonzalez Pizana" }, "entry": { "firstName": "Rogelio", "middleName": "GONZALEZ PIZANA", "lastName": "JR.", "fullName": "Rogelio GONZALEZ PIZANA JR." }, "expected": "match", "reason": "compound surname carried across fields with a suffix" },
+    { "search": { "firstName": "Viktor", "lastName": "Petrov" }, "entry": { "firstName": "", "lastName": "", "aliases": ["Viktor Petrov"] }, "expected": "match", "reason": "alias-only record" },
+    { "search": { "firstName": "Viktor", "lastName": "Petrov" }, "entry": { "firstName": "", "lastName": "", "aliases": ["Petrov, Viktor"] }, "expected": "match", "reason": "comma-reversed alias" },
+    { "search": { "firstName": "Joseph", "middleName": "Alan", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Gallant" }, "expected": "match", "reason": "middle name present on one side only" },
+
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Gallo" }, "expected": "no-match", "reason": "shared prefix, unrelated surname" },
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Gallagher" }, "expected": "no-match", "reason": "shared prefix, unrelated surname" },
+    { "search": { "firstName": "John", "lastName": "Smith" }, "entry": { "firstName": "John", "lastName": "Smithson" }, "expected": "no-match", "reason": "surname extension" },
+    { "search": { "firstName": "Wei", "lastName": "Chen" }, "entry": { "firstName": "Wei", "lastName": "Chennault" }, "expected": "no-match", "reason": "surname extension" },
+    { "search": { "firstName": "Min", "lastName": "Park" }, "entry": { "firstName": "Min", "lastName": "Parker" }, "expected": "no-match", "reason": "surname extension" },
+    { "search": { "firstName": "Maria", "lastName": "Cruz" }, "entry": { "firstName": "Maria", "lastName": "Cruzado" }, "expected": "no-match", "reason": "surname extension" },
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Joseph", "lastName": "Karimov" }, "expected": "no-match", "reason": "matching first name, unrelated surname" },
+    { "search": { "firstName": "Joseph", "lastName": "Gallant" }, "entry": { "firstName": "Miguel", "lastName": "Herrera" }, "expected": "no-match", "reason": "unrelated" },
+    { "search": { "firstName": "Sarah", "lastName": "Whitfield" }, "entry": { "firstName": "Sara", "lastName": "Whitmore" }, "expected": "no-match", "reason": "near first name, unrelated surname" }
+  ],
+  "knownExemptions": [
+    { "search": { "firstName": "Omar", "lastName": "Ali" }, "entry": { "firstName": "Omar", "lastName": "Alimov" }, "reason": "surname under 4 characters is exempt from the floor; screening deliberately fails toward flagging" },
+    { "search": { "firstName": "Jae", "lastName": "Han" }, "entry": { "firstName": "Jae", "lastName": "Hanson" }, "reason": "surname under 4 characters is exempt from the floor" }
+  ]
+}

@@ -901,19 +901,6 @@ body.modal-open {
   margin-top: 2px;
 }
 
-.trade-hint {
-  background: var(--info-bg);
-  border-left: 3px solid var(--info);
-  padding: 10px 14px;
-  margin-top: 12px;
-  font-size: 0.8rem;
-  color: var(--info);
-  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* Buttons */
 .btn-primary {
   background: linear-gradient(135deg, #ffcb05 0%, #ffd633 100%);
@@ -2084,14 +2071,6 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 
-  .main-actions,
-  .all-actions {
-    flex-direction: column;
-  }
-  .all-actions button {
-    flex: none;
-    width: 100%;
-  }
 
   .date-picker-popover {
     position: fixed;
@@ -2889,27 +2868,9 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   color: #7d4520;
 }
 
-.results-section .report-selection,
-.results-section .all-actions {
-  margin-inline: 14px;
-}
-
 @media (max-width: 380px) {
-  .first-run-hero {
-    margin-inline: -9px;
-    padding-inline: 17px;
-  }
-
   .final-decision {
     padding-inline: 17px;
-  }
-
-  .evidence-panel,
-  .completed-steps-panel,
-  .review-guidance-panel,
-  .results-section .report-selection,
-  .results-section .all-actions {
-    margin-inline: 9px;
   }
 }
 
@@ -3485,7 +3446,6 @@ body {
   font-weight: 750;
 }
 
-.trade-hint,
 .data-use-note,
 .sos-quote-privacy {
   border: 0;
@@ -4414,13 +4374,6 @@ body {
     padding: 12px;
   }
 
-  .sos-primary-actions {
-    grid-template-columns: 1fr;
-  }
-
-  #calculateSosFeeBtn {
-    grid-column: auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4590,9 +4543,29 @@ body {
 .progress-section,
 .results-section,
 .history-workspace,
-.sos-quote-section,
 #inputPanel > .typed-buyer-card:first-child {
   padding: 12px;
+}
+
+/* Not .sos-quote-section or .results-section: the design layer flattens both
+   to transparent wrappers (their children are the cards), so giving them panel
+   padding insets a whole tab 12px inside the canvas that every other card sits
+   directly on. */
+.sos-quote-section {
+  padding: 0;
+}
+
+.results-section {
+  padding: 0 0 18px;
+}
+
+/* The cards inside the results wrapper carried their own 14px (9px under
+   380px) side margins from before the shared gutter existed; on the canvas
+   rhythm they sit flush like every other card. */
+.evidence-panel,
+.completed-steps-panel,
+.review-guidance-panel {
+  margin: 4px 0 0;
 }
 
 .action-section {
@@ -4774,6 +4747,13 @@ body {
   max-width: 36ch;
 }
 
+/* The heading text must give way before the action does: at 360px the intro
+   paragraph was squeezing Export CSV into a two-line button. */
+.history-workspace-heading > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Settings was the last thing still on the 24px scale: each of the three rules
    between its groups cost 48px, so 144px of a 705px sheet was separator. The
    divider still does its job at 14. */
@@ -4872,4 +4852,35 @@ body {
   #sosPlateDesignControl {
     grid-column: span 2;
   }
+}
+
+/* Settings still carried three dark-theme colors: a sky-blue link (2.1:1 on
+   the white sheet) and status pills whose bright green/amber text was tuned
+   for navy. The link matches the consent-notice link; the pills take the same
+   ink the verdict banners use on the same tinted grounds. */
+.settings-help a {
+  color: #175fa8;
+}
+
+.settings-status.connected {
+  color: #0b5c42;
+}
+
+.settings-status.disconnected {
+  color: #6f4d1f;
+}
+
+/* Every card that sits on the canvas has a 14px radius; these two were 12. */
+.report-selection,
+.sos-fee-reference {
+  border-radius: 14px;
+}
+
+/* The consent notice's Details link is legally-pinned copy rendered at 14px —
+   the text cannot grow, but the hit area can: padding swallowed by an equal
+   negative margin leaves the layout untouched and lifts the target above 24px. */
+.data-use-note a {
+  display: inline-block;
+  padding: 6px 4px;
+  margin: -6px -4px;
 }

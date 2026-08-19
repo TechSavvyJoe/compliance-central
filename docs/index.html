@@ -211,6 +211,15 @@
         @media (prefers-reduced-motion: reduce) {
             html { scroll-behavior: auto; }
         }
+    
+        /* Product gallery */
+        .gallery { max-width: 1080px; margin: 0 auto; padding: 48px 24px 8px; }
+        .gallery h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin-bottom: 6px; }
+        .gallery > p { color: #56718a; max-width: 60ch; margin-bottom: 24px; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .gallery-grid figure { margin: 0; }
+        .gallery-grid img { width: 100%; height: auto; border-radius: 12px; border: 1px solid #dbe4ee; box-shadow: 0 10px 30px rgba(13, 43, 74, 0.10); }
+        .gallery-grid figcaption { margin-top: 8px; color: #56718a; font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -221,6 +230,7 @@
             <span>Compliance Central</span>
         </a>
         <nav aria-label="Primary navigation">
+            <a href="#gallery-title">Screens</a>
             <a href="#privacy-policy">Privacy</a>
             <a href="mailto:joejgallant@gmail.com">Support</a>
             <a class="nav-install" href="https://chromewebstore.google.com/detail/compliance-central-michig/oijkbdclicekpggjblgknnphfdafdgod" target="_blank" rel="noopener noreferrer">Install</a>
@@ -242,6 +252,18 @@
             <li><span class="flow-number">2</span><span><strong>Aim at the wide barcode</strong><small>It is second from the top on the back of the ID.</small></span></li>
             <li><span class="flow-number">3</span><span><strong>Review the filled fields</strong><small>The license image stays on the phone.</small></span></li>
         </ol>
+    </section>
+
+    <section class="gallery" aria-labelledby="gallery-title">
+        <h2 id="gallery-title">The whole deal, in the panel</h2>
+        <p>Real screens from the current release &mdash; the screening workspace, the verdict, the official plate-fee calculator, the on-device audit trail, and the settings that put your store's name on every customer worksheet.</p>
+        <div class="gallery-grid">
+            <figure><img src="images/screen-1.jpg" alt="The screening workspace: scan the buyer's ID or type it in, then run every check" width="1024" height="640" loading="lazy" /><figcaption>Scan the buyer's ID with a phone, or type it in.</figcaption></figure>
+            <figure><img src="images/screen-2.jpg" alt="A completed screening with the verdict Clear to deliver and evidence for each check" width="1024" height="640" loading="lazy" /><figcaption>One verdict, with the evidence saved under it.</figcaption></figure>
+            <figure><img src="images/screen-3.jpg" alt="The plate fee calculator showing an official Michigan SOS total of $179.00" width="1024" height="640" loading="lazy" /><figcaption>The official fee, from the official SOS calculator.</figcaption></figure>
+            <figure><img src="images/screen-4.jpg" alt="The History tab with saved compliance records, re-screen flags, and CSV export" width="1024" height="640" loading="lazy" /><figcaption>Thirty days of records, kept on this device.</figcaption></figure>
+            <figure><img src="images/screen-5.jpg" alt="Settings with the dealership name, re-screen reminder, and privacy controls" width="1024" height="640" loading="lazy" /><figcaption>Your store's name on every printed worksheet.</figcaption></figure>
+        </div>
     </section>
 
     <header class="policy-header" id="privacy-policy">
@@ -324,7 +346,7 @@
             <li><strong>U.S. Treasury OFAC Sanctions List Service</strong> (<code>sanctionslistservice.ofac.treas.gov</code>): provides the official SDN list the extension downloads for local screening. Treasury redirects the file download to its dedicated AWS GovCloud storage host. Only the public list is downloaded &mdash; no customer data is sent.</li>
             <li><strong>Michigan Department of State (MDOS):</strong> the official source queried (via our backend) for Repeat Offender and Title/Lien results.</li>
             <li><strong>Michigan Secretary of State public fee calculator:</strong> verifies the locally completed registration/plate choices and supplies the calculated fee and actual official result-page capture only after an explicit SOS Fee Quote action. Official plate artwork is loaded from <code>www.michigan.gov</code>. The extension does not use an SOS account or access SOS credentials/cookies.</li>
-            <li><strong>NHTSA vPIC</strong> (<code>vpic.nhtsa.dot.gov</code>): receives an optional VIN or partial VIN only after you click Look up VIN and returns basic vehicle characteristics for SOS field suggestions.</li>
+            <li><strong>NHTSA vPIC</strong> (<code>vpic.nhtsa.dot.gov</code>): receives an optional VIN or partial VIN only after you click Decode VIN and returns basic vehicle characteristics for SOS field suggestions.</li>
             <li><strong>Fly.io:</strong> hosts our backend service. Customer data is processed in memory and is not intentionally retained after each request; ordinary network metadata is handled as described above. For the optional license scan, the service relays only an encrypted, single-use package it cannot read.</li>
             <li><strong>GitHub Pages</strong> (<code>techsavvyjoe.github.io</code>): serves the static phone scan page (and this policy). The scan page performs the barcode decoding on your phone; the license image is not sent to it.</li>
         </ul>
@@ -351,7 +373,7 @@
     <div class="section">
         <h3>10. Your Rights and Choices</h3>
         <ul>
-            <li>Clear your compliance history at any time with the in-app "Clear All History" button.</li>
+            <li>Clear your compliance history at any time with the in-app "Clear local history" button, or delete a single record from its History card.</li>
             <li>Delete any reports you downloaded from the location where you saved them.</li>
             <li>Uninstalling the extension removes all locally stored data.</li>
         </ul>

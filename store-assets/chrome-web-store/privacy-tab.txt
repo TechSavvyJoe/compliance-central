@@ -1,6 +1,10 @@
 PRIVACY TAB — copy each block into the matching field
 (Dashboard: left sidebar → Privacy)
 
+Synchronized with the public privacy policy served from docs/index.html
+(https://techsavvyjoe.github.io/compliance-central/ — effective August 18, 2026).
+If the policy changes, update this file in the same commit.
+
 
 ==================================================
 SINGLE PURPOSE  (one text box)
@@ -16,33 +20,33 @@ sidePanel —
 The entire user interface is a Chrome side panel; this permission opens and renders it.
 
 storage —
-Saves preferences and bounded device-local customer/report history (up to 30 days / 50 records) so an authorized dealership user can reopen, re-screen, print, or download a prior record.
+Saves preferences (including the per-install dealership name and logo printed on the customer fee worksheet) and bounded device-local customer/report history (up to 30 days / 50 records) so an authorized dealership user can reopen, re-screen, print, or download a prior record.
 
 unlimitedStorage —
 Stores the downloaded OFAC SDN sanctions dataset and bounded device-local report history, including captured state-site evidence images. SOS credentials and authentication tokens are not stored in History.
 
 alarms —
-Schedules a daily attempt to refresh the local OFAC sanctions list and maintain the 30-day history limit.
+Schedules a daily attempt to refresh the local OFAC sanctions list and purge device-local History past the 30-day limit.
 
 Host permission https://sanctionslistservice.ofac.treas.gov/ —
-Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening.
+Downloads the official U.S. Treasury OFAC SDN sanctions list used for on-device screening. Only the public list is downloaded — no customer data is sent.
 
 Host permission https://wc2h-sls-prod-public-published.s3.us-gov-west-1.amazonaws.com/ —
 Allows the official Treasury Sanctions List Service download to follow its signed redirect to Treasury's dedicated AWS GovCloud file host. Only the public OFAC list is downloaded.
 
 Host permission https://compliance-central-api.fly.dev/ —
-The dealer's backend endpoint that performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal. It also relays the optional phone license-scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read (deleted on pickup; the license image is never transmitted).
+The extension's backend endpoint. It (1) performs the Repeat Offender and Title/Lien checks against the Michigan Department of State portal using the fields the dealer submits, (2) runs the public Michigan SOS registration-fee calculator after an explicit Calculate action and returns the verified fee plus a capture of the official result page, and (3) relays the optional phone license scan: the scanned fields are end-to-end encrypted on the phone, so the backend only passes along an encrypted, single-use package it cannot read — the package expires in about two minutes, is deleted the moment the computer retrieves it, and is never written to a database or log. The license image is never transmitted.
 
-The hosting service receives ordinary network request metadata. Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention; the app does not write them to a database or application log.
+Submitted customer fields are processed in memory to request the portal response and are not intentionally retained by the backend or written to its database or application log. The hosting service receives ordinary network request metadata; Compliance Central uses request IP addresses transiently in memory for rate limiting and abuse prevention, and does not write them to a database or application log.
 
 Host permission https://dsvsesvc.sos.state.mi.us/ —
-Uses the public Michigan SOS registration-fee calculator after an explicit user action, verifies and applies the completed local choices, and returns the official fee plus a session-only image of the actual result page. The extension does not access SOS credentials or cookies.
+Added in 1.6.0. Loads official Michigan plate-design artwork displayed in the side panel beside a fee quote. That artwork request is the only thing the extension itself sends to this host: the SOS fee calculator is driven by the backend after an explicit Calculate action (see the backend justification above), and the extension does not read or send SOS credentials, cookies, or account information.
 
 Host permission https://vpic.nhtsa.dot.gov/ —
-Sends a VIN or partial VIN directly to NHTSA's public vPIC decoder only after the user clicks Decode, then uses supported vehicle details to fill local fee fields for review. The raw VIN is not retained in the decoder response.
+Added in 1.6.0. Sends a VIN or partial VIN directly to NHTSA's public vPIC decoder only after the user clicks Decode VIN, then uses supported vehicle type, body, fuel, and model-year details to fill local fee fields for review. The raw VIN is not kept in the decoder response, sent to SOS, or written to extension storage.
 
 Are you using remote code?  →  NO
-(All code is bundled in the package; nothing is fetched and executed remotely.)
+(All code is bundled in the package, including the vendored jsPDF and QR-code libraries in lib/. The manifest CSP allows only 'self' scripts, and nothing is fetched and executed remotely. The phone scan page is a separate static website on GitHub Pages, not extension code.)
 
 
 ==================================================
@@ -51,14 +55,19 @@ DATA USAGE  (the checkbox form)
 "Does this item collect or use user data?"  →  YES
 
 Data types to mark as COLLECTED:
-  • Personally identifiable information  (name, date of birth, government ID — Michigan DLN/PID)
+  • Personally identifiable information  (entered by the dealer about a customer: name, date of birth, government ID — Michigan DLN/PID — and trade-in VIN)
   • Website content  (Michigan Repeat Offender and title/lien responses and screenshots saved in bounded device-local History; SOS fee result-page captures remain session-only)
   • Location  (the hosting service receives the request IP address; Compliance Central uses it transiently in memory for rate limiting and abuse prevention, and does not write it to a database or application log)
 
 Data types to leave UNCHECKED:
   • Web history: NO
   • Financial, health, authentication, personal communications, user activity, etc.: NO
-  (The trade-in VIN is sent only for the optional title check — note under "other" if asked. Customer fields, VINs, full results, and portal screenshots are retained in device-local History for up to 30 days / 50 records so dealership staff can reopen and reproduce a record. User-requested PDF or CSV downloads remain in the user's chosen location.)
+
+How the collected data is handled (matches the privacy policy):
+  • For the Repeat Offender and Title/Lien checks only, the name, date of birth, and DLN/PID (and the VIN for a title check) are transmitted over HTTPS to the extension's own backend, which processes them in memory and does not intentionally retain them.
+  • OFAC screening is performed entirely on the device; no customer information is transmitted for an OFAC-only check.
+  • Retention: submitted customer fields, trade VINs, results, and captured portal evidence stay in device-local History for up to 30 days / 50 records and can be cleared at any time from Settings or History. SOS fee-quote data is session-only. User-requested PDF or CSV downloads remain in the user's chosen location.
+  • Prominent disclosure: the side panel shows the data-use disclosure open by default until the user has read it, and existing users get a one-time in-app notice that saved records now keep the submitted buyer/co-buyer fields and captured state pages for up to 30 days.
 
 Check ALL THREE required certifications (they are all true for this extension):
   [x] I do not sell or transfer user data to third parties, outside of the approved use cases.

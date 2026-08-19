@@ -138,11 +138,11 @@ test("camera screen keeps only essential visible guidance", () => {
   assert.equal((html.match(/<li class="scan-step/g) || []).length, 3);
   assert.match(
     html,
-    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260818-24" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
+    /class="id-example" aria-label="Step 1\. Turn it over\. Show the back of the ID\."[\s\S]*?images\/mi-id-front-demo\.webp\?v=20260819-25" width="640" height="404" alt=""[\s\S]*?id="step1Title"[\s\S]*?<span class="step-number" aria-hidden="true">1<\/span>[\s\S]*?<strong>Turn it over<\/strong><small>Show the back<\/small>/
   );
   assert.match(
     html,
-    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260818-24" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
+    /class="id-example is-target" aria-label="Step 2\. Find the wide barcode\. It is the second barcode from the top on the right, directly below the thin barcode\."[\s\S]*?images\/mi-id-back-demo\.webp\?v=20260819-25" width="640" height="404" alt=""[\s\S]*?id="step2Title"[\s\S]*?<span class="step-number" aria-hidden="true">2<\/span>[\s\S]*?<strong>Find the wide barcode<\/strong><small>Second from top, on the right<\/small>/
   );
   assert.match(
     html,
@@ -200,8 +200,8 @@ test("demo ID artwork is lightweight and clearly non-document training media", (
   assert.ok(frontDemoWebp.byteLength + backDemoWebp.byteLength < 50_000);
   assert.deepEqual(vp8Dimensions(frontDemoWebp), { width: 640, height: 404 });
   assert.deepEqual(vp8Dimensions(backDemoWebp), { width: 640, height: 404 });
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260818-24" width="640" height="404"/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260818-24" width="640" height="404"/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260819-25" width="640" height="404"/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260819-25" width="640" height="404"/);
 });
 
 test("normal scans do not populate implementation diagnostics", () => {
@@ -217,12 +217,12 @@ test("normal scans do not populate implementation diagnostics", () => {
 test("scanner asset versions are updated together", () => {
   const cssVersion = html.match(/scan\.css\?v=([^"']+)/)?.[1];
   const scriptVersion = html.match(/scan\.js\?v=([^"']+)/)?.[1];
-  assert.equal(cssVersion, "20260818-24");
+  assert.equal(cssVersion, "20260819-25");
   assert.equal(scriptVersion, cssVersion);
-  assert.match(html, /mi-id-front-demo\.webp\?v=20260818-24/);
-  assert.match(html, /mi-id-back-demo\.webp\?v=20260818-24/);
+  assert.match(html, /mi-id-front-demo\.webp\?v=20260819-25/);
+  assert.match(html, /mi-id-back-demo\.webp\?v=20260819-25/);
   assert.match(pairingJs, /new URLSearchParams\(\{ s: sessionId, k: key \}\)/);
-  assert.match(pairingJs, /cb=20260818-24#\$\{fragment\.toString\(\)\}/);
+  assert.match(pairingJs, /cb=20260819-25#\$\{fragment\.toString\(\)\}/);
   assert.doesNotMatch(pairingJs, /debug=1/);
 });
 
@@ -295,4 +295,22 @@ test("the camera opens without a tap on every browser that already granted it", 
 
   // Anything unknown must fall back to asking, never to opening the camera.
   assert.equal(await cameraAlreadyPermitted({}), false);
+});
+
+// The permission probe made the auto-start asynchronous, and the camera screen
+// underneath it is already live — "Choose a photo" is tappable while the probe
+// is still resolving. The deferred start must stand down if the salesperson
+// got there first, and must not light the camera in a tab that went to the
+// background before the probe came back.
+test("the deferred camera auto-start yields to the user and to a hidden tab", () => {
+  const initStart = scanJs.indexOf("cameraAlreadyPermitted().then");
+  assert.ok(initStart > -1, "the auto-start block should exist");
+  const initBlock = scanJs.slice(initStart, scanJs.indexOf("});", initStart) + 3);
+
+  // A photo-picker tap bumps captureGen / sets choosingPhoto before the probe
+  // resolves; the auto-start must not stomp that flow.
+  assert.match(initBlock, /captureGen > 0 \|\| choosingPhoto/);
+  // A hidden tab downgrades to the explicit button rather than opening the
+  // camera in the background.
+  assert.match(initBlock, /waitForGesture: !granted \|\| document\.hidden/);
 });

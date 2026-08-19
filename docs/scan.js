@@ -1629,6 +1629,13 @@ if (promoteToTopLevelIfNeeded()) {
   // camera grant for this origin, go straight to the viewfinder.
   unlockAudioOnFirstGesture();
   cameraAlreadyPermitted().then((granted) => {
-    beginCapture("buyer", { waitForGesture: !granted });
+    // The permission probe is asynchronous, and the page under it is live: the
+    // camera screen (with its "Choose a photo" button) is already visible. If
+    // the salesperson reached the photo picker first, or the tab went to the
+    // background before the probe resolved, opening the camera over them is
+    // worse than one extra tap — leave it to the explicit button, which can
+    // only be pressed with the page in front.
+    if (captureGen > 0 || choosingPhoto) return;
+    beginCapture("buyer", { waitForGesture: !granted || document.hidden });
   });
 }

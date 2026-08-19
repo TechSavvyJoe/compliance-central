@@ -223,7 +223,7 @@ async function openSession(attempt) {
   // Both pairing capabilities live in the fragment, which browsers do not
   // send in HTTP requests or server logs.
   const fragment = new URLSearchParams({ s: sessionId, k: key });
-  const url = `${SCAN_PAGE}${sep}cb=20260818-24#${fragment.toString()}`;
+  const url = `${SCAN_PAGE}${sep}cb=20260819-25#${fragment.toString()}`;
   return { sessionId, key, url };
 }
 

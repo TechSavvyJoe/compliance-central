@@ -8,6 +8,7 @@ import { CONFIG } from "../lib/config.js";
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
 import { createOperationFence, isCurrentRunState } from "../lib/run-fence.js";
 import { clearAllHistory } from "../src/sidepanel/history.js";
+import { clearHistory } from "../src/worker/history.js";
 
 test("ensureDataUrl accepts png/jpeg/webp data URLs and raw base64", () => {
   const png = "data:image/png;base64,iVBORw0KGgo=";
@@ -258,13 +259,9 @@ test("sensitive side-panel entry points bound what they accept", async () => {
   );
 
   // Clearing history must also clear the working copy: a shared showroom
-  // machine kept the last customer in session storage otherwise.
+  // machine kept the last customer in session storage otherwise. The clear is
+  // scoped — run bookkeeping survives — which the dedicated test below pins.
   const { readFileSync } = await import("node:fs");
-  const workerSource = readFileSync(
-    new URL("../src/worker/history.js", import.meta.url),
-    "utf8"
-  );
-  assert.match(workerSource, /chrome\.storage\.session\.clear\(\)/);
 
   // The phone scanner's optional SDK loader is pinned to a known origin.
   const providerSource = readFileSync(
@@ -273,4 +270,105 @@ test("sensitive side-panel entry points bound what they accept", async () => {
   );
   assert.match(providerSource, /ALLOWED_SDK_ORIGINS/);
   assert.match(providerSource, /commercial-sdk-url-not-allowed/);
+});
+
+// Clearing history wipes the last customer's working copy from session storage
+// — but session storage is also where the run fence and search status live.
+// A blanket session.clear() during an active run erased the fence, so every
+// remaining worker write was rejected while the panel sat on a progress screen
+// that no completion event would ever leave. The clear must take customer data
+// (including any pending print payload, which is report HTML for that same
+// customer) and leave run bookkeeping alone.
+test("clearing history removes customer session data but not the run fence", async () => {
+  const session = {
+    // Run bookkeeping — must survive.
+    activeRunId: "run-live",
+    stateRunId: "run-live",
+    cancelledRunId: "run-older",
+    activeIndividualOperationId: "op-live",
+    cancelledIndividualOperationId: "op-older",
+    searchStatus: "running",
+    searchProgress: 40,
+    inFlightCheck: "ofac",
+    // The last customer — must go.
+    currentResults: { customer: { firstName: "Jane" } },
+    cachedFormData: { firstName: "Jane" },
+    cachedAt: 1234,
+    repeatOffenderScreenshot: "data:image/png;base64,AAA",
+    coBuyerRepeatOffenderScreenshot: "data:image/png;base64,BBB",
+    titleScreenshot: "data:image/png;base64,CCC",
+    lastResult: { status: "eligible" },
+    sosFeeQuote: { feeCents: 19500 },
+    lastError: "MDOS lookup failed for Jane",
+    "ccPrint:pending-job": { html: "<h1>Jane</h1>", createdAt: 1, expiresAt: 2 },
+  };
+  const local = {
+    complianceHistory: [{ auditId: "run:x" }],
+    searchHistory: [],
+  };
+  globalThis.chrome = {
+    storage: {
+      local: {
+        async get(key) {
+          return { [key]: structuredClone(local[key]) };
+        },
+        async remove(keys) {
+          for (const key of Array.isArray(keys) ? keys : [keys]) {
+            delete local[key];
+          }
+        },
+      },
+      session: {
+        async get(key) {
+          if (key === null || key === undefined) return structuredClone(session);
+          if (Array.isArray(key)) {
+            return Object.fromEntries(key.map((k) => [k, session[k]]));
+          }
+          return { [key]: session[key] };
+        },
+        async remove(keys) {
+          for (const key of Array.isArray(keys) ? keys : [keys]) {
+            delete session[key];
+          }
+        },
+        // Present so a regression back to a blanket clear() runs — and fails
+        // the fence assertions below — instead of throwing into the catch.
+        async clear() {
+          for (const key of Object.keys(session)) delete session[key];
+        },
+      },
+    },
+  };
+
+  const result = await clearHistory();
+  assert.equal(result.success, true);
+  assert.equal(local.complianceHistory, undefined);
+  assert.equal(local.searchHistory, undefined);
+
+  for (const gone of [
+    "currentResults",
+    "cachedFormData",
+    "cachedAt",
+    "repeatOffenderScreenshot",
+    "coBuyerRepeatOffenderScreenshot",
+    "titleScreenshot",
+    "lastResult",
+    "sosFeeQuote",
+    "lastError",
+    "ccPrint:pending-job",
+  ]) {
+    assert.equal(session[gone], undefined, `${gone} must be cleared`);
+  }
+  for (const kept of [
+    "activeRunId",
+    "stateRunId",
+    "cancelledRunId",
+    "activeIndividualOperationId",
+    "cancelledIndividualOperationId",
+    "searchStatus",
+    "searchProgress",
+    "inFlightCheck",
+  ]) {
+    assert.notEqual(session[kept], undefined, `${kept} must survive the clear`);
+  }
 });

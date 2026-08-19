@@ -11,7 +11,26 @@ import {
   minimizeHistoryEntry,
   retainAuditHistory,
 } from "../../lib/history-retention.js";
+import { PRINT_STORAGE_PREFIX } from "../../lib/print-html.js";
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+
+// Session keys that hold the last customer's data. Clearing history clears
+// these — and ONLY these. A blanket chrome.storage.session.clear() also erased
+// the run fence (activeRunId/stateRunId/cancelledRunId) and search status, so
+// a clear during an active run left the worker's remaining writes all fenced
+// out while the panel sat on a progress screen no completion event would ever
+// leave. Run bookkeeping is not customer data; it stays.
+const CUSTOMER_SESSION_KEYS = Object.freeze([
+  STORAGE_KEYS.currentResults,
+  STORAGE_KEYS.cachedFormData,
+  STORAGE_KEYS.cachedAt,
+  STORAGE_KEYS.repeatOffenderScreenshot,
+  STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
+  STORAGE_KEYS.titleScreenshot,
+  STORAGE_KEYS.lastResult,
+  STORAGE_KEYS.sosFeeQuote,
+  STORAGE_KEYS.lastError,
+]);
 
 export const HISTORY_MESSAGES = Object.freeze({
   append: "SAVE_HISTORY_ENTRY",
@@ -272,9 +291,19 @@ export function clearHistory() {
     // showroom machine to the next person, but the session store still held
     // the last customer — currentResults, the cached form fields, the portal
     // screenshots — and reopening the panel rehydrated the completed run from
-    // it. Clearing records has to mean clearing the working copy too.
+    // it. Clearing records has to mean clearing the working copy too, and
+    // pending print payloads are report HTML for that same customer, so they
+    // go as well. The clear is scoped: run-fence and status bookkeeping hold
+    // no customer data and erasing them mid-run orphaned the active check.
     try {
-      await chrome.storage.session.clear();
+      const sessionBag = await chrome.storage.session.get(null);
+      const printPayloadKeys = Object.keys(sessionBag || {}).filter((key) =>
+        key.startsWith(PRINT_STORAGE_PREFIX)
+      );
+      await chrome.storage.session.remove([
+        ...CUSTOMER_SESSION_KEYS,
+        ...printPayloadKeys,
+      ]);
     } catch {
       // A blocked session clear must not fail the history clear itself; the
       // persistent records are already gone by this point.

@@ -1253,6 +1253,17 @@ test("the dealership is a per-install setting, not compiled in", () => {
   // An uploaded logo is validated before it is stored or printed.
   assert.match(sidepanelScript, /sanitizeDealerLogo\(dataUrl\)/);
   assert.match(sidepanelScript, /MAX_DEALER_LOGO_BYTES/);
+
+  // A failed storage write must never announce success (or surface as an
+  // unhandled rejection): the name save is awaited, and both the save and the
+  // logo removal report their own failure instead of pretending it worked.
+  assert.match(
+    sidepanelScript,
+    /await chrome\.storage\.local\.set\(\{ \[STORAGE_KEYS\.dealershipName\]: name \}\)/,
+    "the dealership-name write must be awaited so failure is observable"
+  );
+  assert.match(sidepanelScript, /The dealership name could not be saved\./);
+  assert.match(sidepanelScript, /The dealership logo could not be removed\./);
 });
 
 test("a worksheet prints correctly with no dealership configured", () => {

@@ -2095,10 +2095,17 @@ function initEventListeners() {
         );
       })
       .catch(() => {});
-    elements.dealershipNameInput.addEventListener("change", () => {
+    elements.dealershipNameInput.addEventListener("change", async () => {
       const name = elements.dealershipNameInput.value.trim().slice(0, 80);
       elements.dealershipNameInput.value = name;
-      chrome.storage.local.set({ [STORAGE_KEYS.dealershipName]: name });
+      // Await the write: announcing "saved" over a failed set() would leave
+      // printed worksheets carrying whatever name was stored before.
+      try {
+        await chrome.storage.local.set({ [STORAGE_KEYS.dealershipName]: name });
+      } catch {
+        showToast("The dealership name could not be saved. Try again.", "error");
+        return;
+      }
       showToast(
         name ? "Dealership name saved." : "Dealership name cleared.",
         "info"
@@ -2145,7 +2152,14 @@ function initEventListeners() {
     });
 
     elements.removeDealershipLogoBtn?.addEventListener("click", async () => {
-      await chrome.storage.local.remove(STORAGE_KEYS.dealershipLogo);
+      try {
+        await chrome.storage.local.remove(STORAGE_KEYS.dealershipLogo);
+      } catch {
+        // The logo is still stored; saying otherwise (or rejecting unhandled)
+        // helps no one. Leave the UI reflecting reality.
+        showToast("The dealership logo could not be removed. Try again.", "error");
+        return;
+      }
       renderLogoState(false);
       showToast("Dealership logo removed.", "info");
     });

@@ -33,7 +33,7 @@ import {
   maskDateText,
 } from "./src/sidepanel/date-picker.js";
 import {
-  calculateFinalDecision,
+  finalDecisionForResults,
   runOfacCheck,
   runRepeatOffenderCheck,
   runTitleCheck,
@@ -408,7 +408,11 @@ async function resolveOfacTriage(checkKey, disposition) {
 
   ofac.disposition = disposition;
   ofac.reviewedAt = new Date().toISOString();
-  results.finalDecision = calculateFinalDecision(results.checks);
+  // The shared verdict, not the base one: this value is persisted to session
+  // before displayResults recomputes, so skipping the incomplete-checks
+  // downgrade here left the stored copy APPROVED while both surfaces said
+  // REVIEW for the same record.
+  results.finalDecision = finalDecisionForResults(results);
   setCurrentResults(results);
   await persistCurrentResults();
   displayResults(elements, results);

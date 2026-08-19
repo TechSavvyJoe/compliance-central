@@ -379,3 +379,21 @@ test("the screen and the printed report reach the same verdict", async () => {
   const stale = { customer: { tradeVin: "1FTFW1E84PFA10397" }, checks: clean, finalDecision: { level: "APPROVED", approved: true } };
   assert.equal(finalDecisionForResults(stale).level, "REVIEW");
 });
+
+// The OFAC triage handler persists its verdict to session BEFORE
+// displayResults recomputes it, so a call site that still used the base
+// calculateFinalDecision stored an un-downgraded APPROVED while both visible
+// surfaces said REVIEW for the same record. No panel call site may bypass the
+// shared downgrade.
+test("every panel verdict flows through the shared downgrade", async () => {
+  const source = await readFile(
+    new URL("../sidepanel.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /finalDecisionForResults\(results\)/);
+  assert.doesNotMatch(
+    source,
+    /calculateFinalDecision\s*\(/,
+    "sidepanel.js must not compute a verdict without the incomplete-checks downgrade"
+  );
+});

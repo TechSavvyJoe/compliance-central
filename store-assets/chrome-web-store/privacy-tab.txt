@@ -64,7 +64,7 @@ Data types to leave UNCHECKED:
   • Financial, health, authentication, personal communications, user activity, etc.: NO
 
 How the collected data is handled (matches the privacy policy):
-  • For the Repeat Offender and Title/Lien checks only, the name, date of birth, and DLN/PID (and the VIN for a title check) are transmitted over HTTPS to the extension's own backend, which processes them in memory and does not intentionally retain them.
+  • For the Repeat Offender check, the name, date of birth, and DLN/PID are transmitted over HTTPS to the extension's own backend. A Title/Lien check transmits the trade-in VIN. An explicit SOS fee calculation transmits the completed calculator fields, including the registered owner's birthdate (used by Michigan to set the expiration date) and, for a plate transfer, the plate number. The backend processes each request in memory and does not intentionally retain it.
   • OFAC screening is performed entirely on the device; no customer information is transmitted for an OFAC-only check.
   • Retention: submitted customer fields, trade VINs, results, and captured portal evidence stay in device-local History for up to 30 days / 50 records and can be cleared at any time from Settings or History. SOS fee-quote data is session-only. User-requested PDF or CSV downloads remain in the user's chosen location.
   • Prominent disclosure: the side panel shows the data-use disclosure open by default until the user has read it, and existing users get a one-time in-app notice that saved records now keep the submitted buyer/co-buyer fields and captured state pages for up to 30 days.

@@ -19,8 +19,8 @@
  * Requires Google Chrome at the standard macOS path. No npm dependencies.
  */
 
-import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import http from "node:http";
@@ -166,7 +166,7 @@ const SCREENSHOTS = [
       const now = Date.now();
       const rec = (over) => Object.assign({
         id: "a" + Math.random().toString(16).slice(2),
-        reference: "CC-20260815-113802",
+        reference: "CC-20260817-104233",
         timestamp: now - 2 * 864e5, decision: "APPROVED", runType: "full",
         customerName: "Marcus Delaney", hasCoBuyer: false, hasTrade: true,
         tradeVin: "1FTFW1E84PFA10397",
@@ -177,6 +177,7 @@ const SCREENSHOTS = [
         rec({}),
         rec({
           decision: "REVIEW", timestamp: now - 9 * 864e5,
+          reference: "CC-20260810-153012",
           customerName: "Dana Whitfield",
           savedResults: { customer: { firstName: "Dana", lastName: "Whitfield" } },
           checks: { ofac: "potential_match", repeatOffender: "eligible", title: "not_run" },
@@ -184,6 +185,7 @@ const SCREENSHOTS = [
         }),
         rec({
           runType: "individual", runLabel: "OFAC only", decision: "PARTIAL",
+          reference: "CC-20260812-091507",
           customerName: "Lee Tran",
           savedResults: { customer: { firstName: "Lee", lastName: "Tran" } },
           checks: { ofac: "clear", repeatOffender: "not_run", title: "not_run" },

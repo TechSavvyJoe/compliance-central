@@ -2975,7 +2975,10 @@ body {
 }
 
 body {
-  min-width: 320px;
+  min-width: 300px; /* Chrome's minimum side-panel viewport is 320px, but a
+    visible (non-overlay) scrollbar takes ~17px of it — a 320px floor guaranteed
+    Windows users a horizontal scrollbar at minimum width. The layout is fluid
+    to 300. */
 }
 
 .compliance-hub {

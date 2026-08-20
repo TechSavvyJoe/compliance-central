@@ -56,9 +56,9 @@ Key Features:
 
 ✅ Repeat Offender Check — Sends the required name, date of birth, and Michigan DLN/PID over HTTPS to the Compliance Central service, which requests the MDOS portal result and returns the actual captured Michigan state page as evidence. Potential, unavailable, or unexpected results require human review.
 
-✅ Title & Lien Check — Sends the required customer fields and trade-in VIN over HTTPS and displays what the MDOS portal returns, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the actual captured Michigan state page; missing or uncertain results are labeled for review.
+✅ Title & Lien Check — Sends the trade-in VIN over HTTPS and displays what the MDOS portal returns, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the captured Michigan state page; uncertain results are labeled for review.
 
-✅ SOS Registration & Plate Fee Workspace — Complete passenger or commercial vehicle, fuel, use, and plate choices locally, and inspect official Michigan plate artwork in a zoomable viewer. One explicit Calculate action sends your completed choices to the Compliance Central service, which runs the public Michigan SOS calculator and returns the verified fee plus a capture of the official result page. Nothing opens on your computer. Print or download the verified total, or hand the customer a plain-language fee worksheet.
+✅ SOS Registration & Plate Fee Workspace — Complete vehicle, fuel, use, and plate choices locally and inspect official Michigan plate artwork in a zoomable viewer. One explicit Calculate action sends your completed choices — including the owner's birthdate, which sets the Michigan expiration date — to the Compliance Central service, which runs the public Michigan SOS calculator and returns the verified fee plus a capture of the official result page. Nothing opens on your computer. Print or download the verified total, or hand the customer a plain-language fee worksheet.
 
 ✅ VIN Assist — An explicit NHTSA vPIC lookup fills supported vehicle type, body, fuel, and model-year fields locally for review. The raw VIN is not stored in quote history or passed to SOS.
 

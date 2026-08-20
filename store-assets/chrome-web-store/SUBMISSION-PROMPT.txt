@@ -54,9 +54,9 @@ Key Features:
 
 ✅ Repeat Offender Check — Sends the required name, date of birth, and Michigan DLN/PID over HTTPS to the Compliance Central service, which requests the MDOS portal result and returns the actual captured Michigan state page as evidence. Potential, unavailable, or unexpected results require human review.
 
-✅ Title & Lien Check — Sends the required customer fields and trade-in VIN over HTTPS and displays what the MDOS portal returns, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the actual captured Michigan state page; missing or uncertain results are labeled for review.
+✅ Title & Lien Check — Sends the trade-in VIN over HTTPS and displays what the MDOS portal returns, including available title brand, lien, lienholder, vehicle, and weight information. The report includes the captured Michigan state page; uncertain results are labeled for review.
 
-✅ SOS Registration & Plate Fee Workspace — Complete passenger or commercial vehicle, fuel, use, and plate choices locally, and inspect official Michigan plate artwork in a zoomable viewer. One explicit Calculate action sends your completed choices to the Compliance Central service, which runs the public Michigan SOS calculator and returns the verified fee plus a capture of the official result page. Nothing opens on your computer. Print or download the verified total, or hand the customer a plain-language fee worksheet.
+✅ SOS Registration & Plate Fee Workspace — Complete vehicle, fuel, use, and plate choices locally and inspect official Michigan plate artwork in a zoomable viewer. One explicit Calculate action sends your completed choices — including the owner's birthdate, which sets the Michigan expiration date — to the Compliance Central service, which runs the public Michigan SOS calculator and returns the verified fee plus a capture of the official result page. Nothing opens on your computer. Print or download the verified total, or hand the customer a plain-language fee worksheet.
 
 ✅ VIN Assist — An explicit NHTSA vPIC lookup fills supported vehicle type, body, fuel, and model-year fields locally for review. The raw VIN is not stored in quote history or passed to SOS.
 
@@ -87,36 +87,26 @@ Requirements:
 • Google Chrome. No account, API key, or setup is required.
 -----END DESCRIPTION-----
 
-GRAPHIC ASSETS — READ THIS BEFORE TOUCHING THE IMAGES:
-The five screenshots currently on disk were rendered on 2026-07-22 for version 1.3.1.
-They predate the side-panel redesign AND the SOS registration/plate fee workspace, so they
-no longer show the shipping UI. Do NOT upload them as-is for this update.
+GRAPHIC ASSETS:
+The listing images were re-captured on 2026-08-19 from the REAL 1.6.0 side panel —
+tools/capture-store-shots.mjs renders sidepanel.html itself in headless Chrome, so the
+screenshots show exactly what installs. (The older tools/build-store-assets.mjs mockups and
+everything under store-assets/upload/ are retired; do not upload from there.)
 
-  1. Regenerate them first, from the repo root:
-       npm i -D sharp     # required: tools/build-store-assets.mjs imports sharp,
-                          # which is not a declared dependency and is not installed
-       npm run assets
-  2. Look at each regenerated image and confirm it matches the current side panel.
-  3. Then replace screenshots 01–05 in the dashboard, in order.
-  4. If regeneration is not possible right now, STOP and tell me — I would rather ship the
-     text update with the old images left untouched than upload screenshots that show a UI
-     the extension no longer has.
+Upload-ready files, all verified at exact store dimensions:
+  /Users/joegallant/AI App Development Projects/compliance-central/store-assets/chrome-web-store/
+  Screenshots (1280x800, upload in this order): screenshots/screenshot-1.png … screenshot-5.png
+    1 Screening workspace — phone-scan prompt above the buyer form (placeholders only)
+    2 Completed screening — green "Clear to deliver" over the Evidence list (fictional buyer)
+    3 Plate Calculator — calculated $179.00 total, term, expiration, plate artwork
+    4 History — fictional records with status chips, aging badge, Re-screen / Delete
+    5 Settings — dealership name and logo controls (fictional "Great Lakes Auto Group")
+  Promo tiles: promo-small-440x280.png and promo-marquee-1400x560.png
+  Store icon: keep the existing 128px icon already on the listing.
 
-Once regenerated, the upload-ready files are on this Mac at:
-  /Users/joegallant/AI App Development Projects/compliance-central/store-assets/upload/
-  Store icon: cc-store-icon-128.png
-  Screenshots: 01-run-all-approved-1280x800.jpg
-               02-ofac-only-local-1280x800.jpg
-               03-title-lien-1280x800.jpg
-               04-phone-license-scan-1280x800.jpg
-               05-compliance-history-1280x800.jpg
-  Promo tiles: small-promo-440x280.jpg and marquee-promo-1400x560.jpg
-
-Use exactly five screenshots, ordered 01 through 05.
-Screenshot 04 is visibly labeled as an instructional composite and uses fictional ID
-artwork; it is not a live scanner capture or a real identity document.
-Screenshot 05 shows saved Compliance History records, which are identified by customer —
-it is not an anonymized view.
+Every name, date, VIN, and dealership in these images is fictional. If any screenshot does
+not match the current side panel (regenerate with `node tools/capture-store-shots.mjs` and
+re-inspect), STOP and tell me rather than uploading a stale image.
 
 OFFICIAL URL / HOMEPAGE / SUPPORT URL (optional): you may set the Support URL to https://techsavvyjoe.github.io/compliance-central/
 

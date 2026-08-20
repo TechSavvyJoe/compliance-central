@@ -17,16 +17,17 @@ This directory contains all store assets and promotional videos generated for **
 > **Note for Chrome Web Store Dashboard:**
 > Chrome Web Store accepts YouTube URLs for video teasers on your store listing. You can upload either `promo_video_main_with_logo.webm` or `promo_video_fast_paced_with_logo.webm` to YouTube (e.g. Unlisted or Public) and paste the YouTube link into the **"Promotional Video"** field in the Chrome Developer Dashboard Store Listing tab.
 
-## 🖼️ Store Screenshots & Images (`store-assets/upload/`)
+## 🖼️ Store Screenshots & Images (`store-assets/chrome-web-store/`)
 
-- `01-run-all-approved-1280x800.jpg`: Main screenshot showing unified compliance check.
-- `02-ofac-only-local-1280x800.jpg`: Screenshot showing local OFAC SDN screening.
-- `03-title-lien-1280x800.jpg`: Screenshot showing Title & Lien report result.
-- `04-phone-license-scan-1280x800.jpg`: Screenshot showing phone license scanner QR pairing. Visibly labeled as an instructional composite; the ID artwork is fictional.
-- `05-compliance-history-1280x800.jpg`: Screenshot showing saved Compliance History — device-local **customer** records that a dealership can reopen, re-screen, print, or download, kept up to 30 days / 50 records. This history is identified, not anonymous: records carry the submitted customer fields, and the audit CSV export includes Customer, Co-Buyer, and Trade VIN columns.
-- `marquee-promo-1400x560.jpg`: Large Marquee Promo tile.
-- `small-promo-440x280.jpg`: Small Promo tile.
-- `cc-store-icon-128.png`: 128x128 Store icon.
+The live listing set, captured 2026-08-19 from the real 1.6.0 side panel by
+`node tools/capture-store-shots.mjs` (headless Chrome rendering `sidepanel.html`
+itself — not mockups). `screenshots/screenshot-1.png` … `screenshot-5.png`
+(1280x800) plus `promo-small-440x280.png` and `promo-marquee-1400x560.png`.
+Captions and upload order live in `chrome-web-store/SUBMISSION-CHECKLIST.md`.
+Every name, date, VIN, and dealership shown is fictional; History records are
+identified by customer, not anonymized. The pre-1.6.0 JPEG set that used to sit
+in `upload/` and `chrome-web-store/images/` showed the retired dark UI and has
+been deleted.
 
 ## 📄 HTML Animations (`store-assets/`)
 

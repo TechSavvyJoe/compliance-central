@@ -76,11 +76,15 @@ test("Buyer, co-buyer, and optional workflow rows use full-width controls", asyn
   assert.match(css, /\.cobuyer-toggle\s*\{[\s\S]*?cursor:\s*pointer/);
 });
 
+// The selected-day ink is pinned to the canonical brand navy. The panel used to
+// carry two navies — #00274c from the original dark theme and #0d2b4a from the
+// light redesign — rendering the same brand colour two ways in one UI. They are
+// unified on #0d2b4a; on gold that is 9.44:1, comfortably past AA.
 test("the DOB calendar uses a readable light redesign surface", async () => {
   const css = await readFile(new URL("sidepanel.css", root), "utf8");
   assert.match(css, /\.date-picker-popover\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?color:\s*#142b43/);
   assert.match(css, /\.date-day\s*\{[\s\S]*?color:\s*#142b43/);
-  assert.match(css, /\.date-day\.is-selected\s*\{[\s\S]*?background:\s*var\(--gold\)[\s\S]*?color:\s*#00274c/);
+  assert.match(css, /\.date-day\.is-selected\s*\{[\s\S]*?background:\s*var\(--gold\)[\s\S]*?color:\s*#0d2b4a/);
 });
 
 test("saved records lead with the customer name and demote the internal reference", async () => {

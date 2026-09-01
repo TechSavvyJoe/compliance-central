@@ -339,7 +339,7 @@ body.modal-open {
 .sos-workspace-status { min-height: 16px; margin: 8px 1px 0; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.35; }
 .sos-primary-actions { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; margin-top: 8px; }
 .sos-primary-actions .btn-primary { grid-column: 1 / -1; }
-.sos-primary-actions .btn-sm { min-height: 34px; justify-content: center; padding: 6px 8px; font-size: var(--fs-caption); }
+.sos-primary-actions .btn-sm { min-height: 34px; justify-content: center; padding: 6px 8px; }
 .sos-quote-status { margin: 8px 0 0; padding: 7px 8px; border-radius: var(--r-sm); background: #0d2b4a; color: var(--text-secondary); font-size: var(--fs-caption); line-height: 1.35; }
 .sos-quote-privacy { margin: 7px 1px 0; color: #7891a9; font-size: var(--fs-micro); line-height: 1.35; }
 
@@ -2956,7 +2956,7 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   --design-navy: #0d2b4a;
   --design-navy-soft: #143b61;
   --design-gold: #ffcb05;
-  --design-canvas: #e3e8ef;
+  --design-canvas: #eef2f7; /* lighter than --line-soft so card edges read */
   --design-card: #ffffff;
   --design-ink: #101a26;
   --design-slate: #42536a;
@@ -5052,3 +5052,180 @@ label.settings-link-button[for="dealershipLogoInput"] {
   grid-column: 2;
   justify-self: start;
 }
+
+
+/* ---------------------------------------------------------------------------
+ * Buttons size from their tokens, not from their contents.
+ *
+ * Every button inherited `line-height: normal`, so its height depended on the
+ * font's own metrics and on whatever inline content it happened to hold. Two
+ * secondary buttons with identical padding, border and min-height measured 48px
+ * and 49px side by side. Pinning line-height makes height a function of the
+ * three values that are actually declared.
+ */
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-large,
+.btn-sm,
+.btn-hist {
+  line-height: 1.15;
+}
+
+/* A label that wraps stretches its whole grid row, which is where the odd pixel
+   came from. These rows hold short verbs; keep them on one line. */
+.all-actions button,
+.individual-checks button,
+.sos-primary-actions button {
+  white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Production polish — one control language across every surface.
+ *
+ * A six-surface visual audit after the token migration found the same faults
+ * repeating: native form controls in the browser's default face, buttons at
+ * three radii and four heights, sibling cards with and without elevation,
+ * two same-role rows built differently, and a handful of dark-theme leftovers
+ * (a gold hover on white, a 6%-white badge on a white card). Everything below
+ * is a rule the tokens should already have implied.
+ */
+
+/* Native controls never inherit the page face by default. This single line is
+   why "Run All Checks" rendered in Arial beside an Archivo label. */
+button, input, select, textarea { font-family: inherit; }
+
+/* One radius for every button and field, one height per tier. */
+.btn-primary, .btn-secondary, .btn-ghost, .btn-large, .btn-sm, .btn-hist,
+.btn-danger, .form-group input, .form-group select,
+.sos-control select, .sos-control input[type="text"], .sos-vin-controls input,
+#dealershipNameInput, .history-search-shell {
+  border-radius: var(--r-md);
+}
+.btn-sm, .btn-hist { min-height: 34px; font-size: var(--fs-small); }
+.btn-secondary, .btn-ghost, .btn-danger { min-height: 40px; font-size: var(--fs-body); }
+.btn-primary, .btn-large, .main-actions .btn-secondary { min-height: 46px; font-size: var(--fs-strong); }
+.main-actions .btn-primary { font-size: var(--fs-lead); }
+.btn-primary, .btn-secondary, .btn-ghost, .btn-large, .btn-sm, .btn-hist, .btn-danger { font-weight: 700; letter-spacing: 0.01em; }
+
+/* Every white card on the canvas carries the same lift and the same corner. */
+.input-section, .action-section, .progress-section, .history-workspace,
+.evidence-panel, .completed-steps-panel, .report-selection, .history-item,
+#sosQuoteHeadline, .sos-local-workbench, .sos-vin-lookup, #sosTransferFields,
+.final-decision, .retention-notice, .rescreen-banner {
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-2);
+}
+#inputPanel > .typed-buyer-card:first-child { box-shadow: var(--elev-2); }
+.sos-quote-status, .sos-workspace-status { border-radius: var(--r-lg); box-shadow: none; }
+
+/* A select with appearance:none and no arrow is indistinguishable from a text
+   field. The plate calculator's selects had a chevron; the buyer form's did not. */
+.form-group select, .sos-control select, #suffix, #cbSuffix {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230d2b4a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px 14px;
+}
+
+/* Placeholders measured 3.98:1; the caption grey clears 5.6:1 on white. */
+.form-group input::placeholder, .sos-control input::placeholder,
+.sos-vin-controls input::placeholder, #historySearchInput::placeholder,
+#dealershipNameInput::placeholder { color: var(--muted); opacity: 1; }
+
+/* Every meta line on the tab is caption size; field help was a step smaller. */
+.helper-text { font-size: var(--fs-caption); }
+
+/* The two optional-step rows sit on top of each other and must be twins:
+   same height, same title weight, same subtitle face, same action style. */
+.cobuyer-toggle, .trade-section-title {
+  min-height: 60px;
+  padding: 10px 12px;
+  gap: 12px;
+  align-items: center;
+}
+.trade-section { padding: 0; }
+.trade-section .section-content { padding: 0 12px 12px; }
+.cobuyer-toggle .optional-step-copy strong, .trade-section-title strong,
+.cobuyer-toggle .checkbox-label strong {
+  font: 700 var(--fs-lead)/1.2 var(--font-body);
+  color: var(--design-ink);
+}
+.cobuyer-toggle .optional-step-copy small, .trade-section-title small {
+  display: block; margin-top: 2px;
+  font: 500 var(--fs-caption)/1.3 var(--font-body);
+  color: var(--design-muted);
+}
+.cobuyer-toggle .checkbox-text, .trade-section-title .optional-label {
+  margin-left: auto;
+  font: 700 var(--fs-small)/1 var(--font-body);
+  color: var(--link);
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Dark-theme leftovers found on the light surface. */
+.checkbox-label:hover, .checkbox-label:hover .checkbox-text { color: var(--design-navy); }
+.history-age { background: #eef2f7; color: var(--design-slate); border: 1px solid var(--line-soft); }
+.history-age.is-aging { background: #fdf1e3; color: #8a4a00; border-color: #f0d9b0; }
+.hchip-pass { border-color: #bfe3d4; }
+.hchip-fail { border-color: #f2c3bd; }
+.hchip-review { border-color: #f0d9b0; }
+.hchip-na, .hchip-none { border-color: var(--line-soft); }
+
+/* The review banner reused the approved variant's green for its meta line. */
+.verdict-review .decision-meta, .verdict-manager .decision-meta { color: #6f4d1f; }
+.decision-headline { font-size: var(--fs-hero); }
+
+/* Status markers are one control: every state is a pill, not some pills and
+   some bare italic text. */
+.result-status, .status-indicator {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  background: #eef2f7; color: var(--design-slate);
+  font: 700 var(--fs-caption)/1.2 var(--font-body);
+  font-style: normal; letter-spacing: 0.02em; white-space: nowrap;
+}
+.status-pass, .result-status.status-pass { background: var(--success-bg); color: var(--success); }
+.status-fail, .result-status.status-fail { background: var(--danger-bg); color: var(--danger); }
+.status-review, .status-warning, .result-status.status-review { background: var(--warning-bg); color: var(--warning); }
+
+/* Reserve room for the save action only on the card that has one, so status
+   pills on the other rows share the card's right edge. */
+.evidence-panel .result-card { padding-right: 12px; }
+.evidence-panel .result-card:has(.result-actions .btn-emphasis) { padding-right: 54px; }
+
+/* Nowrap fixed a 1px row stretch but clipped "Download selected PDF" at 360px.
+   Let these labels wrap; line-height is pinned so heights stay deterministic. */
+.all-actions button { white-space: normal; }
+
+/* The kicker is 60px wide but was given a 160px flex basis, forcing a wrap. */
+.evidence-heading > div:first-child { flex: 1 1 60px; min-width: 0; }
+
+/* A fieldset legend notches the card border; float it into the flow instead. */
+.report-selection { padding-top: 12px; }
+.report-selection legend { float: left; width: 100%; padding: 0; margin: 0 0 8px; }
+
+/* Both disclosures in the action card use the same chevron affordance. */
+.individual-check-menu > summary { list-style: none; position: relative; padding-right: 22px; cursor: pointer; }
+.individual-check-menu > summary::-webkit-details-marker { display: none; }
+.individual-check-menu > summary::after {
+  content: ""; position: absolute; right: 2px; top: 50%; width: 12px; height: 12px;
+  margin-top: -6px; transform: rotate(0deg); transition: transform var(--transition-fast);
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d2b4a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") center/12px no-repeat;
+}
+.individual-check-menu[open] > summary::after { transform: rotate(180deg); }
+.data-use-note { padding: 8px 0 0; }
+
+/* Plate calculator timing row: legends sat flush on their buttons while
+   labels floated; both now hold the same 4px before their control. */
+.sos-timing-row > .sos-control { align-content: start; }
+.sos-timing-row legend, .sos-timing-row > .sos-control > label { display: block; margin: 0 0 4px; padding: 0; }
+
+/* Dialog headlines match the workspace headlines. */
+#settingsModalTitle, .modal-header h2 { font: 800 var(--fs-display)/1.15 var(--font-display); letter-spacing: -0.02em; }

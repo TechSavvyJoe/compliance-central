@@ -170,6 +170,9 @@ const elements = {
   sosVinLookupStatus: $("sosVinLookupStatus"),
   sosLienStatus: $("sosLienStatus"),
   sosWorkspaceStatus: $("sosWorkspaceStatus"),
+  sosReadiness: $("sosReadiness"),
+  sosProgress: $("sosProgress"),
+  sosProgressElapsed: $("sosProgressElapsed"),
   sosWorkspaceStatusText: $("sosWorkspaceStatusText"),
   sosQuoteStatus: $("sosQuoteStatus"),
   sosQuoteHeadline: $("sosQuoteHeadline"),
@@ -837,15 +840,74 @@ function clearSosValidation() {
   document
     .querySelectorAll("#sosNewPlateFields [aria-invalid], #sosTransferFields [aria-invalid]")
     .forEach((control) => control.removeAttribute("aria-invalid"));
+  document.querySelectorAll(".sos-field-error").forEach((n) => n.remove());
 }
 
-function showSosValidation(errors) {
+function showSosValidation(errors, { focusFirst = true } = {}) {
   clearSosValidation();
   for (const error of errors) {
     const control = document.getElementById(error.id);
-    control?.setAttribute("aria-invalid", "true");
+    if (!control) continue;
+    control.setAttribute("aria-invalid", "true");
+    // Every wrong field says what is wrong with it. The status bar used to
+    // carry errors[0].message alone, so a form with three problems showed
+    // three red borders and one explanation, and you fixed them one
+    // calculate at a time.
+    const field = control.closest(".sos-control") || control.parentElement;
+    if (!field || field.querySelector(".sos-field-error")) continue;
+    const note = document.createElement("small");
+    note.className = "sos-field-error";
+    note.id = `${control.id}-error`;
+    note.textContent = error.message;
+    field.append(note);
+    const described = (control.getAttribute("aria-describedby") || "")
+      .split(/\s+/).filter(Boolean).filter((x) => x !== note.id);
+    control.setAttribute("aria-describedby", [...described, note.id].join(" "));
   }
-  document.getElementById(errors[0]?.id)?.focus?.();
+  if (focusFirst) document.getElementById(errors[0]?.id)?.focus?.();
+}
+
+// True once Calculate has been pressed: before that, an untouched form should
+// not be scolded for fields the salesperson has not reached yet.
+let sosSubmitAttempted = false;
+
+/** Live "what is left" count, from the same validator the submit uses. */
+function renderSosReadiness() {
+  const el = elements.sosReadiness;
+  if (!el) return;
+  if (sosWorkspaceBusy) { el.textContent = ""; return; }
+  let errors;
+  try {
+    errors = validateSosLocalValues(localSosValues()) || [];
+  } catch {
+    errors = [];
+  }
+  const n = errors.length;
+  el.textContent = n === 0 ? "Ready to calculate." : `${n} detail${n === 1 ? "" : "s"} left`;
+  el.classList.toggle("is-ready", n === 0);
+  if (sosSubmitAttempted) showSosValidation(errors, { focusFirst: false });
+}
+
+let sosProgressTimer = null;
+
+/** Honest progress: the run reports no stages, so show that it is moving and
+ *  how long it has taken — not a fabricated percentage. */
+function setSosProgress(on) {
+  const box = elements.sosProgress;
+  if (!box) return;
+  clearInterval(sosProgressTimer);
+  sosProgressTimer = null;
+  box.classList.toggle("hidden", !on);
+  if (!on) return;
+  const started = Date.now();
+  const tick = () => {
+    const secs = Math.round((Date.now() - started) / 1000);
+    if (elements.sosProgressElapsed) {
+      elements.sosProgressElapsed.textContent = secs >= 3 ? ` \u00b7 ${secs}s` : "";
+    }
+  };
+  tick();
+  sosProgressTimer = setInterval(tick, 1000);
 }
 
 function canCheckSosLien(value = elements.sosVinLookupInput?.value || "") {
@@ -1654,6 +1716,7 @@ async function handleSosOfficialFieldChange(event) {
 
 async function handleSosCalculationInput() {
   clearSosValidation();
+  renderSosReadiness();
   await invalidateSosQuoteAfterEdit();
 }
 
@@ -1661,13 +1724,21 @@ async function calculateSosFee() {
   if (sosWorkspaceBusy) return;
   const values = localSosValues();
   const errors = validateSosLocalValues(values);
+  sosSubmitAttempted = true;
   if (errors.length) {
     showSosValidation(errors);
-    setSosWorkspaceStatus(errors[0].message, "error");
+    setSosWorkspaceStatus(
+      errors.length === 1
+        ? errors[0].message
+        : `${errors.length} details need attention before this can be calculated.`,
+      "error"
+    );
+    renderSosReadiness();
     return;
   }
   clearSosValidation();
   sosWorkspaceBusy = true;
+  setSosProgress(true);
   renderSosWorkspace();
   setSosWorkspaceStatus("Sending all completed choices to the official calculator…", "busy");
   try {
@@ -1713,7 +1784,9 @@ async function calculateSosFee() {
     );
   } finally {
     sosWorkspaceBusy = false;
+    setSosProgress(false);
     renderSosWorkspace();
+    renderSosReadiness();
   }
 }
 

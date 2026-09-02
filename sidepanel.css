@@ -5292,3 +5292,80 @@ button, input, select, textarea { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ---------------------------------------------------------------------------
+ * Plate calculator: say what is wrong, where it is wrong.
+ *
+ * Validation used to set aria-invalid on every bad field but send only
+ * errors[0].message to the status bar, so a form with three problems showed
+ * three red borders and one explanation — and the salesperson fixed them one
+ * Calculate at a time, six seconds apart.
+ */
+.sos-field-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger);
+  font: 600 var(--fs-caption)/1.35 var(--font-body);
+}
+
+/* How close the form is to being calculable, from the same validator the
+   submit runs — the panel never said, and there are eleven fields. */
+.sos-readiness {
+  margin: 0 2px 6px;
+  color: var(--design-muted);
+  font: 700 var(--fs-caption)/1.3 var(--font-body);
+  letter-spacing: 0.02em;
+}
+
+.sos-readiness.is-ready {
+  color: var(--success);
+}
+
+/* The run reports no stages, so this shows motion and elapsed time rather
+   than inventing a percentage. Six seconds against a government site is a
+   long time to look at one unchanging line of text. */
+.sos-progress {
+  display: grid;
+  gap: 6px;
+  margin: 0 2px 8px;
+}
+
+.sos-progress.hidden {
+  display: none !important;
+}
+
+.sos-progress-track {
+  position: relative;
+  overflow: hidden;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-soft);
+}
+
+.sos-progress-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--design-navy), var(--focus));
+  animation: sosProgressSlide 1.15s ease-in-out infinite;
+}
+
+@keyframes sosProgressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+.sos-progress-copy {
+  color: var(--design-slate);
+  font: 600 var(--fs-caption)/1.3 var(--font-body);
+}
+
+.sos-progress-elapsed {
+  color: var(--design-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sos-progress-bar { animation: none; width: 100%; opacity: 0.5; }
+}

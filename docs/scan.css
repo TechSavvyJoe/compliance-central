@@ -65,8 +65,11 @@
 
   /* True black behind the camera feed; navy would tint the preview. */
   --video-bg: #000000;
-  /* Dims everything outside the barcode target without hiding it. */
-  --frame-scrim: rgba(0, 0, 0, 0.16);
+  /* Dims everything outside the barcode strip without hiding it. The strip
+   * is a small part of the frame now, so the scrim has to be definite
+   * enough to name it as the target and still leave the card's own edges
+   * readable above and below it. */
+  --frame-scrim: rgba(0, 0, 0, 0.42);
 
   /* Panels floating over the camera feed. */
   --scrim: rgba(6, 23, 45, 0.92);
@@ -120,6 +123,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The page is a column the height of the phone, so a screen with little on
+ * it can still put its decision buttons where the thumb already is instead
+ * of stranding them under the heading at the top of a mostly empty page. */
 body {
   font-family: var(--font-body);
   background: var(--bg-primary);
@@ -127,6 +133,8 @@ body {
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
   padding:
@@ -142,10 +150,14 @@ button, input, select, textarea {
   line-height: inherit;
 }
 
+/* width:100% matters now that the body is a flex column: an auto margin on
+ * the cross axis opts a flex item out of stretching, which would leave the
+ * masthead shrink-wrapped and centred instead of ranged left. */
 .cc-header {
   display: flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-2) 0 var(--sp-3); margin-bottom: var(--sp-3);
-  max-width: 520px; margin-left: auto; margin-right: auto;
+  flex: 0 0 auto;
+  width: 100%; max-width: 520px; margin-left: auto; margin-right: auto;
 }
 .cc-logo { width: 34px; height: 34px; flex: 0 0 auto; }
 .cc-header h1 {
@@ -157,9 +169,28 @@ button, input, select, textarea {
   letter-spacing: -0.01em;
 }
 
-.cc-main { max-width: 520px; margin: 0 auto; }
-.screen { display: flex; flex-direction: column; gap: var(--sp-3); }
+/* Grow to fill a tall phone, never shrink on a short one: the camera screen
+ * is already taller than a small handset and must be allowed to overflow
+ * into a scroll rather than be compressed to fit. */
+.cc-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+}
+.screen { display: flex; flex-direction: column; flex: 1 0 auto; gap: var(--sp-3); }
 .screen.hidden, .hidden { display: none !important; }
+/* Every decision on this page sits at the bottom of the screen, in the arc
+ * a thumb already covers — never in the top third, and never in a corner. */
+#reviewScreen .actions,
+#cobuyerPrompt .actions { margin-top: auto; }
+/* The done screen's buttons are direct children of the column, where the
+ * shared `.btn { flex: 1 }` would stretch them to fill the page. */
+#doneScreen > .btn { flex: 0 0 auto; }
+#doneScreen > .btn:not(.hidden) { margin-top: auto; }
+#doneScreen > .btn:not(.hidden) ~ .btn:not(.hidden) { margin-top: 0; }
 
 h2 {
   font-family: var(--font-display);
@@ -189,9 +220,11 @@ h2 {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+/* Gold marks the barcode to look for. It stops at a border, though: the
+ * loudest gold on the screen belongs to the live target, not to a picture
+ * of one, and the halo this card used to carry out-shouted it. */
 .id-example.is-target {
   border: 2px solid var(--gold);
-  box-shadow: 0 0 0 1px var(--gold-halo);
 }
 /* The two pictures differ in width (0.82fr vs 1.18fr) and so in height. The
  * picture box grows to fill whatever the row leaves it and sits the artwork
@@ -311,11 +344,29 @@ h2 {
   width: 100% !important;
   height: 100% !important;
 }
-/* A generous target with quiet corner marks instead of a precise alignment
- * box. Its rectangle is also the decoder's crop, so it stays centred. */
-.frame-guide {
+/* The target is shaped like the thing being scanned. A PDF417 on the back of
+ * a licence is a wide, shallow strip — at most 75.6mm across and 38.1mm tall,
+ * with its bars running perpendicular to the card's bottom edge — so a
+ * card-shaped box would invite the salesperson to fill the frame with the
+ * whole licence and leave the barcode too small to resolve. The track is
+ * 8:3; the guide inside it is 94% × 84% of that, which lands the target at
+ * almost exactly 3:1. The shape never changes during a session.
+ *
+ * The guide's rectangle is also the decoder's crop (scan.js measures it live
+ * with getBoundingClientRect), so the strip the salesperson sees and the
+ * pixels the decoder reads are the same thing by construction. */
+.frame-track {
   position: absolute;
   z-index: 2;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  aspect-ratio: 8 / 3;
+  pointer-events: none;
+}
+.frame-guide {
+  position: absolute;
   left: 3%;
   width: 94%;
   height: 84%;
@@ -365,14 +416,15 @@ h2 {
 .status { color: var(--text-secondary); font-size: var(--fs-md); line-height: 1.45;
   text-align: center; overflow-wrap: anywhere; }
 .status:empty { display: none; }
-/* Capped so a two-line message never reaches the bottom corner marks. */
+/* Live guidance, in the dimmed band below the strip: the one line that
+ * changes while framing, kept clear of the target it talks about. */
 #cameraScreen .viewport-shell .status {
   position: absolute;
   z-index: 3;
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
-  max-width: calc(100% - 96px);
+  max-width: calc(100% - 32px);
   width: max-content;
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
@@ -389,7 +441,7 @@ h2 {
 /* Size is literal, not a token: tests/scanner-ui.test.js pins it. The glare
  * legibility this note needed came from lifting the colour instead. */
 .privacy-note { color: var(--text-secondary); font-size: 13px; line-height: 1.45;
-  text-align: center; }
+  text-align: center; text-wrap: pretty; }
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -405,13 +457,18 @@ h2 {
   font-family: var(--font-mono); opacity: 0.8;
   word-break: break-word; min-height: 14px; }
 
+/* Six values to check against the card in the other hand. Label above,
+ * value below, both flush left: the values then form one column the eye can
+ * run straight down. Side by side, a right-aligned value column ragged at
+ * its left edge made every name start in a different place, and a long one
+ * wrapped into a narrow gutter. */
 .fields { background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-4); }
-.fields > div { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
-  padding: 10px 0; border-bottom: 1px solid var(--border); }
+  border-radius: var(--radius); padding: var(--sp-2) var(--sp-4); }
+.fields:empty { display: none; }
+.fields > div { padding: 9px 0; border-bottom: 1px solid var(--border); }
 .fields > div:last-child { border-bottom: none; }
-.fields dt { flex: 0 0 auto; color: var(--text-muted); font-size: var(--fs-md); }
-.fields dd { min-width: 0; max-width: 70%; font-size: var(--fs-lg); font-weight: 700; text-align: right;
+.fields dt { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.25; }
+.fields dd { margin-top: 2px; font-size: var(--fs-lg); font-weight: 700; line-height: 1.3;
   font-variant-numeric: lining-nums tabular-nums; overflow-wrap: anywhere; }
 
 .note { background: var(--warning-bg); border: 1px solid var(--warning);
@@ -453,23 +510,40 @@ h2 {
 .done-check {
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   width: 72px;
   height: 72px;
-  margin: var(--sp-2) auto 0;
+  margin: var(--sp-5) auto var(--sp-1);
   border-radius: 50%;
   background: var(--cc-navy);
   color: var(--gold);
   box-shadow: 0 0 0 1.5px var(--gold-line);
 }
 .done-check svg { display: block; width: 36px; height: 36px; }
+/* The instruction ("go back to your computer") and the delivery state
+ * ("sent") were two identical grey paragraphs. The state is the one fact
+ * that changes, so it gets a settled chip of its own to sit in. */
+#doneScreen #deliveryStatus {
+  align-self: center;
+  max-width: 100%;
+  padding: 6px var(--sp-3);
+  border: 1px solid var(--gold-line);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+/* The same record list as the review screen, so the recap of what was
+ * captured looks like the thing that was confirmed a screen earlier. */
 .capture-summary { background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-1) var(--sp-4); text-align: left; }
-.capture-summary .cap-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
-  padding: 10px 0; border-bottom: 1px solid var(--border); }
+  border-radius: var(--radius); padding: var(--sp-2) var(--sp-4); text-align: left; }
+.capture-summary:empty { display: none; }
+.capture-summary .cap-row { padding: 9px 0; border-bottom: 1px solid var(--border); }
 .capture-summary .cap-row:last-child { border-bottom: none; }
-.capture-summary .cap-row span { color: var(--text-muted); font-size: var(--fs-md); }
-.capture-summary .cap-row strong { min-width: 0; max-width: 70%; font-size: var(--fs-base); font-weight: 700;
-  text-align: right; overflow-wrap: anywhere; }
+.capture-summary .cap-row span { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.25; }
+.capture-summary .cap-row strong { display: block; margin-top: 2px; font-size: var(--fs-lg); font-weight: 700;
+  line-height: 1.3; overflow-wrap: anywhere; }
 
 .error-banner { background: var(--danger-bg); border: 1px solid var(--danger);
   color: var(--danger); border-radius: var(--radius); padding: var(--sp-3); font-size: var(--fs-md);

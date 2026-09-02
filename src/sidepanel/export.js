@@ -1177,7 +1177,7 @@ const PALETTE = {
 
 async function createPdfContext(orientation = "portrait") {
   const JsPDF = await loadJsPDF();
-  const doc = new JsPDF({ unit: "pt", format: "letter", orientation });
+  const doc = new JsPDF({ unit: "pt", format: "letter", orientation, putOnlyUsedFonts: true });
   return {
     doc,
     pageWidth: doc.internal.pageSize.getWidth(),

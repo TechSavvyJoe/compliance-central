@@ -3449,7 +3449,8 @@ body {
 .sos-control input[type="text"]:focus,
 .sos-vin-controls input:focus {
   border-color: var(--focus);
-  outline: 3px solid rgba(43, 108, 168, 0.15);
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 
 .helper-text {
@@ -5004,7 +5005,8 @@ body {
 
 #dealershipNameInput:focus {
   border-color: var(--focus);
-  outline: 3px solid rgba(43, 108, 168, 0.15);
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 
 /* The file input is visually hidden behind its own label, which is the button. */
@@ -5284,7 +5286,7 @@ button, input, select, textarea { font-family: inherit; }
    zero-specificity via :where); anything that had none gets the panel ring,
    meeting WCAG 2.4.13 focus appearance. */
 :where(button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 3px solid rgba(43, 108, 168, 0.35);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

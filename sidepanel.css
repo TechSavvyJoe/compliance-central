@@ -5279,3 +5279,14 @@ button, input, select, textarea { font-family: inherit; }
 .sos-fee-reference summary { flex-wrap: wrap; gap: 4px 10px; }
 .sos-fee-reference summary > span { flex: 1 1 auto; hyphens: none; overflow-wrap: normal; }
 .sos-fee-reference summary small { white-space: nowrap; }
+
+/* One focus language. Controls with their own focus style keep it (this is
+   zero-specificity via :where); anything that had none gets the panel ring,
+   meeting WCAG 2.4.13 focus appearance. */
+:where(button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid rgba(43, 108, 168, 0.35);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

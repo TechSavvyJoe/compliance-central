@@ -8,6 +8,7 @@
  */
 
 import { sanitizeHTML, buildSanitizedName } from "./dom-utils.js";
+import { registerPdfFonts, PDF_FACE } from "../../lib/pdf-fonts.js";
 import { showToast } from "./toast.js";
 import {
   formatTitleType,
@@ -1123,14 +1124,19 @@ export async function printAllReports(currentResults, selectedKeys) {
 // drawn programmatically in jsPDF so we avoid html2canvas/html2pdf bloat.
 
 async function loadJsPDF() {
-  if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+  if (window.jspdf?.jsPDF) {
+    registerPdfFonts(window.jspdf.jsPDF);
+    return window.jspdf.jsPDF;
+  }
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = chrome.runtime.getURL("lib/jspdf.umd.min.js");
     script.onload = () => {
-      if (window.jspdf?.jsPDF) resolve(window.jspdf.jsPDF);
-      else reject(new Error("jsPDF did not load"));
+      if (window.jspdf?.jsPDF) {
+        registerPdfFonts(window.jspdf.jsPDF);
+        resolve(window.jspdf.jsPDF);
+      } else reject(new Error("jsPDF did not load"));
     };
     script.onerror = () => reject(new Error("Failed to load jsPDF script"));
     document.head.appendChild(script);
@@ -1206,7 +1212,7 @@ function writeText(ctx, text, opts = {}) {
   const {
     fontSize = 10,
     bold = false,
-    italic = false,
+    italic: _italic = false, // accepted for callers; no italic cut ships
     color = PALETTE.ink,
     align = "left",
     lineHeight = 1.35,
@@ -1214,9 +1220,11 @@ function writeText(ctx, text, opts = {}) {
   } = opts;
   const { doc, pageWidth, margin } = ctx;
   doc.setFontSize(fontSize);
+  // Headings in the printed HTML are Bricolage Grotesque; the same threshold
+  // applies here. Archivo ships upright only, so italic falls to the regular.
   doc.setFont(
-    "helvetica",
-    bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal"
+    bold && fontSize >= 13 ? PDF_FACE.display : PDF_FACE.body,
+    bold ? "bold" : "normal"
   );
   setText(doc, color);
 
@@ -1256,7 +1264,7 @@ function drawOfacRecordHeader(ctx, opts = {}) {
 
   // Prominent non-government notice. This must not resemble government
   // letterhead, so it leads the masthead rather than sitting inside a frame.
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(7);
   setText(doc, PALETTE.alert);
   doc.text(eyebrow, innerLeft, yy);
@@ -1267,7 +1275,7 @@ function drawOfacRecordHeader(ctx, opts = {}) {
   yy += 16;
 
   // Italic subtitle.
-  doc.setFont("helvetica", "italic");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(9);
   setText(doc, PALETTE.body);
   const subLines = doc.splitTextToSize(subtitle, innerWidth);
@@ -1278,7 +1286,7 @@ function drawOfacRecordHeader(ctx, opts = {}) {
   yy += 8;
 
   // Meta two-column row.
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(8.5);
   setText(doc, PALETTE.body);
   if (meta.length) {
@@ -1287,9 +1295,9 @@ function drawOfacRecordHeader(ctx, opts = {}) {
     let ly = yy;
     let ry = yy;
     for (const item of left) {
-      doc.setFont("helvetica", "bold");
+      doc.setFont(PDF_FACE.body, "bold");
       doc.text(item.label + ":", innerLeft, ly);
-      doc.setFont("helvetica", "normal");
+      doc.setFont(PDF_FACE.body, "normal");
       doc.text(
         String(item.value || "—"),
         innerLeft + doc.getTextWidth(item.label + ": "),
@@ -1298,12 +1306,12 @@ function drawOfacRecordHeader(ctx, opts = {}) {
       ly += 11;
     }
     for (const item of right) {
-      doc.setFont("helvetica", "bold");
+      doc.setFont(PDF_FACE.body, "bold");
       const labelWidth = doc.getTextWidth(item.label + ": ");
       const valWidth = doc.getTextWidth(String(item.value || "—"));
       const rightEdge = innerLeft + innerWidth;
       doc.text(item.label + ":", rightEdge - labelWidth - valWidth, ry);
-      doc.setFont("helvetica", "normal");
+      doc.setFont(PDF_FACE.body, "normal");
       doc.text(String(item.value || "—"), rightEdge - valWidth, ry);
       ry += 11;
     }
@@ -1320,7 +1328,7 @@ function drawMasthead(ctx, title, ruleY) {
   const { doc, pageWidth, margin } = ctx;
   const right = pageWidth - margin;
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(15);
   setText(doc, PALETTE.navy);
   doc.text(String(title), margin, ruleY - 12);
@@ -1344,7 +1352,7 @@ function drawCheckHeader(ctx, opts) {
 
   // Meta strip first, then the masthead — the same order the HTML pages read
   // in, where `.page-header` sits above `.main-title`.
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(7.5);
   setText(doc, PALETTE.slate);
   const metaText = meta
@@ -1371,7 +1379,7 @@ function drawSubjectBox(ctx, opts) {
   const labelWidth = 138;
   const rowLineHeight = 12;
   const valueWidth = pageWidth - margin * 2 - padding * 2 - labelWidth;
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(10);
   const preparedRows = rows.map((row) => {
     const value = String(row.value ?? "").trim() || "—";
@@ -1392,7 +1400,7 @@ function drawSubjectBox(ctx, opts) {
   doc.setLineWidth(0.6);
   doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 2, 2, "FD");
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(9);
   setText(doc, PALETTE.slate);
   doc.text(title, margin + padding, ctx.y + padding + 10);
@@ -1408,12 +1416,12 @@ function drawSubjectBox(ctx, opts) {
 
   let rowTop = ctx.y + padding + headerHeight;
   for (const row of preparedRows) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont(PDF_FACE.body, "bold");
     doc.setFontSize(10);
     setText(doc, PALETTE.body);
     doc.text(row.label + ":", margin + padding, rowTop + 14);
 
-    doc.setFont("helvetica", "normal");
+    doc.setFont(PDF_FACE.body, "normal");
     setText(doc, PALETTE.ink);
     let valueY = rowTop + 14;
     for (const line of row.lines) {
@@ -1473,10 +1481,10 @@ function drawResultBox(ctx, opts) {
   const barWidth = 4;
   const textLeft = margin + barWidth + padding;
   const innerWidth = pageWidth - margin * 2 - barWidth - padding * 2;
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(15);
   const titleLines = doc.splitTextToSize(String(title || "RESULT"), innerWidth);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(10);
   const subtitleLines = subtitle
     ? doc.splitTextToSize(String(subtitle), innerWidth)
@@ -1505,7 +1513,7 @@ function drawResultBox(ctx, opts) {
   setFill(doc, palette.border);
   doc.rect(margin, ctx.y, barWidth, totalH, "F");
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(15);
   setText(doc, palette.text);
   let textY = ctx.y + padding + 12;
@@ -1515,7 +1523,7 @@ function drawResultBox(ctx, opts) {
   }
 
   if (subtitleLines.length) {
-    doc.setFont("helvetica", "normal");
+    doc.setFont(PDF_FACE.body, "normal");
     doc.setFontSize(10);
     setText(doc, PALETTE.ink);
     textY += 2;
@@ -1526,7 +1534,7 @@ function drawResultBox(ctx, opts) {
   }
 
   if (preparedExtraLines.length) {
-    doc.setFont("helvetica", "normal");
+    doc.setFont(PDF_FACE.body, "normal");
     doc.setFontSize(9);
     setText(doc, PALETTE.ink);
     textY += 2;
@@ -1546,7 +1554,7 @@ function drawScreeningRecord(ctx, text) {
   const lineHeight = 11;
   const textLeft = margin + barWidth + padding;
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   const lines = doc.splitTextToSize(
     text,
     pageWidth - margin * 2 - barWidth - padding * 2
@@ -1563,9 +1571,9 @@ function drawScreeningRecord(ctx, text) {
   doc.rect(margin, ctx.y, barWidth, totalH, "F");
 
   setText(doc, PALETTE.navy);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.text("SCREENING RECORD", textLeft, ctx.y + padding + 9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   setText(doc, PALETTE.ink);
   let ly = ctx.y + padding + 24;
   for (const line of lines) {
@@ -1583,7 +1591,7 @@ function drawFooter(ctx, lines) {
   doc.setLineWidth(0.4);
   doc.line(margin, yStart, pageWidth - margin, yStart);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(8);
   setText(doc, PALETTE.slate);
   let ly = yStart + 12;
@@ -1866,11 +1874,11 @@ function drawPortalCapture(ctx, opts) {
   const evidenceMargin = 26;
   ctx.y = 24;
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(11.5);
   setText(doc, PALETTE.ink);
   doc.text(title, evidenceMargin, ctx.y + 10);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(7.5);
   setText(doc, PALETTE.slate);
   doc.text("ACTUAL MICHIGAN STATE-SITE CAPTURE · ONE-PAGE RECORD", pageWidth - evidenceMargin, ctx.y + 10, { align: "right" });
@@ -1898,7 +1906,7 @@ function drawPortalCapture(ctx, opts) {
   // like an app-designed substitute for the state webpage.
   doc.setFillColor(255, 255, 255);
   doc.rect(0, pageHeight - 25, pageWidth, 25, "F");
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(7);
   setText(doc, PALETTE.slate);
   doc.text(footerLines.join(" "), pageWidth / 2, pageHeight - 10, {
@@ -2143,10 +2151,10 @@ export async function downloadSosOfficialEvidencePDF(quote) {
   const { doc, pageWidth, pageHeight } = ctx;
   const margin = 24;
   doc.setTextColor(...PALETTE.navy);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FACE.body, "bold");
   doc.setFontSize(14);
   doc.text("Michigan SOS Registration Fee Calculation", margin, 28);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...PALETTE.slate);
   doc.text(

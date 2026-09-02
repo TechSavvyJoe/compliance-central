@@ -304,7 +304,7 @@ function hideAllResultCards(elements) {
 
 /**
  * Toggle skeleton-loading appearance on the three result cards.
- * Used during a Run All Checks in-flight so the UI feels predictive.
+ * Used during a Run all checks in-flight so the UI feels predictive.
  */
 export function setCardsLoadingState(elements, isLoading) {
   for (const card of [

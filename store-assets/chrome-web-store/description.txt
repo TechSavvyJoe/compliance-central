@@ -35,7 +35,7 @@ Full privacy policy: https://techsavvyjoe.github.io/compliance-central/
 How It Works:
 1. Open the Compliance Central side panel.
 2. Enter the Buyer/Co-Buyer information and optional Trade-In VIN, or use the phone scanner.
-3. Choose one check or "Run All Checks."
+3. Choose one check or "Run all checks."
 4. Review each labeled outcome. Possible matches and unavailable or uncertain results require human review.
 5. Print or download a screening record when needed.
 

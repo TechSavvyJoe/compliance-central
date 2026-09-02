@@ -83,7 +83,7 @@ export function buildAuditCsv(history) {
       item.customerName || "",
       item.coBuyerName || "",
       item.tradeVin || "",
-      item.runLabel || item.runType || "Run All Checks",
+      item.runLabel || item.runType || "Run all checks",
       stateLabel("ofac", checks.ofac),
       stateLabel("repeat", checks.repeatOffender),
       item.hasCoBuyer ? stateLabel("ofac", checks.coBuyerOfac) : "N/A",

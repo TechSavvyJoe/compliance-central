@@ -43,7 +43,7 @@ Backend lives in sibling repo `compliance-central-api` (not this repo). Live `/h
    - Align paste sources: `description.txt` mentions phone scan; listing detailed description may omit it — one consistent story.
    - Optionally note 30-day / 50-entry retention and that DOB/DLN text still stays in local history.
 
-8. **Clear All History gap** — Also remove legacy `searchHistory` (or stop writing it) so Clear All matches privacy claims.
+8. **Clear local history gap** — Also remove legacy `searchHistory` (or stop writing it) so Clear All matches privacy claims.
 
 9. **Commit / tag 1.3.0** — Working tree holds the ship candidate; commit before packaging so the zip is reproducible.
 

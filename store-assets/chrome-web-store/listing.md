@@ -79,7 +79,7 @@ Full privacy policy: https://techsavvyjoe.github.io/compliance-central/
 How It Works:
 1. Open the Compliance Central side panel.
 2. Enter the Buyer/Co-Buyer information and optional Trade-In VIN, or use the phone scanner.
-3. Choose one check or "Run All Checks."
+3. Choose one check or "Run all checks."
 4. Review each labeled outcome. Possible matches and unavailable or uncertain results require human review.
 5. Print or download a screening record when needed.
 
@@ -126,7 +126,7 @@ WHAT'S NEW IN 1.2.0
 
 • Every check is now included free — no account, API key, or setup required.
 • OFAC data-freshness warning when the extension cannot confirm a current sanctions list.
-• More reliable "Run All Checks" (protected against double-runs; one failing check no longer hides the others).
+• More reliable "Run all checks" (protected against double-runs; one failing check no longer hides the others).
 • Refreshed store media and privacy policy.
 
 

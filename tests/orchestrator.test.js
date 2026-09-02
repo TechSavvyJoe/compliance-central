@@ -67,7 +67,7 @@ test("cancellation releases orchestration without waiting for a slow shared bran
   await slowBranch;
 });
 
-test("a second concurrent Run All Checks is rejected while one is in flight", async () => {
+test("a second concurrent Run all checks is rejected while one is in flight", async () => {
   let releaseStart;
   let markStartEntered;
   const startBlocked = new Promise((resolve) => {

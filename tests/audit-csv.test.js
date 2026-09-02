@@ -12,7 +12,7 @@ const SAMPLE = [
     tradeVin: "1HGBH41JXMN109186",
     decision: "APPROVED",
     runType: "full",
-    runLabel: "Run All Checks",
+    runLabel: "Run all checks",
     hasCoBuyer: true,
     checks: {
       ofac: "clear",
@@ -48,7 +48,7 @@ test("buildAuditCsv preserves typed outcomes without false clear or match labels
   const lines = buildAuditCsv(SAMPLE).split("\r\n");
   assert.match(
     lines[1],
-    /CC-20260616-123456,Jamie Dealer,Taylor Dealer,1HGBH41JXMN109186,Run All Checks,Clear,Eligible,Clear,Eligible,Active lien,APPROVED$/
+    /CC-20260616-123456,Jamie Dealer,Taylor Dealer,1HGBH41JXMN109186,Run all checks,Clear,Eligible,Clear,Eligible,Active lien,APPROVED$/
   );
   assert.match(
     lines[2],

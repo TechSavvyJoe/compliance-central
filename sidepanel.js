@@ -376,7 +376,7 @@ function updateReportSelectionState() {
   }
   if (elements.downloadAllPdfsLabel) {
     elements.downloadAllPdfsLabel.textContent = allSelected
-      ? "Download All PDFs"
+      ? "Download all PDFs"
       : "Download Selected PDFs";
   }
   for (const button of [

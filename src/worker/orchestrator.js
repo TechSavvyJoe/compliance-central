@@ -186,7 +186,7 @@ async function runAllChecks(data, runId, signal, onInitialized) {
     timestamp: new Date().toISOString(),
     hasTrade,
     runType: "full",
-    runLabel: "Run All Checks",
+    runLabel: "Run all checks",
     runId,
     checks: {},
   };

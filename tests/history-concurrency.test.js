@@ -18,7 +18,7 @@ function anonymousEntry(auditId, offsetMs = 0) {
     timestamp,
     decision: "APPROVED",
     runType: "full",
-    runLabel: "Run All Checks",
+    runLabel: "Run all checks",
   });
 }
 

@@ -91,5 +91,5 @@ test("bulk exports expose accessible per-document selection and all three action
   assert.match(sidepanelHtml, /id="printAllBtn"/);
   assert.match(sidepanelHtml, /id="downloadPdfBtn"/);
   assert.match(sidepanelHtml, /id="downloadAllPdfsBtn"/);
-  assert.match(sidepanelHtml, /Download All PDFs/);
+  assert.match(sidepanelHtml, /Download all PDFs/);
 });

@@ -897,7 +897,7 @@ test("the screening action row stays reachable without scrolling to the end", ()
   assert.match(rule, /position:\s*sticky/);
   assert.match(rule, /bottom:\s*0/);
   assert.match(rule, /background:\s*var\(--design-card\)/);
-  // Run All Checks and Clear form must both live in that pinned row.
+  // Run all checks and Clear form must both live in that pinned row.
   const actions = sidepanelHtml.slice(sidepanelHtml.indexOf('class="main-actions"'));
   assert.ok(actions.indexOf('id="runAllChecksBtn"') > -1);
   assert.ok(actions.indexOf('id="clearBtn"') > -1);

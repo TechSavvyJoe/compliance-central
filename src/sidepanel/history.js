@@ -175,7 +175,7 @@ export async function saveToHistory(results, { shouldSave = () => true } = {}) {
       timestamp: results.timestamp,
       decision: finalDecision.level,
       runType: results.runType || "full",
-      runLabel: results.runLabel || "Run All Checks",
+      runLabel: results.runLabel || "Run all checks",
       hasTrade: Boolean(results.customer?.tradeVin || checks.title),
       hasCoBuyer: Boolean(results.customer?.hasCoBuyer),
       fullResults: { ...results, finalDecision },

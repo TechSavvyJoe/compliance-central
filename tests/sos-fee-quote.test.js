@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { printBaseCSS } from "../lib/print-html.js";
+
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
 import {
   SOS_QUOTE_MODE,
@@ -922,10 +924,14 @@ test("official SOS evidence prints portrait", () => {
     new URL("../src/sidepanel/sos-fee-quote.js", import.meta.url),
     "utf8"
   );
-  assert.match(sosSource, /@page \{ size: letter portrait/);
+  // The page size lives in the shared print base, so every sheet — this one
+  // included — is letter portrait with the same 0.6in margin.
+  assert.match(printBaseCSS(), /@page \{ size: letter portrait; margin: 0\.6in; \}/);
+  assert.doesNotMatch(sosSource, /@page/);
   assert.doesNotMatch(sosSource, /size: letter landscape/);
-  // Letter portrait content box at .3in margins is 10.4in tall.
-  assert.match(sosSource, /\.page \{ height: 10\.4in/);
+  // Letter portrait content box at 0.6in margins is 9.8in tall; the sheet
+  // stops a tenth short so rounding never spills onto a blank second page.
+  assert.match(sosSource, /\.page \{ height: 9\.7in/);
 
   const exportSource = readFileSync(
     new URL("../src/sidepanel/export.js", import.meta.url),

@@ -9,6 +9,7 @@
 import {
   consumePrintPayload,
   PRINT_TIMEOUT_MS,
+  printFontFaceCSS,
   removeExpiredPrintPayloads,
   schedulePrint,
 } from "./lib/print-html.js";
@@ -29,6 +30,18 @@ async function loadPayload() {
   }
 }
 
+/**
+ * The document names its faces by family only. This page is the one host that
+ * can reach the files shipped inside the extension, so it declares them here,
+ * after document.write() has replaced everything this page started with.
+ */
+function installPrintFonts() {
+  if (!chrome?.runtime?.getURL) return;
+  const style = document.createElement("style");
+  style.textContent = printFontFaceCSS((path) => chrome.runtime.getURL(path));
+  (document.head || document.documentElement).appendChild(style);
+}
+
 async function main() {
   const payload = await loadPayload();
   try {
@@ -45,6 +58,7 @@ async function main() {
   document.open();
   document.write(payload.html);
   document.close();
+  installPrintFonts();
 
   let closed = false;
   const closeSoon = () => {

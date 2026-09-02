@@ -197,7 +197,7 @@ test("successful Michigan reports print as one authentic evidence sheet each", (
     assert.doesNotMatch(html, /class="page repeat-page"|class="page title-page"/);
     assert.match(
       html,
-      /\.state-evidence img\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*max-width:\s*100%;[^}]*max-height:\s*9\.2in/
+      /\.state-evidence img\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*max-width:\s*100%;[^}]*max-height:\s*8\.3in/
     );
     assert.match(
       html,

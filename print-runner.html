@@ -4,11 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Print — Compliance Central</title>
+    <style>
+      /* The holding screen the user sees for a beat before the document
+         replaces it, set in the same ink and face as the document itself. */
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo-latin-variable.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 400 800;
+        font-display: swap;
+      }
+      body {
+        margin: 0;
+        padding: 18pt;
+        color: #101c2b;
+        font: 400 11pt/1.45 "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+    </style>
   </head>
   <body>
-    <p style="font-family: system-ui, sans-serif; padding: 24px; color: #334155">
-      Preparing print…
-    </p>
+    <p>Preparing print…</p>
     <script type="module" src="print-runner.js"></script>
   </body>
 </html>

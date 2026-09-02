@@ -9,6 +9,7 @@
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { ensureDataUrl } from "../../lib/data-url.js";
+import { printBaseCSS } from "../../lib/print-html.js";
 import { sanitizeHTML } from "./dom-utils.js";
 
 export const SOS_QUOTE_MODE = Object.freeze({
@@ -266,45 +267,58 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   return `<!doctype html>
   <html lang="en"><head><meta charset="utf-8" />
   <title>Customer Registration Cost Summary</title>
-  <style>
-    @page { size: letter; margin: 0.5in; }
-    * { box-sizing: border-box; }
-    body { margin: 0; color: #172033; background: #fff; font-family: Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .sheet { border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; }
-    header { display: flex; align-items: center; gap: 16px; padding: 16px 26px; background: #00274c; color: #fff; }
-    header img { flex: none; max-height: 52px; max-width: 210px; object-fit: contain; background: #fff; padding: 6px 9px; border-radius: 7px; }
-    .head-copy { min-width: 0; }
-    h1 { margin: 0; font-size: 21px; letter-spacing: -0.2px; }
-    .sub { margin: 4px 0 0; color: #dbeafe; font-size: 11px; }
-    main { padding: 20px 26px 8px; }
-    .status { display: inline-block; padding: 5px 9px; border-radius: 999px; color: #1e3a5f; background: #e0f2fe; font-size: 11px; font-weight: 700; }
-    .status.unverified { color: #78350f; background: #fef3c7; }
-    .headline { display: grid; grid-template-columns: 1.05fr 1fr; gap: 14px; margin: 14px 0 4px; padding: 14px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #00274c; border-radius: 10px; }
-    .headline span { display: block; color: #64748b; font-size: 9.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
-    .headline strong { display: block; margin-top: 2px; color: #00274c; font-size: 26px; font-weight: 800; }
-    .headline .term { margin-top: 2px; color: #0f172a; font-size: 14px; font-weight: 700; line-height: 1.3; }
-    .plate { display: grid; grid-template-columns: 248px 1fr; align-items: center; gap: 14px; margin: 12px 0 2px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
-    .plate img { width: 248px; height: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
-    .plate strong { display: block; color: #0f172a; font-size: 14px; }
-    .plate small { display: block; margin-top: 3px; color: #64748b; font-size: 10.5px; line-height: 1.4; }
-    h2 { margin: 16px 0 0; color: #00274c; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
-    table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; }
-    th, td { padding: 9px 0; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
-    th { width: 58%; color: #475569; font-size: 12px; font-weight: 600; }
-    td { color: #0f172a; font-size: 13px; font-weight: 700; }
-    tr.total th, tr.total td { border-bottom: 2px solid #00274c; }
-    tr.total td { color: #00274c; font-size: 16px; }
-    .note { margin: 14px 0 4px; padding: 12px 13px; border-left: 4px solid #ffcb05; background: #fffbeb; color: #4b3b09; font-size: 11px; line-height: 1.5; }
-    footer { padding: 0 26px 18px; color: #64748b; font-size: 9.5px; line-height: 1.4; }
+  <style>${printBaseCSS()}
+
+
+    /* The worksheet wears the same masthead as every compliance record: a
+       navy rule with the one gold hairline, not a solid navy band. A band
+       across the top of a customer sheet is a quarter-inch of toner the
+       dealership pays for on every print. */
+    header { display: flex; align-items: flex-end; gap: var(--s5); }
+    .worksheet-logo { flex: none; max-height: 0.55in; max-width: 2.2in; object-fit: contain; }
+    .head-copy { min-width: 0; flex: 1; }
+    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; }
+    .sub { margin: var(--s1) 0 0; color: var(--slate); font-size: var(--t-small); }
+    main { display: block; }
+    .status {
+      display: inline-block; padding: var(--s1) var(--s2); margin: 0 0 var(--s2);
+      border: var(--rule) solid var(--line); border-left: var(--rule-heavy) solid var(--ok);
+      border-radius: var(--radius); color: var(--ok);
+      font-size: 8pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    }
+    .status.unverified { border-left-color: var(--gold); color: var(--navy); }
+    .headline {
+      display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s5);
+      margin: var(--s4) 0; padding: var(--s4);
+      border: var(--rule) solid var(--line); border-left: var(--rule-heavy) solid var(--navy);
+      border-radius: var(--radius);
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .headline span { display: block; color: var(--slate); font-size: var(--t-micro); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .headline strong { display: block; margin-top: var(--s1); color: var(--navy); font-family: var(--font-display); font-size: var(--t-hero); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+    .headline .term { margin-top: var(--s1); color: var(--ink); font-size: 11pt; font-weight: 700; line-height: 1.3; }
+    .plate {
+      display: grid; grid-template-columns: 2.6in 1fr; align-items: center; gap: var(--s5);
+      margin: var(--s4) 0; padding: var(--s4);
+      border: var(--rule) solid var(--line); border-radius: var(--radius);
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .plate img { width: 2.6in; height: auto; border: var(--rule) solid var(--line); border-radius: var(--radius); background: var(--paper); }
+    .plate strong { display: block; color: var(--ink); font-size: 11pt; }
+    .plate small { display: block; margin-top: var(--s1); color: var(--slate); font-size: var(--t-small); line-height: 1.4; }
+    th { width: 58%; }
+    footer { margin-top: var(--s5); padding-top: var(--s3); border-top: var(--rule) solid var(--line); color: var(--slate); font-size: var(--t-micro); line-height: 1.5; }
   </style></head><body>
   <section class="sheet">
     <header>
-      ${logo ? `<img src="${sanitizeHTML(logo)}" alt="${sanitizeHTML(dealer || "Dealership")}" />` : ""}
+      ${logo ? `<img src="${sanitizeHTML(logo)}" alt="${sanitizeHTML(dealer || "Dealership")}" class="worksheet-logo" />` : ""}
       <div class="head-copy">
         <h1>Customer Registration Cost Summary</h1>
         <p class="sub">${dealer ? `${sanitizeHTML(dealer)} · ` : ""}Sales-desk worksheet · Not a Michigan SOS document</p>
       </div>
     </header>
+    <div class="masthead-rule"></div>
+    <div class="masthead-accent"></div>
     <main>
       <span class="status">${sanitizeHTML(sourceLabel(normalized.source))}</span>
 
@@ -355,17 +369,19 @@ export function createSosOfficialEvidencePrintHTML(quote) {
   const when = new Date(normalized.calculatedAt).toLocaleString();
   return `<!doctype html><html lang="en"><head><meta charset="utf-8" />
   <title>Michigan SOS Registration Fee Calculation</title>
-  <style>
-    @page { size: letter portrait; margin: .3in; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; width: 100%; height: 100%; background: #fff; color: #172033; font-family: Arial, Helvetica, sans-serif; }
-    .page { height: 10.4in; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; break-after: avoid; page-break-after: avoid; overflow: hidden; }
-    header { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding-bottom: 7px; border-bottom: 3px solid #00274c; }
-    h1 { margin: 0; color: #00274c; font-size: 15px; }
-    header p, footer { margin: 0; color: #475569; font-size: 8px; }
-    .capture { min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #cbd5e1; background: #f8fafc; }
+  <style>${printBaseCSS()}
+
+    html, body { height: 100%; }
+    .page { height: 9.7in; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--s3); break-after: avoid; page-break-after: avoid; overflow: hidden; }
+    header { position: relative; display: flex; align-items: end; justify-content: space-between; gap: var(--s5); padding-bottom: var(--s2); border-bottom: var(--rule-heavy) solid var(--navy); }
+    /* The one gold accent, drawn under the masthead rule without adding a row
+       to the grid that keeps the capture on a single page. */
+    header::after { content: ""; position: absolute; right: 0; bottom: -3.75pt; left: 0; height: var(--rule-accent); background: var(--gold); }
+    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; }
+    header p, footer { margin: 0; color: var(--slate); font-size: var(--t-micro); }
+    .capture { min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: var(--rule) solid var(--line); background: var(--paper); }
     .capture img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
-    footer { display: flex; justify-content: space-between; gap: 12px; }
+    footer { display: flex; justify-content: space-between; gap: var(--s4); }
   </style></head><body><main class="page">
     <header><div><h1>Michigan SOS Registration Fee Calculation</h1><p>Actual official state-site result page captured during the calculation</p></div><p>${sanitizeHTML(modeLabel(normalized.mode))} · ${sanitizeHTML(formatMoney(normalized.feeCents))}</p></header>
     <section class="capture"><img src="${normalized.officialPageImage}" alt="Actual Michigan SOS registration fee result page" /></section>

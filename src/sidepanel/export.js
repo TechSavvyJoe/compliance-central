@@ -23,10 +23,13 @@ import {
 import { ensureDataUrl, imageDataUrlExtension } from "../../lib/data-url.js";
 import {
   createPrintPayload,
+  PRINT_COLORS,
   PRINT_TIMEOUT_MS,
   PRINT_PAYLOAD_TTL_MS,
   createPrintJobId,
   htmlContainsImages,
+  printRgb,
+  reportDocumentCSS,
   schedulePrint,
 } from "../../lib/print-html.js";
 
@@ -476,76 +479,63 @@ export function ofacReportHTML({
   lastUpdate,
   subjectLabel = "SUBJECT SCREENED",
 }) {
-  const timestamp = reportDate(Date.now());
-  const screeningDate = reportDate(ofac?.timestamp);
-  const outcome = ofacResultArgs(ofac);
-
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <title>Compliance Central OFAC Screening Record</title>
-  <style>
-    @page { size: letter portrait; margin: 0.35in; }
-    * { box-sizing: border-box; }
-    html, body { width: 100%; margin: 0; padding: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; color: #111827; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .header { border: 1px solid #cbd5e1; border-left: 6px solid #1e3a5f; padding: 22px; margin-bottom: 25px; background: #f8fafc; }
-    .header-title { text-align: center; border-bottom: 2px solid #1e3a5f; padding-bottom: 15px; margin-bottom: 15px; }
-    .app-notice { color: #7c2d12; margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-    .header h1 { color: #1e3a5f; margin: 0; font-size: 22px; }
-    .header h2 { color: #334155; margin: 8px 0 0; font-size: 15px; }
-    .header-subtitle { color: #64748b; font-size: 13px; margin: 8px 0 0; font-style: italic; }
-    .header-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; font-size: 12px; color: #374151; }
-    .header-info > div { min-width: 0; overflow-wrap: anywhere; }
-    .result { padding: 30px; margin: 25px 0; border-radius: 8px; text-align: center; }
-    .result.pass { background: linear-gradient(to bottom, #d1fae5, #a7f3d0); border: 3px solid #10b981; }
-    .result.fail { background: linear-gradient(to bottom, #fee2e2, #fecaca); border: 3px solid #ef4444; }
-    .result.warn { background: #fffbeb; border: 3px solid #f59e0b; }
-    .result.neutral { background: #f8fafc; border: 3px solid #94a3b8; }
-    .result h2 { margin: 0; font-size: 36px; }
-    .result.pass h2 { color: #065f46; }
-    .result.fail h2 { color: #991b1b; }
-    .result.warn h2 { color: #92400e; }
-    .result.neutral h2 { color: #334155; }
-    .result p { margin: 15px 0 0; font-size: 16px; }
-    .subject { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #e2e8f0; break-inside: avoid; page-break-inside: avoid; }
-    .subject h3 { margin: 0 0 15px; color: #1e3a5f; font-size: 14px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; }
-    .subject table { width: 100%; table-layout: fixed; font-size: 13px; border-collapse: collapse; }
-    .subject td { padding: 5px 0; }
-    .subject td:first-child { width: 30%; }
-    .subject td:last-child { overflow-wrap: anywhere; word-break: break-word; }
-    .certification { background: #fefce8; padding: 15px; border-radius: 6px; margin: 25px 0; border: 1px solid #fde047; font-size: 12px; color: #713f12; break-inside: avoid; page-break-inside: avoid; }
-    .footer { color: #64748b; font-size: 10px; text-align: center; margin-top: 30px; border-top: 2px solid #e2e8f0; padding-top: 15px; }
-    .matches { margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.7); border-radius: 6px; text-align: left; }
+  <style>${reportDocumentCSS()}
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-title">
-      <p class="app-notice">App-generated record · Not issued or endorsed by the U.S. Treasury or OFAC</p>
-      <h1>Compliance Central OFAC Screening Record</h1>
-      <h2>Screening against the U.S. Treasury OFAC SDN list</h2>
-      <p class="header-subtitle">User-requested automated name comparison; potential matches require human review.</p>
+  ${getOfacReportPageHTML({ customer, ofac, lastUpdate, subjectLabel })}
+</body>
+</html>`;
+}
+
+/**
+ * The one OFAC record. The standalone print and the deal jacket both draw
+ * this page, so the running head, the subject panel, the verdict, and the
+ * certification are one design wherever the record turns up. Before this the
+ * jacket carried its own copy with different labels, a different meta strip,
+ * a footer that sat wherever the text ended, and no certification paragraph.
+ */
+export function getOfacReportPageHTML({
+  customer,
+  ofac,
+  lastUpdate,
+  subjectLabel = "SUBJECT SCREENED",
+  screenedAt,
+}) {
+  const subject = customer || {};
+  const timestamp = reportDate(Date.now());
+  const screeningDate = reportDate(ofac?.timestamp || screenedAt);
+  const outcome = ofacResultArgs(ofac);
+  const dlnPid = sanitizeHTML(subject.dlnPid);
+  const tradeVin = sanitizeHTML(subject.tradeVin);
+
+  return `<div class="page ofac-page">
+  <div class="page-header">
+    <div>
+      <strong>Screening Date:</strong> ${sanitizeHTML(screeningDate)}<br>
+      <strong>Entries Searched:</strong> ${ofac?.entriesSearched?.toLocaleString() || "N/A"}
     </div>
-    <div class="header-info">
-      <div>
-        <p><strong>Report Generated:</strong> ${timestamp}</p>
-        <p><strong>Screening Date:</strong> ${screeningDate}</p>
-      </div>
-      <div style="text-align: right;">
-        <p><strong>Database Updated:</strong> ${sanitizeHTML(lastUpdate || "Unknown")}</p>
-        <p><strong>Entries Searched:</strong> ${ofac.entriesSearched?.toLocaleString() || "N/A"}</p>
-      </div>
+    <div class="center">Compliance Central &mdash; All Reports</div>
+    <div class="end">
+      <strong>Report Generated:</strong> ${sanitizeHTML(timestamp)}<br>
+      <strong>Database Updated:</strong> ${sanitizeHTML(lastUpdate || "Unknown")}
     </div>
   </div>
+  <p class="app-notice">App-generated record · Not issued or endorsed by the U.S. Treasury or OFAC</p>
+  <h1 class="main-title">Compliance Central OFAC Screening Record</h1>
+  <p class="doc-sub">Screening against the U.S. Treasury OFAC SDN list<br><em>User-requested automated name comparison; potential matches require human review.</em></p>
   <div class="subject">
     <h3>${sanitizeHTML(subjectLabel)}</h3>
     <table>
-      <tr><td><strong>Full Name:</strong></td><td>${buildSanitizedName(customer)}</td></tr>
-      <tr><td><strong>Date of Birth:</strong></td><td>${sanitizeHTML(customer.dob) || "Not Provided"}</td></tr>
-      <tr><td><strong>Driver License / PID:</strong></td><td>${sanitizeHTML(customer.dlnPid) || "Not Provided"}</td></tr>
-      ${customer.tradeVin ? `<tr><td><strong>Trade-In VIN:</strong></td><td>${sanitizeHTML(customer.tradeVin)}</td></tr>` : ""}
+      <tr><td>Full Name:</td><td>${buildSanitizedName(subject)}</td></tr>
+      <tr><td>Date of Birth:</td><td>${sanitizeHTML(subject.dob) || "Not Provided"}</td></tr>
+      <tr><td>Driver License / PID:</td><td>${dlnPid ? `<span class="ref">${dlnPid}</span>` : "Not Provided"}</td></tr>
+      ${tradeVin ? `<tr><td>Trade-In VIN:</td><td><span class="ref">${tradeVin}</span></td></tr>` : ""}
     </table>
   </div>
   <div class="result ${outcome.variant}">
@@ -554,19 +544,18 @@ export function ofacReportHTML({
     ${ofacMatchesHTML(ofac, outcome)}
   </div>
   ${
-    ofac.stale
-      ? `<div class="certification" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;"><p><strong>Data Freshness Notice:</strong> This screening used cached SDN data (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
+    ofac?.stale
+      ? `<div class="certification is-alert"><p><strong>Data Freshness Notice:</strong> This screening used cached SDN data (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
       : ""
   }
   <div class="certification">
     <p><strong>Screening record:</strong> This report records an automated name search against the U.S. Treasury OFAC SDN list using Compliance Central's configured similarity threshold. It is not an OFAC determination, legal advice, or a compliance certification. Potential matches require human review; no-match results do not by themselves establish that a party is legally cleared.</p>
   </div>
-  <div class="footer">
+  <div class="portal-footer">
     <p><strong>Data Source:</strong> Official U.S. Treasury OFAC SDN List &middot; auto-refreshed every 24 hours.</p>
     <p>Generated by Compliance Central — Michigan Dealer Compliance Hub.</p>
   </div>
-</body>
-</html>`;
+</div>`;
 }
 
 export function ofacMatchesHTML(ofac, outcome = ofacResultArgs(ofac)) {
@@ -616,6 +605,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
   const screenedAt = reportDate(result?.timestamp || currentResults.timestamp);
   const generatedAt = reportDate(Date.now());
   const resultClass = outcome.variant === "pass" ? "eligible-card" : "eligible-card result-review";
+  const dlnPid = sanitizeHTML(formatDlnForMdos(c.dlnPid));
   const resultIconPath =
     outcome.variant === "pass"
       ? "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
@@ -625,15 +615,14 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
     <div class="page repeat-page">
       <div class="page-header">
         <div><strong>Screened:</strong> ${sanitizeHTML(screenedAt)}</div>
-        <div style="font-weight: 600;">Compliance Central &mdash; All Reports</div>
-        <div style="text-align: right;">
+        <div class="center">Compliance Central &mdash; All Reports</div>
+        <div class="end">
           <strong>Customer:</strong> ${buildSanitizedName(c)}<br>
           <strong>Report generated:</strong> ${sanitizeHTML(generatedAt)}
         </div>
       </div>
       <div class="main-title">Michigan Repeat Offender Check</div>
-      <hr style="border: none; border-top: 2px solid #1e3a5f; margin-bottom: 20px; margin-top: -8px;">
-      
+
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
         <span>App-generated overview of the Michigan Repeat Offender response. It is not a state webpage.</span>
@@ -662,7 +651,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
           </div>
         </div>
         
-        <div class="section-subtitle" style="margin-top: 20px; margin-bottom: 15px;">Enter the ID Information</div>
+        <div class="section-title">Enter the ID Information</div>
         
         <div class="form-grid id-grid">
           <div class="form-field">
@@ -671,7 +660,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
           </div>
           <div class="form-field">
             <div class="form-label">Enter the DLN or PID Number</div>
-            <div class="form-value">${sanitizeHTML(formatDlnForMdos(c.dlnPid)) || "Not provided"}</div>
+            <div class="form-value${dlnPid ? " ref" : ""}">${dlnPid || "Not provided"}</div>
           </div>
         </div>
         
@@ -680,7 +669,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
         <div class="${resultClass}">
           <svg class="eligible-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${resultIconPath}"/></svg>
           <div class="eligible-text">
-            <strong>${sanitizeHTML(outcome.title)}</strong><br>${sanitizeHTML(outcome.subtitle)}
+            <strong>${sanitizeHTML(outcome.title)}</strong>${sanitizeHTML(outcome.subtitle)}
             <div class="eligible-note">This generated summary is not an MDOS-issued document. State-site evidence was unavailable or could not be verified; re-run the check before relying on this record.</div>
           </div>
         </div>
@@ -704,6 +693,8 @@ export function getTitleReportPageHTML(currentResults) {
   const screenedAt = reportDate(title.timestamp || currentResults.timestamp);
   const generatedAt = reportDate(Date.now());
   const notReturned = "Not returned";
+  const vin = sanitizeHTML(c.tradeVin);
+  const vinHTML = vin ? `<span class="ref">${vin}</span>` : "Not provided";
   const year = title.year || notReturned;
   const make = title.make || notReturned;
   const model = title.model || notReturned;
@@ -721,15 +712,14 @@ export function getTitleReportPageHTML(currentResults) {
     <div class="page title-page">
       <div class="page-header">
         <div><strong>Screened:</strong> ${sanitizeHTML(screenedAt)}</div>
-        <div style="font-weight: 600;">Compliance Central &mdash; All Reports</div>
-        <div style="text-align: right;">
-          <strong>VIN:</strong> ${sanitizeHTML(c.tradeVin) || "Not provided"}<br>
+        <div class="center">Compliance Central &mdash; All Reports</div>
+        <div class="end">
+          <strong>VIN:</strong> ${vinHTML}<br>
           <strong>Report generated:</strong> ${sanitizeHTML(generatedAt)}
         </div>
       </div>
       <div class="main-title">Michigan Title & Lien Check</div>
-      <hr style="border: none; border-top: 2px solid #1e3a5f; margin-bottom: 20px; margin-top: -8px;">
-      
+
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
         <span>App-generated overview of the Michigan Title &amp; Lien response. It is not a state webpage.</span>
@@ -739,11 +729,11 @@ export function getTitleReportPageHTML(currentResults) {
         <div class="section-title">Search Results</div>
         
         <div class="vin-search-info">
-          Search results for VIN <strong>${sanitizeHTML(c.tradeVin) || "Not provided"}</strong> at <strong>${sanitizeHTML(screenedAt)}</strong>
+          Search results for VIN <strong>${vinHTML}</strong> at <strong>${sanitizeHTML(screenedAt)}</strong>
         </div>
 
         <div class="eligible-card ${outcome.statusKey === "pass" ? "" : "result-review"}">
-          <div class="eligible-text"><strong>${sanitizeHTML(outcome.title)}</strong><br>${sanitizeHTML(outcome.subtitle)}
+          <div class="eligible-text"><strong>${sanitizeHTML(outcome.title)}</strong>${sanitizeHTML(outcome.subtitle)}
           <div class="eligible-note">This generated summary is not an MDOS-issued document. State-site evidence was unavailable or could not be verified; re-run the check before relying on this record.</div></div>
         </div>
         
@@ -921,7 +911,18 @@ export function getFinalDecisionReportPageHTML(currentResults) {
         .join("")}</ul></div>`
     : `<div class="complete-checks"><h2>Incomplete checks</h2><p>None. Every required check returned a recognized result.</p></div>`;
 
+  // The decision page is the cover of the jacket, so it carries the same meta
+  // strip as every sheet filed behind it.
+  const customer = currentResults?.customer || {};
   return `<div class="page decision-page">
+    <div class="page-header">
+      <div><strong>Screened:</strong> ${sanitizeHTML(reportDate(currentResults?.timestamp))}</div>
+      <div class="center">Compliance Central &mdash; All Reports</div>
+      <div class="end">
+        <strong>Customer:</strong> ${buildSanitizedName(customer)}<br>
+        <strong>Report generated:</strong> ${sanitizeHTML(reportDate(Date.now()))}
+      </div>
+    </div>
     <div class="main-title">Overall Compliance Decision</div>
     <div class="overall-decision decision-${level.toLowerCase()}">
       <strong>${sanitizeHTML(level === "REVIEW" ? "REVIEW REQUIRED" : level)}</strong>
@@ -939,7 +940,6 @@ export function getFinalDecisionReportPageHTML(currentResults) {
 
 export function combinedAllReportHTML(currentResults, selectedKeys) {
   const customer = currentResults?.customer || {};
-  const timestamp = reportDate(Date.now());
   const ofac = currentResults?.checks?.ofac;
   const repeatOffender = currentResults?.checks?.repeatOffender;
   const title = currentResults?.checks?.title;
@@ -955,55 +955,26 @@ export function combinedAllReportHTML(currentResults, selectedKeys) {
     sections.push(getFinalDecisionReportPageHTML(currentResults));
   }
 
-  const ofacBlock = (subjectHTML, ofacResult, label) => {
-    const outcome = ofacResultArgs(ofacResult);
-    return `
-    <div class="page ofac-page">
-      <div class="ofac-header">
-        <p class="app-record-notice">App-generated record · Not issued or endorsed by the U.S. Treasury or OFAC</p>
-        <h1>Compliance Central OFAC Screening Record</h1>
-        <h2>Screening against the U.S. Treasury OFAC SDN list</h2>
-        <p class="subtitle">User-requested automated name comparison; potential matches require human review.</p>
-      </div>
-      <div class="ofac-meta">
-        <div><strong>Report Generated:</strong> ${sanitizeHTML(timestamp)}<br><strong>Screening Date:</strong> ${sanitizeHTML(reportDate(ofacResult.timestamp || currentResults.timestamp))}</div>
-        <div style="text-align: right;"><strong>Database Updated:</strong> ${sanitizeHTML(ofacResult.lastUpdate || "N/A")}<br><strong>Entries Searched:</strong> ${ofacResult.entriesSearched?.toLocaleString() || "N/A"}</div>
-      </div>
-      <div class="subject-box">
-        <h3>${sanitizeHTML(label)}</h3>
-        ${subjectHTML}
-      </div>
-      <div class="result-box ${outcome.variant}">
-        <h2>${sanitizeHTML(outcome.title)}</h2>
-        <p>${sanitizeHTML(outcome.subtitle)}</p>
-        ${ofacMatchesHTML(ofacResult, outcome)}
-      </div>
-      <div class="footer">Compliance Central — OFAC Screening Report</div>
-    </div>`;
-  };
-
   if (ofac && selected.has(REPORT_KEYS.buyerOfac)) {
     sections.push(
-      ofacBlock(
-        `<p><strong>Name:</strong> ${buildSanitizedName(customer)}</p>
-         <p><strong>DOB:</strong> ${sanitizeHTML(customer?.dob) || "Not Provided"}</p>
-         <p><strong>DLN/PID:</strong> ${sanitizeHTML(customer?.dlnPid) || "Not Provided"}</p>
-         ${customer?.tradeVin ? `<p><strong>Trade VIN:</strong> ${sanitizeHTML(customer.tradeVin)}</p>` : ""}`,
+      getOfacReportPageHTML({
+        customer,
         ofac,
-        "SUBJECT SCREENED"
-      )
+        lastUpdate: ofac.lastUpdate,
+        screenedAt: currentResults.timestamp,
+      })
     );
   }
 
   if (cbOfac && coBuyer && selected.has(REPORT_KEYS.coBuyerOfac)) {
     sections.push(
-      ofacBlock(
-        `<p><strong>Name:</strong> ${buildSanitizedName(coBuyer)}</p>
-         <p><strong>DOB:</strong> ${sanitizeHTML(coBuyer.dob || "Not Provided")}</p>
-         <p><strong>DLN/PID:</strong> ${sanitizeHTML(coBuyer.dlnPid || "Not Provided")}</p>`,
-        cbOfac,
-        "CO-BUYER SUBJECT SCREENED"
-      )
+      getOfacReportPageHTML({
+        customer: coBuyer,
+        ofac: cbOfac,
+        lastUpdate: cbOfac.lastUpdate,
+        subjectLabel: "CO-BUYER SUBJECT SCREENED",
+        screenedAt: currentResults.timestamp,
+      })
     );
   }
 
@@ -1023,102 +994,7 @@ export function combinedAllReportHTML(currentResults, selectedKeys) {
 <html>
 <head>
   <title>Compliance Central — All Reports</title>
-  <style>
-    @page { size: letter portrait; margin: 0.35in; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; color: #333; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 100%; min-height: 10.2in; position: relative; padding-bottom: 0.3in; break-after: page; page-break-after: always; }
-    .page:last-child { break-after: auto; page-break-after: auto; }
-    .header { border-bottom: 2px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-    .header h2 { color: #1e3a5f; font-size: 18px; margin: 0; }
-    .ofac-header { text-align: center; border: 1px solid #cbd5e1; border-left: 6px solid #1e3a5f; background: #f8fafc; padding: 15px; margin-bottom: 20px; }
-    .ofac-header .app-record-notice { color: #7c2d12; margin: 0 0 8px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-    .ofac-header h1 { font-size: 20px; margin: 0 0 5px; color: #1e3a5f; }
-    .ofac-header h2 { font-size: 14px; margin: 0 0 5px; color: #334155; }
-    .ofac-header .subtitle { font-size: 12px; color: #666; font-style: italic; }
-    .ofac-meta { display: flex; justify-content: space-between; font-size: 10px; color: #555; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-    .subject-box { background: #f8f9fa; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-    .subject-box h3 { font-size: 12px; margin: 0 0 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-    .subject-box p { margin: 5px 0; font-size: 14px; }
-    .result-box { text-align: center; padding: 20px; border: 2px solid; border-radius: 8px; margin: 30px 0; }
-    .result-box.passed { border-color: #28a745; background: #f0fff4; color: #28a745; }
-    .result-box.failed { border-color: #dc3545; background: #fff5f5; color: #dc3545; }
-    .result-box.pass { border-color: #28a745; background: #f0fff4; color: #166534; }
-    .result-box.fail { border-color: #dc3545; background: #fff5f5; color: #991b1b; }
-    .result-box.warn { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .result-box.neutral { border-color: #94a3b8; background: #f8fafc; color: #334155; }
-    .result-box h2 { font-size: 24px; margin: 0 0 10px; }
-    .matches { margin-top: 16px; padding: 12px 14px; border: 1px solid #d1d5db; background: #fff; color: #111827; text-align: left; font-size: 11px; line-height: 1.45; }
-    .matches ul { margin: 8px 0 0 18px; padding: 0; }
-    .matches li { margin: 5px 0; overflow-wrap: anywhere; }
-    .overall-decision { border: 3px solid; border-radius: 8px; padding: 22px; margin: 24px 0; text-align: center; }
-    .overall-decision strong { display: block; font-size: 28px; margin-bottom: 8px; }
-    .overall-decision span { display: block; font-size: 13px; }
-    .decision-approved { border-color: #10b981; background: #ecfdf5; color: #065f46; }
-    .decision-denied { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
-    .decision-review { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .check-summary-title { color: #1e3a5f; font-size: 16px; margin: 24px 0 8px; }
-    .check-summary { width: 100%; border-collapse: collapse; font-size: 11px; }
-    .check-summary th, .check-summary td { border: 1px solid #cbd5e1; padding: 9px; text-align: left; vertical-align: top; }
-    .check-summary thead th { background: #e2e8f0; color: #1e293b; }
-    .incomplete-checks, .complete-checks { margin-top: 22px; padding: 14px; border-radius: 6px; }
-    .incomplete-checks { border: 1px solid #f59e0b; background: #fffbeb; color: #78350f; }
-    .complete-checks { border: 1px solid #86efac; background: #f0fdf4; color: #166534; }
-    .incomplete-checks h2, .complete-checks h2 { font-size: 14px; margin-bottom: 6px; }
-    .incomplete-checks p, .complete-checks p, .incomplete-checks li { font-size: 11px; line-height: 1.5; }
-    .incomplete-checks ul { margin: 8px 0 0 18px; }
-    .screenshot-container { text-align: center; margin-top: 20px; }
-    .screenshot-container img { max-width: 100%; max-height: 65vh; border: 1px solid #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    .footer { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
-    .header-info { font-size: 10px; text-align: right; }
-    .header-info p { margin: 2px 0; }
-
-    .page-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.65fr); gap: 12px; align-items: start; font-size: 10px; line-height: 1.35; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
-    .page-header > div { min-width: 0; overflow-wrap: anywhere; }
-    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
-    .summary-notice { padding: 13px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a5f; border-radius: 6px; background: #f8fafc; margin-bottom: 14px; font-size: 11px; color: #475569; }
-    .summary-notice strong { display: block; margin-bottom: 4px; color: #1e3a5f; font-size: 13px; }
-    .content-box { border: 1px solid #e5e7eb; padding: 22px; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); break-inside: avoid; page-break-inside: avoid; }
-    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
-    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
-    .form-grid { display: grid; gap: 12px 15px; margin-bottom: 18px; }
-    .identity-grid, .id-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .form-field { display: flex; min-width: 0; flex-direction: column; }
-    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
-    .form-value { display: flex; align-items: center; min-height: 38px; height: 100%; background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
-    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
-    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
-    .eligible-text strong { font-weight: 700; }
-    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
-    .eligible-card.result-review { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .state-evidence { margin: 0; padding: 0 0 0.3in; background: #fff; color: #111; break-inside: avoid; page-break-inside: avoid; }
-    .state-evidence-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 0 9px; margin: 0 0 10px; border-bottom: 1px solid #cbd5e1; }
-    .state-evidence h2 { color: #111827; font-size: 14px; line-height: 1.25; margin: 0 0 3px; }
-    .state-evidence p { color: #4b5563; font-size: 9px; line-height: 1.35; margin: 0; }
-    .state-evidence-part { flex: 0 0 auto; color: #4b5563; font-size: 9px; font-weight: 600; white-space: nowrap; }
-    .state-evidence img { display: block; width: auto; height: auto; max-width: 100%; max-height: 9.2in; object-fit: contain; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 0; background: #fff; }
-    .evidence-unavailable { margin-top: 22px; padding: 14px; border: 1px solid #f59e0b; background: #fffbeb; color: #78350f; border-radius: 6px; font-size: 11px; line-height: 1.5; }
-    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
-    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
-    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
-    .vin-search-info strong { color: #111827; }
-    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; color: #137333; margin: 15px 0 20px; }
-    .eligible-card.result-review { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
-    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
-    .detail-row { display: grid; grid-template-columns: 1.65in minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 12px; break-inside: avoid; }
-    .detail-label { font-weight: 600; color: #4b5563; }
-    .detail-value { min-width: 0; color: #111827; font-weight: 500; overflow-wrap: anywhere; }
-    .detail-value.red { color: #b91c1c; font-weight: bold; }
-    .brands-section { margin-top: 25px; }
-    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
-    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
-    .portal-footer { position: absolute; right: 0; bottom: 0; left: 0; margin: 0; padding-top: 10px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 9px; text-align: center; }
-
+  <style>${reportDocumentCSS()}
   </style>
 </head>
 <body>
@@ -1261,29 +1137,36 @@ async function loadJsPDF() {
   });
 }
 
-// Colour palette mirrors the print HTML reports.
+// The PDF draws from the same ten colours as the print HTML, so a report
+// downloaded as a PDF and the same report sent to the printer are one
+// document rendered twice rather than two documents that resemble each other.
+//
+// Every `*Bg` is paper: a status is carried by its rule and its verdict word,
+// never by a block of colour a laser printer has to lay down.
 const PALETTE = {
-  navy: [30, 58, 95],
-  navyDark: [12, 30, 56],
-  muted: [100, 116, 139],
-  border: [205, 213, 220],
-  cardBg: [248, 250, 252],
-  yellowBg: [254, 252, 232],
-  yellowBorder: [253, 224, 71],
-  successBg: [209, 250, 229],
-  successBorder: [16, 185, 129],
-  successText: [6, 95, 70],
-  dangerBg: [254, 226, 226],
-  dangerBorder: [239, 68, 68],
-  dangerText: [153, 27, 27],
-  warnBg: [254, 243, 199],
-  warnBorder: [245, 158, 11],
-  warnText: [146, 64, 14],
-  neutralBg: [248, 250, 252],
-  neutralBorder: [148, 163, 184],
-  neutralText: [51, 65, 85],
-  body: [55, 65, 81],
-  ink: [17, 24, 39],
+  navy: printRgb(PRINT_COLORS.navy),
+  gold: printRgb(PRINT_COLORS.gold),
+  slate: printRgb(PRINT_COLORS.slate),
+  border: printRgb(PRINT_COLORS.line),
+  paper: printRgb(PRINT_COLORS.paper),
+  cardBg: printRgb(PRINT_COLORS.paper),
+  yellowBg: printRgb(PRINT_COLORS.paper),
+  yellowBorder: printRgb(PRINT_COLORS.gold),
+  successBg: printRgb(PRINT_COLORS.paper),
+  successBorder: printRgb(PRINT_COLORS.ok),
+  successText: printRgb(PRINT_COLORS.ok),
+  dangerBg: printRgb(PRINT_COLORS.paper),
+  dangerBorder: printRgb(PRINT_COLORS.alert),
+  dangerText: printRgb(PRINT_COLORS.alert),
+  warnBg: printRgb(PRINT_COLORS.paper),
+  warnBorder: printRgb(PRINT_COLORS.gold),
+  warnText: printRgb(PRINT_COLORS.navy),
+  neutralBg: printRgb(PRINT_COLORS.paper),
+  neutralBorder: printRgb(PRINT_COLORS.slate),
+  neutralText: printRgb(PRINT_COLORS.navy),
+  body: printRgb(PRINT_COLORS.slate),
+  ink: printRgb(PRINT_COLORS.ink),
+  alert: printRgb(PRINT_COLORS.alert),
 };
 
 async function createPdfContext(orientation = "portrait") {
@@ -1367,44 +1250,32 @@ function drawOfacRecordHeader(ctx, opts = {}) {
   const headerHeight = 110;
   ensureSpace(ctx, headerHeight + 8);
 
-  // App-native single frame; this must not resemble government letterhead.
-  setDraw(doc, PALETTE.navy);
-  doc.setLineWidth(0.8);
-  doc.rect(margin, ctx.y, pageWidth - margin * 2, headerHeight);
+  const innerLeft = margin;
+  const innerWidth = pageWidth - margin * 2;
+  let yy = ctx.y + 10;
 
-  const innerLeft = margin + 14;
-  const innerWidth = pageWidth - margin * 2 - 28;
-  let yy = ctx.y + 22;
-
-  // Prominent non-government notice.
+  // Prominent non-government notice. This must not resemble government
+  // letterhead, so it leads the masthead rather than sitting inside a frame.
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  setText(doc, PALETTE.warnText);
-  doc.text(eyebrow, pageWidth / 2, yy, { align: "center" });
-  yy += 16;
+  doc.setFontSize(7);
+  setText(doc, PALETTE.alert);
+  doc.text(eyebrow, innerLeft, yy);
+  yy += 22;
 
-  // Main app-generated record title.
-  doc.setFontSize(15);
-  setText(doc, PALETTE.navy);
-  doc.text(title, pageWidth / 2, yy, { align: "center" });
-  yy += 12;
+  // Main app-generated record title, over the shared masthead rule.
+  drawMasthead(ctx, title, yy);
+  yy += 16;
 
   // Italic subtitle.
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
-  setText(doc, PALETTE.muted);
+  setText(doc, PALETTE.body);
   const subLines = doc.splitTextToSize(subtitle, innerWidth);
   for (const line of subLines) {
-    doc.text(line, pageWidth / 2, yy, { align: "center" });
+    doc.text(line, innerLeft, yy);
     yy += 11;
   }
-
-  // Divider inside header.
-  yy += 4;
-  setDraw(doc, PALETTE.border);
-  doc.setLineWidth(0.4);
-  doc.line(innerLeft, yy, innerLeft + innerWidth, yy);
-  yy += 12;
+  yy += 8;
 
   // Meta two-column row.
   doc.setFont("helvetica", "normal");
@@ -1442,37 +1313,52 @@ function drawOfacRecordHeader(ctx, opts = {}) {
 }
 
 /**
+ * The shared masthead: document title, a heavy navy rule, and the single gold
+ * hairline. Identical in geometry to `.main-title` in the print stylesheet.
+ */
+function drawMasthead(ctx, title, ruleY) {
+  const { doc, pageWidth, margin } = ctx;
+  const right = pageWidth - margin;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  setText(doc, PALETTE.navy);
+  doc.text(String(title), margin, ruleY - 12);
+
+  setDraw(doc, PALETTE.navy);
+  doc.setLineWidth(2.25);
+  doc.line(margin, ruleY, right, ruleY);
+
+  setFill(doc, PALETTE.gold);
+  doc.rect(margin, ruleY + 1.5, right - margin, 1.5, "F");
+}
+
+/**
  * Simpler title bar for non-OFAC reports (Repeat Offender, Title & Lien).
  */
 function drawCheckHeader(ctx, opts) {
   const { title, meta = [] } = opts;
-  const { doc, pageWidth, margin } = ctx;
+  const { doc, margin } = ctx;
 
   ensureSpace(ctx, 56);
 
-  setFill(doc, PALETTE.cardBg);
-  doc.rect(margin, ctx.y, pageWidth - margin * 2, 46, "F");
-  setDraw(doc, PALETTE.navy);
-  doc.setLineWidth(0.8);
-  doc.line(margin, ctx.y + 46, pageWidth - margin * 2 + margin, ctx.y + 46);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  setText(doc, PALETTE.navy);
-  doc.text(title, margin + 12, ctx.y + 18);
-
+  // Meta strip first, then the masthead — the same order the HTML pages read
+  // in, where `.page-header` sits above `.main-title`.
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  setText(doc, PALETTE.muted);
-  const metaY = ctx.y + 32;
+  doc.setFontSize(7.5);
+  setText(doc, PALETTE.slate);
   const metaText = meta
     .filter(Boolean)
     .map((m) => (m.value ? `${m.label}: ${m.value}` : null))
     .filter(Boolean)
     .join("   ·   ");
   if (metaText) {
-    doc.text(metaText, margin + 12, metaY);
+    doc.text(metaText, margin, ctx.y + 8);
   }
+
+  // The same masthead the HTML documents wear: title on paper over a heavy
+  // navy rule, with the one gold hairline beneath it.
+  drawMasthead(ctx, title, ctx.y + 46);
 
   ctx.y += 56;
 }
@@ -1504,11 +1390,11 @@ function drawSubjectBox(ctx, opts) {
   setFill(doc, PALETTE.cardBg);
   setDraw(doc, PALETTE.border);
   doc.setLineWidth(0.6);
-  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 4, 4, "FD");
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 2, 2, "FD");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  setText(doc, PALETTE.muted);
+  setText(doc, PALETTE.slate);
   doc.text(title, margin + padding, ctx.y + padding + 10);
 
   setDraw(doc, PALETTE.border);
@@ -1579,13 +1465,19 @@ function drawResultBox(ctx, opts) {
   };
   const palette = palettes[variant] || palettes.warn;
 
-  const padding = 20;
-  const innerWidth = pageWidth - margin * 2 - padding * 2;
+  // Mirrors `.result` in the print stylesheet: paper ground, a status bar
+  // down the left edge, the verdict word in the status colour, and every
+  // sentence below it in ink. A page-wide tint of colour buys nothing on
+  // paper except toner.
+  const padding = 16;
+  const barWidth = 4;
+  const textLeft = margin + barWidth + padding;
+  const innerWidth = pageWidth - margin * 2 - barWidth - padding * 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(15);
   const titleLines = doc.splitTextToSize(String(title || "RESULT"), innerWidth);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   const subtitleLines = subtitle
     ? doc.splitTextToSize(String(subtitle), innerWidth)
     : [];
@@ -1593,39 +1485,42 @@ function drawResultBox(ctx, opts) {
   const preparedExtraLines = extraLines.flatMap((line) =>
     doc.splitTextToSize(String(line), innerWidth)
   );
-  const titleLineHeight = 25;
-  const subtitleLineHeight = 14;
+  const titleLineHeight = 18;
+  const subtitleLineHeight = 13;
   const extraLineHeight = 12;
   const titleH = titleLines.length * titleLineHeight;
   const subH = subtitleLines.length
-    ? 8 + subtitleLines.length * subtitleLineHeight
+    ? 4 + subtitleLines.length * subtitleLineHeight
     : 0;
   const extraH = preparedExtraLines.length
-    ? 8 + preparedExtraLines.length * extraLineHeight
+    ? 6 + preparedExtraLines.length * extraLineHeight
     : 0;
   const totalH = padding * 2 + titleH + subH + extraH;
   ensureSpace(ctx, totalH + 12);
 
   setFill(doc, palette.bg);
-  setDraw(doc, palette.border);
-  doc.setLineWidth(2);
-  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 6, 6, "FD");
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.75);
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 2, 2, "FD");
+  setFill(doc, palette.border);
+  doc.rect(margin, ctx.y, barWidth, totalH, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(15);
   setText(doc, palette.text);
-  let textY = ctx.y + padding + 20;
+  let textY = ctx.y + padding + 12;
   for (const line of titleLines) {
-    doc.text(line, pageWidth / 2, textY, { align: "center" });
+    doc.text(line, textLeft, textY);
     textY += titleLineHeight;
   }
 
   if (subtitleLines.length) {
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
+    setText(doc, PALETTE.ink);
     textY += 2;
     for (const line of subtitleLines) {
-      doc.text(line, pageWidth / 2, textY, { align: "center" });
+      doc.text(line, textLeft, textY);
       textY += subtitleLineHeight;
     }
   }
@@ -1633,10 +1528,10 @@ function drawResultBox(ctx, opts) {
   if (preparedExtraLines.length) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    setText(doc, palette.text);
+    setText(doc, PALETTE.ink);
     textY += 2;
     for (const line of preparedExtraLines) {
-      doc.text(line, pageWidth / 2, textY, { align: "center" });
+      doc.text(line, textLeft, textY);
       textY += extraLineHeight;
     }
   }
@@ -1647,25 +1542,34 @@ function drawResultBox(ctx, opts) {
 function drawScreeningRecord(ctx, text) {
   const { doc, pageWidth, margin } = ctx;
   const padding = 12;
+  const barWidth = 4;
   const lineHeight = 11;
+  const textLeft = margin + barWidth + padding;
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  const lines = doc.splitTextToSize(text, pageWidth - margin * 2 - padding * 2);
-  const totalH = padding * 2 + lines.length * lineHeight;
+  const lines = doc.splitTextToSize(
+    text,
+    pageWidth - margin * 2 - barWidth - padding * 2
+  );
+  const totalH = padding * 2 + 13 + lines.length * lineHeight;
   ensureSpace(ctx, totalH + 8);
 
+  // The same caution treatment as `.certification`: paper, one gold bar.
   setFill(doc, PALETTE.yellowBg);
-  setDraw(doc, PALETTE.yellowBorder);
-  doc.setLineWidth(0.8);
-  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 4, 4, "FD");
+  setDraw(doc, PALETTE.border);
+  doc.setLineWidth(0.75);
+  doc.roundedRect(margin, ctx.y, pageWidth - margin * 2, totalH, 2, 2, "FD");
+  setFill(doc, PALETTE.yellowBorder);
+  doc.rect(margin, ctx.y, barWidth, totalH, "F");
 
-  setText(doc, PALETTE.warnText);
+  setText(doc, PALETTE.navy);
   doc.setFont("helvetica", "bold");
-  doc.text("SCREENING RECORD", margin + padding, ctx.y + padding + 9);
+  doc.text("SCREENING RECORD", textLeft, ctx.y + padding + 9);
   doc.setFont("helvetica", "normal");
-  let ly = ctx.y + padding + 22;
+  setText(doc, PALETTE.ink);
+  let ly = ctx.y + padding + 24;
   for (const line of lines) {
-    doc.text(line, margin + padding, ly);
+    doc.text(line, textLeft, ly);
     ly += lineHeight;
   }
 
@@ -1681,7 +1585,7 @@ function drawFooter(ctx, lines) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  setText(doc, PALETTE.muted);
+  setText(doc, PALETTE.slate);
   let ly = yStart + 12;
   for (const line of lines) {
     doc.text(line, pageWidth / 2, ly, { align: "center" });
@@ -1733,7 +1637,7 @@ function drawScreenshotPage(ctx, dataUrl, opts = {}) {
     console.error("PDF image error:", err);
     writeText(ctx, "Screenshot could not be embedded.", {
       fontSize: 9,
-      color: PALETTE.warnText,
+      color: PALETTE.alert,
     });
   }
 }
@@ -1872,7 +1776,7 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
       `DATA FRESHNESS NOTICE: This screening used cached SDN data last updated ${lastUpdate}${
         ofac.dataAgeHours != null ? ` (about ${ofac.dataAgeHours} hours ago)` : ""
       }. A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.`,
-      { fontSize: 9, bold: true, color: PALETTE.warnText }
+      { fontSize: 9, bold: true, color: PALETTE.alert }
     );
     ctx.y += 6;
   }
@@ -1916,11 +1820,11 @@ function drawMdosResultSection(ctx, opts) {
       writeText(ctx, "ACTUAL MICHIGAN STATE-SITE SCREENSHOT", {
         fontSize: 9,
         bold: true,
-        color: PALETTE.muted,
+        color: PALETTE.slate,
       });
       writeText(ctx, "Captured from https://dsvsesvc.sos.state.mi.us/", {
         fontSize: 8,
-        color: PALETTE.muted,
+        color: PALETTE.slate,
       });
       ctx.y += 2;
       drawScreenshotPage(ctx, safeShot, { reserveFooter: true });
@@ -1928,24 +1832,24 @@ function drawMdosResultSection(ctx, opts) {
       writeText(
         ctx,
         "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE",
-        { fontSize: 9, bold: true, color: PALETTE.warnText }
+        { fontSize: 9, bold: true, color: PALETTE.alert }
       );
       writeText(
         ctx,
         "The result above is an app-generated summary, not a Michigan Department of State webpage or document. Re-run the check before relying on it when state-site evidence is required.",
-        { fontSize: 9, color: PALETTE.warnText }
+        { fontSize: 9, color: PALETTE.ink }
       );
     }
   } else {
     writeText(
       ctx,
       "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE",
-      { fontSize: 9, bold: true, color: PALETTE.warnText }
+      { fontSize: 9, bold: true, color: PALETTE.alert }
     );
     writeText(
       ctx,
       "The result above is an app-generated summary, not a Michigan Department of State webpage or document. Re-run the check before relying on it when state-site evidence is required.",
-      { fontSize: 9, color: PALETTE.warnText }
+      { fontSize: 9, color: PALETTE.ink }
     );
   }
   drawFooter(ctx, MDOS_FOOTER);
@@ -1968,7 +1872,7 @@ function drawPortalCapture(ctx, opts) {
   doc.text(title, evidenceMargin, ctx.y + 10);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  setText(doc, PALETTE.muted);
+  setText(doc, PALETTE.slate);
   doc.text("ACTUAL MICHIGAN STATE-SITE CAPTURE · ONE-PAGE RECORD", pageWidth - evidenceMargin, ctx.y + 10, { align: "right" });
   ctx.y += 17;
 
@@ -1996,7 +1900,7 @@ function drawPortalCapture(ctx, opts) {
   doc.rect(0, pageHeight - 25, pageWidth, 25, "F");
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
-  setText(doc, PALETTE.muted);
+  setText(doc, PALETTE.slate);
   doc.text(footerLines.join(" "), pageWidth / 2, pageHeight - 10, {
     align: "center",
   });
@@ -2178,7 +2082,7 @@ export function finalDecisionSection(currentResults) {
         writeText(ctx, `${row.label}: ${row.state}`, {
           fontSize: 10,
           bold: true,
-          color: row.incomplete ? PALETTE.warnText : PALETTE.ink,
+          color: row.incomplete ? PALETTE.alert : PALETTE.ink,
         });
         writeText(ctx, row.detail, {
           fontSize: 8.5,
@@ -2193,14 +2097,14 @@ export function finalDecisionSection(currentResults) {
         bold: true,
         color:
           summary.incomplete.length > 0
-            ? PALETTE.warnText
+            ? PALETTE.alert
             : PALETTE.successText,
       });
       if (summary.incomplete.length > 0) {
         for (const row of summary.incomplete) {
           writeText(ctx, `${row.label}: ${row.state} — ${row.detail}`, {
             fontSize: 9,
-            color: PALETTE.warnText,
+            color: PALETTE.alert,
           });
         }
       } else {
@@ -2244,7 +2148,7 @@ export async function downloadSosOfficialEvidencePDF(quote) {
   doc.text("Michigan SOS Registration Fee Calculation", margin, 28);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  doc.setTextColor(...PALETTE.muted);
+  doc.setTextColor(...PALETTE.slate);
   doc.text(
     "Actual official state-site result page captured during the calculation",
     margin,
@@ -2268,7 +2172,7 @@ export async function downloadSosOfficialEvidencePDF(quote) {
   doc.addImage(image, imageDataUrlExtension(image), x, y, width, height);
 
   doc.setFontSize(7);
-  doc.setTextColor(...PALETTE.muted);
+  doc.setTextColor(...PALETTE.slate);
   doc.text("Source: dsvsesvc.sos.state.mi.us", margin, pageHeight - 10);
   doc.text(
     "Verify before final paperwork",
@@ -2732,43 +2636,7 @@ export function repeatReportHTML(currentResults, isCoBuyer = false) {
 <head>
   <meta charset="UTF-8">
   <title>Michigan Repeat Offender Check</title>
-  <style>
-    @page { size: letter portrait; margin: 0.35in; }
-    * { box-sizing: border-box; }
-    html, body { width: 100%; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 100%; min-height: 10.2in; position: relative; padding-bottom: 0.3in; break-after: page; page-break-after: always; }
-    .page:last-child { break-after: auto; page-break-after: auto; }
-    .page-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.65fr); gap: 12px; align-items: start; font-size: 10px; line-height: 1.35; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
-    .page-header > div { min-width: 0; overflow-wrap: anywhere; }
-    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
-    .summary-notice { padding: 13px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a5f; border-radius: 6px; background: #f8fafc; margin-bottom: 14px; font-size: 11px; color: #475569; }
-    .summary-notice strong { display: block; margin-bottom: 4px; color: #1e3a5f; font-size: 13px; }
-    .content-box { border: 1px solid #e5e7eb; padding: 22px; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); break-inside: avoid; page-break-inside: avoid; }
-    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 4px; }
-    .section-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
-    .form-grid { display: grid; gap: 12px 15px; margin-bottom: 18px; }
-    .identity-grid, .id-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .form-field { display: flex; min-width: 0; flex-direction: column; }
-    .form-label { font-size: 10px; color: #4b5563; margin-bottom: 4px; font-weight: 600; }
-    .form-value { display: flex; align-items: center; min-height: 38px; height: 100%; background: #f9fafb; border: 1px solid #d1d5db; padding: 8px 10px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-    .results-header { font-size: 12px; font-weight: bold; color: #374151; margin-top: 25px; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; color: #137333; margin-top: 15px; }
-    .eligible-icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; margin-top: 2px; }
-    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
-    .eligible-text strong { font-weight: 700; }
-    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
-    .btn-search { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
-    .portal-footer { position: absolute; right: 0; bottom: 0; left: 0; margin: 0; padding-top: 10px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 9px; text-align: center; }
-    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
-    .eligible-card.result-review { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .state-evidence { margin: 0; padding: 0 0 0.3in; background: #fff; color: #111; break-inside: avoid; page-break-inside: avoid; }
-    .state-evidence-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 0 9px; margin: 0 0 10px; border-bottom: 1px solid #cbd5e1; }
-    .state-evidence h2 { color: #111827; font-size: 14px; line-height: 1.25; margin: 0 0 3px; }
-    .state-evidence p { color: #4b5563; font-size: 9px; line-height: 1.35; margin: 0; }
-    .state-evidence-part { flex: 0 0 auto; color: #4b5563; font-size: 9px; font-weight: 600; white-space: nowrap; }
-    .state-evidence img { display: block; width: auto; height: auto; max-width: 100%; max-height: 9.2in; object-fit: contain; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 0; background: #fff; }
-    .evidence-unavailable { margin-top: 22px; padding: 14px; border: 1px solid #f59e0b; background: #fffbeb; color: #78350f; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+  <style>${reportDocumentCSS()}
   </style>
 </head>
 <body>
@@ -2785,43 +2653,7 @@ export function titleReportHTML(currentResults) {
 <head>
   <meta charset="UTF-8">
   <title>Michigan Title & Lien Check</title>
-  <style>
-    @page { size: letter portrait; margin: 0.35in; }
-    * { box-sizing: border-box; }
-    html, body { width: 100%; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #333; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 100%; min-height: 10.2in; position: relative; padding-bottom: 0.3in; break-after: page; page-break-after: always; }
-    .page:last-child { break-after: auto; page-break-after: auto; }
-    .page-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr) minmax(0, 1.65fr); gap: 12px; align-items: start; font-size: 10px; line-height: 1.35; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px; }
-    .page-header > div { min-width: 0; overflow-wrap: anywhere; }
-    .main-title { color: #1e3a5f; font-size: 20px; font-weight: 700; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif; }
-    .summary-notice { padding: 13px 16px; border: 1px solid #cbd5e1; border-left: 4px solid #1e3a5f; border-radius: 6px; background: #f8fafc; margin-bottom: 14px; font-size: 11px; color: #475569; }
-    .summary-notice strong { display: block; margin-bottom: 4px; color: #1e3a5f; font-size: 13px; }
-    .content-box { border: 1px solid #e5e7eb; padding: 22px; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); break-inside: avoid; page-break-inside: avoid; }
-    .section-title { font-size: 16px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
-    .vin-search-info { border-left: 3px solid #137078; padding-left: 10px; font-size: 11px; color: #374151; margin-bottom: 20px; font-weight: 500; }
-    .vin-search-info strong { color: #111827; }
-    .eligible-card { border: 1px solid #ceead6; background: #e6f4ea; border-radius: 6px; padding: 16px; color: #137333; margin: 15px 0 20px; }
-    .eligible-card.result-review { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-    .eligible-text { font-size: 12px; line-height: 1.5; font-weight: 500; }
-    .eligible-note { font-size: 10px; color: #5f6368; margin-top: 6px; font-weight: normal; }
-    .detail-row { display: grid; grid-template-columns: 1.65in minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 12px; break-inside: avoid; }
-    .detail-label { font-weight: 600; color: #4b5563; }
-    .detail-value { min-width: 0; color: #111827; font-weight: 500; overflow-wrap: anywhere; }
-    .detail-value.red { color: #b91c1c; font-weight: bold; }
-    .brands-section { margin-top: 25px; }
-    .brands-title { font-size: 14px; font-weight: bold; color: #111827; margin-bottom: 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-    .brands-text { font-size: 12px; color: #4b5563; margin-bottom: 20px; }
-    .btn-start-over { background: #137078; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; display: inline-block; text-align: center; }
-    .portal-footer { position: absolute; right: 0; bottom: 0; left: 0; margin: 0; padding-top: 10px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 9px; text-align: center; }
-    .copyright { font-size: 9px; color: #9ca3af; margin-top: 5px; }
-    .state-evidence { margin: 0; padding: 0 0 0.3in; background: #fff; color: #111; break-inside: avoid; page-break-inside: avoid; }
-    .state-evidence-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 0 9px; margin: 0 0 10px; border-bottom: 1px solid #cbd5e1; }
-    .state-evidence h2 { color: #111827; font-size: 14px; line-height: 1.25; margin: 0 0 3px; }
-    .state-evidence p { color: #4b5563; font-size: 9px; line-height: 1.35; margin: 0; }
-    .state-evidence-part { flex: 0 0 auto; color: #4b5563; font-size: 9px; font-weight: 600; white-space: nowrap; }
-    .state-evidence img { display: block; width: auto; height: auto; max-width: 100%; max-height: 9.2in; object-fit: contain; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 0; background: #fff; }
-    .evidence-unavailable { margin-top: 22px; padding: 14px; border: 1px solid #f59e0b; background: #fffbeb; color: #78350f; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+  <style>${reportDocumentCSS()}
   </style>
 </head>
 <body>

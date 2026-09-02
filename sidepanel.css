@@ -5229,3 +5229,53 @@ button, input, select, textarea { font-family: inherit; }
 
 /* Dialog headlines match the workspace headlines. */
 #settingsModalTitle, .modal-header h2 { font: 800 var(--fs-display)/1.15 var(--font-display); letter-spacing: -0.02em; }
+
+
+/* ---------------------------------------------------------------------------
+ * Accent stripes. A `border-left` on a rounded card follows the corner and
+ * tapers to a wedge where it meets the top and bottom edges — it read as a
+ * rendering glitch on the quote card and every History record. The stripe is
+ * now a pseudo-element inset 10px from each corner with its own rounded end,
+ * and every striped surface uses this one treatment. The colour is carried by
+ * --stripe so the state variants only set a value.
+ */
+.sos-quote-headline, .sos-workspace-status, .rescreen-banner, .retention-notice,
+.cobuyer-section, .manager-review-card, .history-item {
+  position: relative;
+  border-left-width: 1px;
+  border-left-color: var(--line-soft);
+}
+.sos-workspace-status.is-busy, .sos-workspace-status.is-error, .sos-workspace-status.is-ok,
+.history-item.decision-approved, .history-item.decision-review, .history-item.decision-denied {
+  border-left-color: var(--line-soft);
+}
+.sos-quote-headline::before, .sos-workspace-status::before, .rescreen-banner::before,
+.retention-notice::before, .cobuyer-section::before, .manager-review-card::before,
+.history-item::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--stripe, var(--line-strong));
+  pointer-events: none;
+}
+.sos-quote-headline { --stripe: var(--design-navy); }
+.retention-notice { --stripe: var(--design-navy); }
+.rescreen-banner { --stripe: var(--design-warning); }
+.cobuyer-section { --stripe: var(--gold); }
+.manager-review-card { --stripe: #b8843a; }
+.sos-workspace-status { --stripe: var(--design-slate); }
+.sos-workspace-status.is-busy { --stripe: var(--navy-soft); }
+.sos-workspace-status.is-error { --stripe: #8f1d14; }
+.sos-workspace-status.is-ok { --stripe: #0f6f50; }
+.history-item.decision-approved { --stripe: #0f6f50; }
+.history-item.decision-review { --stripe: #d49a2e; }
+.history-item.decision-denied { --stripe: #8f1d14; }
+
+/* At 360px the fee-reference disclosure broke its title at the hyphen
+   ("fee add-" / "ons") while the right-hand note wrapped beside it. Let the
+   note drop to its own line whole instead of both halves splintering. */
+.sos-fee-reference summary { flex-wrap: wrap; gap: 4px 10px; }
+.sos-fee-reference summary > span { flex: 1 1 auto; hyphens: none; overflow-wrap: normal; }
+.sos-fee-reference summary small { white-space: nowrap; }

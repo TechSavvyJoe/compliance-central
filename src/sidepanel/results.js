@@ -680,7 +680,7 @@ export function displayResults(elements, results) {
       elements.downloadTitleBtn?.classList.remove("hidden");
     }
   } else {
-    setResultStatus(elements.titleResultStatus, "skipped", "No Trade");
+    setResultStatus(elements.titleResultStatus, "skipped", "No trade");
     elements.titleResultDetail.textContent = "No trade-in provided";
     elements.printTitleBtn?.classList.add("hidden");
     elements.downloadTitleBtn?.classList.add("hidden");

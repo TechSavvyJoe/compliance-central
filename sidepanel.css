@@ -107,6 +107,13 @@
   outline-offset: 2px;
 }
 
+/* The panel's focus ring. This is the rule that actually wins: the :where()
+   ring at the end of the sheet is zero-specificity, so it never beat these
+   element selectors, and every control in the panel was ringed in 3px gold —
+   1.52:1 on a white card, and invisible around the gold buttons. A ring you
+   cannot see is not a focus indicator (WCAG 2.4.13 wants 3:1 against both
+   adjacent colours). Gold is kept only where the ground is navy; see
+   "Focus on the navy surfaces" below. */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -114,7 +121,7 @@ textarea:focus-visible,
 summary:focus-visible,
 a:focus-visible,
 [role="button"]:focus-visible {
-  outline: 3px solid var(--gold);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .form-group:focus-within label {
@@ -405,12 +412,15 @@ body.modal-open {
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
+/* Gold on the white bar is 1.52:1 — hovering the collapsed buyer summary
+   replaced a visible grey edge with one that is not there. */
 .input-summary-bar:hover {
-  border-color: var(--gold);
+  border-color: var(--line-strong);
+  background: var(--hover-surface);
 }
 
 .input-summary-bar:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -466,7 +476,9 @@ body.modal-open {
   width: 100%;
   gap: 8px;
   min-height: 32px;
-  border-radius: var(--r-sm);
+  /* Transparent at rest; the radius matters only once hover or press tints
+     it, and then it has to follow the card's own corner. */
+  border-radius: inherit;
   padding: 0;
   border: 0;
   background: transparent;
@@ -932,15 +944,8 @@ body.modal-open {
   box-shadow: var(--glow-gold);
   min-height: 48px;
 }
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-.btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
 }
 
 .btn-large {
@@ -965,16 +970,7 @@ body.modal-open {
   box-shadow: var(--elev-1);
   min-height: 40px;
 }
-.btn-secondary:hover {
-  background: #204363;
-  color: var(--gold);
-  border-color: rgba(255, 203, 5, 0.38);
-  transform: translateY(-1px);
-  box-shadow: var(--elev-2);
-}
-.btn-secondary:active { transform: translateY(0); }
 .btn-secondary:disabled {
-  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -986,7 +982,7 @@ body.modal-open {
   box-shadow: var(--glow-gold);
 }
 .btn-secondary.btn-emphasis:hover {
-  background: #ffda47;
+  background: var(--gold-deep);
   color: #0d2b4a;
   border-color: transparent;
 }
@@ -998,21 +994,15 @@ body.modal-open {
   box-shadow: none;
   border: 1px solid var(--border-color);
 }
-.btn-ghost:hover {
-  background: var(--bg-card);
-  color: var(--gold);
-  border-color: rgba(255, 203, 5, 0.3);
-}
+/* The ghost hover is set with the other neutral buttons below; these values
+   were the dark panel's gold-on-navy and had been overridden since. */
 
 .btn-danger {
   background: var(--danger-strong);
   color: #fff;
   border: none;
 }
-.btn-danger:hover {
-  background: #dc2626;
-  color: #fff;
-}
+/* Hover is set with the other filled buttons below. */
 
 .btn-sm {
   padding: 5px 10px;
@@ -1073,10 +1063,14 @@ body.modal-open {
   min-height: 40px;
   padding: 4px 0;
 }
+/* One accent for every checkbox in the panel. These were gold while the
+   History filter was navy, so the same control appeared in two brand colours;
+   gold also gives the checked box a 1.5:1 edge against the white card it sits
+   on, where navy gives 12.4:1. */
 .checkbox-label input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--gold);
+  accent-color: var(--design-navy);
   cursor: pointer;
 }
 .checkbox-label:hover { color: var(--gold); }
@@ -1152,7 +1146,7 @@ body.modal-open {
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 .progress-bar:focus-visible {
-  outline: 3px solid var(--gold);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 .progress-fill {
@@ -1284,8 +1278,11 @@ body.modal-open {
 }
 
 /* Skeleton loading state — shown while a Run All Checks is in flight. */
+/* --bg-input was #1a3654 when these were written and is #fff now, so the
+   skeleton was white bars on a white card with a 6%-white sheen sliding
+   across them: during a run the three evidence rows rendered blank. */
 .result-card.is-loading .result-status {
-  background: var(--bg-input);
+  background: var(--line-soft);
   color: transparent;
   position: relative;
   overflow: hidden;
@@ -1299,14 +1296,14 @@ body.modal-open {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.06),
+    var(--skeleton-sheen),
     transparent
   );
   animation: skeleton-shimmer 1.6s ease-in-out infinite;
 }
 .result-card.is-loading .result-detail {
   color: transparent;
-  background: var(--bg-input);
+  background: var(--line-soft);
   border-radius: var(--r-sm);
   position: relative;
   overflow: hidden;
@@ -1382,12 +1379,14 @@ body.modal-open {
   flex-direction: column;
   gap: 6px;
 }
+/* --border was never defined, so these rows fell back to a black alpha that
+   belongs to no palette. */
 .ofac-match {
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--line-soft);
   border-left-width: 3px;
   border-radius: var(--r-sm);
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.015);
+  background: var(--design-canvas);
 }
 .ofac-match.conf-high { border-left-color: var(--danger); }
 .ofac-match.conf-medium { border-left-color: var(--warning); }
@@ -1420,7 +1419,7 @@ body.modal-open {
 .match-conf.conf-high { background: var(--danger-bg); color: var(--danger-text); }
 .match-conf.conf-medium { background: var(--warning-bg); color: var(--warning); }
 .match-conf.conf-low {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--line-soft);
   color: var(--text-secondary);
 }
 .ofac-match-meta {
@@ -1480,7 +1479,7 @@ body.modal-open {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
-  accent-color: var(--gold);
+  accent-color: var(--design-navy);
 }
 .report-selection-status {
   margin: 7px 0 0;
@@ -1648,10 +1647,13 @@ body.modal-open {
 .history-item.decision-approved::before { background: var(--success); }
 .history-item.decision-denied::before { background: var(--danger); }
 .history-item.decision-review::before { background: var(--warning); }
+/* Gold at 22% over a white card is lighter than the grey border it replaced,
+   so pointing at a saved record used to make its edge fade out — a hover that
+   lowers contrast. It now darkens the edge and tints the ground. */
 .history-item:hover {
-  border-color: rgba(255, 203, 5, 0.22);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  border-color: var(--line-strong);
+  background: var(--hover-surface);
+  box-shadow: var(--elev-3);
 }
 
 .history-item-header {
@@ -1798,25 +1800,10 @@ body.modal-open {
 }
 .btn-hist .btn-hist-ic { display: inline-flex; }
 .btn-hist svg { width: 13px; height: 13px; }
-.btn-hist:hover {
-  color: var(--gold);
-  border-color: rgba(255, 203, 5, 0.35);
-  background: var(--bg-card);
-}
-.btn-hist-primary {
-  background: var(--accent-gradient);
-  color: var(--text-primary);
-  border-color: transparent;
-}
-.btn-hist-primary:hover {
-  color: var(--gold);
-  filter: brightness(1.18);
-  background: var(--accent-gradient);
-}
-.history-rescreen-btn.is-aging {
-  border-color: rgba(245, 158, 11, 0.5);
-  color: var(--warning);
-}
+/* Every rule here was written for the dark panel and had since been overridden
+   by the light-workspace button rules, which is why Open record — the primary
+   action on a saved record — rendered identically to Print and PDF beside it.
+   Its filled treatment is restored below at a specificity that survives. */
 
 /* Reports disclosure */
 .history-reports { margin-top: 8px; }
@@ -1911,15 +1898,22 @@ body.modal-open {
   background: var(--bg-card);
 }
 
+/* An empty audit trail is a state a new user meets first, and it was loose
+   centred text floating in the card with no edge of its own — indistinguishable
+   from a list that had failed to draw. It is now a placeholder: a dashed well
+   on the canvas tint, sized like the record it is standing in for. */
 .history-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   text-align: center;
   color: var(--text-secondary);
-  padding: 40px var(--spacing-lg);
-  line-height: 1.6;
+  padding: 26px 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--design-canvas);
+  line-height: 1.5;
 }
 .history-empty strong {
   color: var(--text-primary);
@@ -1935,10 +1929,16 @@ body.modal-open {
 }
 
 /* Loading overlay */
+/* The blocking overlay was a near-black scrim from the dark panel while every
+   dialog in the app used a blurred navy one, so the same "the panel is busy"
+   moment looked like two different products. And "Processing..." was slate on
+   near-black — 2.23:1, the least readable text in the app on the one screen a
+   user has nothing to do but read. */
 .loading-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 15, 26, 0.9);
+  background: var(--scrim-strong);
+  backdrop-filter: blur(5px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1956,8 +1956,9 @@ body.modal-open {
 }
 .loading-text {
   margin-top: var(--spacing-md);
-  color: var(--text-secondary);
+  color: #fff;
   font-size: var(--fs-lead);
+  font-weight: 650;
 }
 
 /* Utility */
@@ -1997,16 +1998,24 @@ body.modal-open {
   margin-left: auto;
   pointer-events: none;
 }
+/* The toast is how the panel answers almost every action, and it was still
+   the dark panel's: a #1e1e1e card edged in #333 with Bootstrap's #dc3545 /
+   #ffc107 / #28a745 / #17a2b8 — four hexes belonging to no palette, floating
+   over a light navy-and-gold workspace. It now speaks the same language as
+   every other status surface in the app: a white sheet, a coloured stripe
+   down the left, ink text, and the status inks that were measured for these
+   grounds. */
 .toast {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 16px;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: var(--r-md);
-  box-shadow: var(--elev-2);
-  color: #fff;
+  padding: 11px 12px;
+  background: var(--design-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-3);
+  color: var(--design-ink);
   font-size: var(--fs-body);
   line-height: 1.4;
   word-wrap: break-word;
@@ -2035,7 +2044,7 @@ body.modal-open {
   flex-shrink: 0;
   background: none;
   border: none;
-  color: #888;
+  color: var(--design-muted);
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -2049,19 +2058,19 @@ body.modal-open {
   transition: color var(--transition-fast);
 }
 .toast-close svg { width: 14px; height: 14px; }
-.toast-close:hover { color: #fff; }
-.toast-close:focus-visible {
-  color: #fff;
-  outline-color: #fff;
+.toast-close:hover {
+  background: var(--hover-surface);
+  color: var(--design-ink);
 }
-.toast-error   { border-color: #dc3545; }
-.toast-warning { border-color: #ffc107; }
-.toast-success { border-color: #28a745; }
-.toast-info    { border-color: #17a2b8; }
-.toast-error   .toast-icon { color: #dc3545; }
-.toast-warning .toast-icon { color: #ffc107; }
-.toast-success .toast-icon { color: #28a745; }
-.toast-info    .toast-icon { color: #17a2b8; }
+.toast-message { padding-top: 1px; }
+.toast-error   { --stripe: var(--danger); }
+.toast-warning { --stripe: var(--warning); }
+.toast-success { --stripe: var(--success); }
+.toast-info    { --stripe: var(--info); }
+.toast-error   .toast-icon { color: var(--danger); }
+.toast-warning .toast-icon { color: var(--warning); }
+.toast-success .toast-icon { color: var(--success); }
+.toast-info    .toast-icon { color: var(--info); }
 
 @media (max-width: 520px) {
   .hub-main {
@@ -2307,8 +2316,7 @@ body.modal-open {
 }
 
 .first-run-scan-btn:hover {
-  background: #ffda47;
-  transform: translateY(-1px);
+  background: var(--gold-deep);
 }
 
 .first-run-actions kbd {
@@ -2562,7 +2570,7 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   margin-top: 11px;
   padding: 7px 10px;
   border-radius: var(--r-md);
-  background: #f7f2e8;
+  background: var(--warning-soft);
   color: #8a5f22;
   font: 600 var(--fs-small)/1 var(--font-mono);
 }
@@ -2643,7 +2651,7 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
 
 .evidence-panel .result-card:hover {
   border-color: var(--line-soft);
-  background: #ffffff;
+  background: var(--hover-surface);
 }
 
 .evidence-panel .result-header {
@@ -2744,8 +2752,9 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   border-top: 0;
 }
 
+/* The row is a 52px button; it used to hover to the white it already was. */
 .completed-step-row:hover {
-  background: #ffffff;
+  background: var(--hover-surface);
 }
 
 .completed-step-icon {
@@ -3058,6 +3067,41 @@ body.has-screening-results .action-section[data-workspace-panel="screening"] {
   --shadow-sm: 0 2px 6px rgba(13, 43, 74, 0.08);
   --shadow-md: 0 8px 22px rgba(13, 43, 74, 0.12);
   --shadow-lg: 0 20px 48px rgba(13, 43, 74, 0.2);
+
+  /* Interaction surfaces. Hover and pressed are two steps down the neutral
+     ramp the panel already owns — the canvas grey, then the soft line grey —
+     so a control never changes hue when you touch it and every step raises
+     contrast. Atlassian's light theme puts a neutral hover near a 6-14% ink
+     overlay and pressed near 24-31%; Polaris uses #F7F7F7 then #F3F3F3. These
+     two greys sit in that band and are already in the palette. */
+  --hover-surface: #eef2f7;
+  --press-surface: #e3e8ef;
+
+  /* Filled navy and gold controls cannot go lighter for the same effect, so
+     they go darker. Navy hover was --navy-soft, which is lighter than the
+     rest state: the button's edge against its white card, and its white
+     label, both lost contrast on hover. */
+  --navy-deep: #08203a;
+  --gold-deep: #e5b400;
+  --danger-deep: #6d1e15;
+
+  /* Disabled: a flat fill and a label that is still readable. The old
+     treatment stacked 40% opacity on top of that flat fill, which took the
+     label to about 1.5:1 — inert, but also gone, and the label is the part
+     that says what the control would do. #6b7a8d on the fill is 3.9:1:
+     unmistakably weaker than an enabled label at 8.6:1, still legible. */
+  --disabled-surface: #eef2f7;
+  --disabled-ink: #6b7a8d;
+  --disabled-line: #dbe3ec;
+
+  /* One scrim for everything that covers the panel. */
+  --scrim: rgba(13, 43, 74, 0.62);
+  --scrim-strong: rgba(13, 43, 74, 0.86);
+
+  /* The sheen that crosses a loading skeleton, and the warm ground shared by
+     the advisory surfaces (re-screen banner, manager review, fee caveats). */
+  --skeleton-sheen: rgba(255, 255, 255, 0.9);
+  --warning-soft: #f7f2e8;
 }
 
 html,
@@ -3472,7 +3516,7 @@ body {
 
 .cobuyer-toggle:hover {
   border-color: var(--navy-tint);
-  background: #ffffff;
+  background: var(--hover-surface);
 }
 
 .cobuyer-toggle:has(input:focus-visible) {
@@ -3581,7 +3625,7 @@ body {
 
 .btn-primary:hover,
 .btn-large:hover {
-  background: var(--navy-soft);
+  background: var(--navy-deep);
   color: #fff;
 }
 
@@ -3593,11 +3637,14 @@ body {
   color: var(--design-slate);
 }
 
+/* The neutral hover changed the border and the ink but left the surface the
+   white it already was, so on a white card the only signal was a one-shade
+   border shift. */
 .btn-secondary:hover,
 .btn-ghost:hover,
 .btn-hist:hover {
   border-color: #7294b5;
-  background: #ffffff;
+  background: var(--hover-surface);
   color: var(--design-navy);
 }
 
@@ -3818,7 +3865,7 @@ body {
 }
 
 .data-use-details[open] > summary::after { content: " Hide"; }
-.data-use-details > summary:focus-visible { outline: 2px solid var(--design-gold); outline-offset: 2px; }
+.data-use-details > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .data-use-details[open] .data-use-note { margin-top: 8px; }
 
 /* Reuse the trade-in VIN the screening already captured rather than retyping
@@ -3989,7 +4036,7 @@ body {
 
 .btn-hist.history-rescreen-btn.is-aging {
   border-color: var(--design-warning);
-  background: #f7f2e8;
+  background: var(--warning-soft);
   color: var(--design-warning);
 }
 
@@ -4022,7 +4069,7 @@ body {
   border: 1px solid #f0c98a;
   border-left: 4px solid var(--design-warning);
   border-radius: var(--r-md);
-  background: var(--design-warning-bg, #f7f2e8);
+  background: var(--warning-soft);
   color: var(--design-ink);
   font: inherit;
   text-align: left;
@@ -4067,8 +4114,8 @@ body {
 
 .evidence-new-customer:hover,
 .evidence-new-customer:focus-visible {
-  background: var(--design-navy-soft);
-  border-color: var(--design-navy-soft);
+  background: var(--navy-deep);
+  border-color: var(--navy-deep);
 }
 
 .evidence-kicker,
@@ -4403,7 +4450,7 @@ body {
 
 /* All true dialogs use the redesign's white sheet treatment. */
 .modal {
-  background: rgba(8, 27, 47, 0.62);
+  background: var(--scrim);
   backdrop-filter: blur(5px);
 }
 
@@ -5242,7 +5289,7 @@ button, input, select, textarea { font-family: inherit; }
  * --stripe so the state variants only set a value.
  */
 .sos-quote-headline, .sos-workspace-status, .rescreen-banner, .retention-notice,
-.cobuyer-section, .manager-review-card, .history-item {
+.cobuyer-section, .manager-review-card, .history-item, .toast {
   position: relative;
   border-left-width: 1px;
   border-left-color: var(--line-soft);
@@ -5253,7 +5300,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .sos-quote-headline::before, .sos-workspace-status::before, .rescreen-banner::before,
 .retention-notice::before, .cobuyer-section::before, .manager-review-card::before,
-.history-item::before {
+.history-item::before, .toast::before {
   content: "";
   position: absolute;
   left: 0; top: 10px; bottom: 10px;
@@ -5368,4 +5415,255 @@ button, input, select, textarea { font-family: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .sos-progress-bar { animation: none; width: 100%; opacity: 0.5; }
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Interaction states: pressed, disabled, and the controls that had neither.
+ *
+ * Going through every control's hover, :active and :disabled turned up three
+ * gaps that ran through the whole panel rather than through any one component.
+ *
+ * Nothing in the app had a pressed state. The sheet held three :active rules
+ * and all three were `transform: translateY(0)` — they cancelled a hover lift,
+ * so a click produced no feedback whatsoever. The lift itself was backwards:
+ * a button that rises as you press it contradicts the gesture. Controls now
+ * move 1px down, drop their elevation, and take a surface one step deeper
+ * than hover.
+ *
+ * Disabled was two different nothings. The variants the redesign covered got
+ * a flat fill *and* the baseline's 40% opacity on top of it, which took the
+ * label to roughly 1.5:1 — inert, but also gone, and the label is the part
+ * that says what the control would do. Every other variant — Open record,
+ * Delete, Deny, PDF all, New customer — had no disabled style at all and
+ * looked fully live. Worst of it: results.js disables the entire buyer form
+ * for the length of a screening run, and every field kept its enabled white
+ * fill, so the form simply stopped accepting typing with nothing to say why.
+ *
+ * And a handful of rows that are buttons — the trade-in header, PDF all and
+ * Print all — had no hover rule at all, while the completed deal steps and the
+ * evidence rows had one that resolved to the white they already were. Both
+ * come out the same on screen: a 52px target that does not answer the pointer.
+ */
+
+/* --- Rows and links that were missing a hover ---------------------------- */
+
+/* The co-buyer and trade-in rows are built as twins further up; they now
+   behave like twins too. Only the co-buyer row had a hover. */
+.trade-section:has(.trade-section-title:hover) {
+  border-color: var(--design-navy);
+}
+
+.trade-section-title:hover {
+  background: var(--hover-surface);
+}
+
+/* Evidence exports are text actions, so they answer like text actions. */
+.evidence-download-btn:not(.evidence-new-customer):hover {
+  color: var(--design-navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.modal-close:hover {
+  background: var(--hover-surface);
+  color: var(--design-ink);
+}
+
+/* --- Pressed ------------------------------------------------------------- */
+
+.btn-secondary:active,
+.btn-ghost:active,
+.btn-hist:active,
+.btn-sm:active,
+.completed-step-row:active,
+.trade-section-title:active,
+.cobuyer-toggle:active,
+.command-menu button:active,
+.input-summary-bar:active,
+.rescreen-banner:active,
+.date-day:active,
+.date-nav-btn:active,
+.date-year-btn:active,
+.date-picker-footer button:active,
+.workspace-tabs button:active:not([aria-selected="true"]) {
+  background: var(--press-surface);
+  box-shadow: none;
+  transform: translateY(1px);
+  transition-duration: 80ms;
+}
+
+.btn-primary:active,
+.btn-large:active,
+.evidence-new-customer:active,
+.btn-hist.btn-hist-primary:active {
+  background: var(--navy-deep);
+  border-color: var(--navy-deep);
+  box-shadow: none;
+  transform: translateY(1px);
+  transition-duration: 80ms;
+}
+
+.btn-secondary.btn-emphasis:active,
+.first-run-scan-btn:active {
+  background: var(--gold-deep);
+  box-shadow: none;
+  transform: translateY(1px);
+  transition-duration: 80ms;
+}
+
+.btn-danger:active {
+  background: var(--danger-deep);
+  border-color: var(--danger-deep);
+  transform: translateY(1px);
+  transition-duration: 80ms;
+}
+
+.evidence-download-btn:not(.evidence-new-customer):active {
+  color: var(--navy-deep);
+}
+
+/* Rows that fill their card have no elevation to drop, so the press is the
+   deeper surface alone — moving a full-width row down 1px only shears it
+   against the card edge. */
+.completed-step-row:active,
+.trade-section-title:active,
+.cobuyer-toggle:active,
+.command-menu button:active,
+.rescreen-banner:active,
+.workspace-tabs button:active:not([aria-selected="true"]) {
+  transform: none;
+}
+
+/* --- Disabled ------------------------------------------------------------ */
+
+/* Open record keeps the filled treatment it was written with. Every rule that
+   gave it one sat above the light-workspace button rules and had been losing
+   to them since, so the primary action on a saved record rendered as a third
+   white outline button between Print and PDF. */
+.btn-hist.btn-hist-primary {
+  border-color: var(--design-navy);
+  background: var(--design-navy);
+  color: #fff;
+}
+
+.btn-hist.btn-hist-primary:hover {
+  border-color: var(--navy-deep);
+  background: var(--navy-deep);
+  color: #fff;
+}
+
+.btn-primary:disabled,
+.btn-large:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled,
+.btn-sm:disabled,
+.btn-hist:disabled,
+.btn-hist.btn-hist-primary:disabled,
+.btn-secondary.btn-emphasis:disabled,
+.btn-danger:disabled,
+.evidence-download-btn:disabled,
+.first-run-scan-btn:disabled,
+.input-summary-bar:disabled,
+.completed-step-row:disabled {
+  border-color: var(--disabled-line);
+  background: var(--disabled-surface);
+  color: var(--disabled-ink);
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  pointer-events: none;
+}
+
+/* The scan button carries its call to action in a pseudo-element chip, which
+   would otherwise stay gold on the flat grey. */
+.first-run-scan-btn:disabled::after {
+  background: var(--disabled-line);
+  color: var(--disabled-ink);
+}
+
+/* The buyer form is disabled for the whole of a screening run. */
+.form-group input:disabled,
+.form-group select:disabled,
+#dealershipNameInput:disabled,
+.history-search-shell input:disabled {
+  border-color: var(--disabled-line);
+  background: var(--disabled-surface);
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+
+/* Otherwise an empty disabled field reads louder than a filled one: the
+   placeholder ink clears 4.8:1 on the disabled fill, the value ink 3.9:1. */
+.form-group input:disabled::placeholder,
+#dealershipNameInput:disabled::placeholder,
+.history-search-shell input:disabled::placeholder {
+  color: var(--disabled-ink);
+}
+
+.form-group:has(input:disabled) > label,
+.form-group:has(select:disabled) > label,
+.form-group:has(input:disabled) .helper-text,
+.checkbox-label:has(input:disabled),
+.report-select-all:has(input:disabled),
+.report-selection-item:has(input:disabled),
+.history-aging-filter:has(input:disabled) {
+  color: var(--disabled-ink);
+  cursor: not-allowed;
+}
+
+/* --- Focus on the navy surfaces ------------------------------------------ */
+
+/* The panel ring is navy blue, which is 2.53:1 against the navy header and
+   hero — under the 3:1 WCAG 2.4.13 asks for. On those three controls the ring
+   stays gold, which is 9.15:1 on navy and is already the accent this product
+   uses on that ground. */
+.header-action-btn:focus-visible,
+.command-bar:focus-visible,
+.first-run-scan-btn:focus-visible {
+  outline-color: var(--design-gold);
+}
+
+/* --- States that were rendering as another state ------------------------- */
+
+/* Running looked exactly like Waiting: the status-pill unification above set
+   one neutral ground for every marker and only pass/fail/review took a colour
+   back, so the single check that is happening right now was painted like the
+   two that have not started. The pulse it also carries is switched off under
+   prefers-reduced-motion, which left those users no difference at all. */
+.status-running,
+.result-status.status-running {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+/* The skeleton has to outrank the outcome classes that are still on the pill
+   from the previous run, or a re-screen shows last run's verdict while the
+   new one is in flight. */
+.result-card.is-loading .result-status,
+.result-card.is-loading .result-detail {
+  background: var(--line-soft);
+  color: transparent;
+}
+
+/* Gold on white is 1.52:1, so the collapsed buyer summary announced its one
+   affordance in a colour that is not there. Every other inline action in the
+   panel — Add, Expand, Details — is set in the link ink. */
+.input-summary-edit {
+  color: var(--link);
+}
+
+.input-summary-icon {
+  color: var(--design-navy);
+}
+
+/* --- Narrow panel -------------------------------------------------------- */
+
+/* Chromium's side panel floors at 360px of content but the user can drag it
+   narrower than the layout's assumptions; at 320 the trade-in row broke its
+   two-letter action across two lines ("Ad" / "d"). These are verbs, not
+   prose. */
+.cobuyer-toggle .checkbox-text,
+.trade-section-title .optional-label {
+  white-space: nowrap;
 }

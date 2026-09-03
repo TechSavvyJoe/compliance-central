@@ -316,7 +316,7 @@ body.modal-open {
 .sos-plate-preview-unavailable strong { color: #bae6fd; font-size: var(--fs-caption); }
 .sos-plate-preview-unavailable span { color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.35; }
 .sos-plate-viewer { padding: 0; background: rgba(1, 9, 18, .94); backdrop-filter: blur(14px); }
-.sos-plate-viewer-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: calc(100% - 14px); height: calc(100% - 14px); min-height: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: var(--r-lg); background: radial-gradient(circle at 50% 35%, rgba(23, 70, 108, .62), rgba(3, 15, 27, .98) 68%); box-shadow: var(--elev-4); animation: sosPlateViewerIn .2s cubic-bezier(.2,.8,.2,1); }
+.sos-plate-viewer-shell { display: grid; grid-template-rows: auto auto auto; width: calc(100% - 14px); max-width: 760px; height: auto; max-height: calc(100% - 14px); min-height: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: var(--r-lg); background: radial-gradient(circle at 50% 35%, rgba(23, 70, 108, .62), rgba(3, 15, 27, .98) 68%); box-shadow: var(--elev-4); animation: sosPlateViewerIn .2s cubic-bezier(.2,.8,.2,1); }
 @keyframes sosPlateViewerIn { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: scale(1); } }
 @keyframes sosPlateLoading { to { background-position-x: -220%; } }
 .sos-plate-viewer-header, .sos-plate-viewer-footer { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; background: rgba(4, 20, 35, .74); backdrop-filter: blur(12px); }
@@ -325,7 +325,7 @@ body.modal-open {
 .sos-plate-viewer-eyebrow { display: block; margin-bottom: 3px; color: var(--gold); font-size: var(--fs-micro); font-weight: 850; letter-spacing: .095em; text-transform: uppercase; }
 .sos-plate-viewer-header h2 { margin: 0; color: #fff; font-size: var(--fs-lead); letter-spacing: -.015em; }
 .sos-plate-viewer-close { flex: 0 0 auto; border: 1px solid rgba(255,255,255,.13); background: rgba(255,255,255,.055); }
-.sos-plate-viewer-stage { display: grid; place-items: center; min-width: 0; min-height: 0; overflow: auto; padding: 18px 12px; overscroll-behavior: contain; outline: none; cursor: zoom-in; touch-action: none; }
+.sos-plate-viewer-stage { display: grid; place-items: center; min-width: 0; min-height: 0; max-height: min(62vh, 520px); overflow: auto; padding: 14px 12px; overscroll-behavior: contain; outline: none; cursor: zoom-in; touch-action: none; }
 .sos-plate-viewer-stage:focus-visible { box-shadow: inset 0 0 0 2px var(--gold); }
 .sos-plate-viewer-stage.is-zoomed { place-items: start; cursor: grab; }
 .sos-plate-viewer-stage.is-panning { cursor: grabbing; }
@@ -4500,6 +4500,48 @@ body {
 .settings-help-muted,
 .sos-plate-viewer-caption span {
   color: var(--design-muted);
+}
+
+/* The light redesign repainted the plate viewer white but never revisited the
+   controls inside it, which were still written for the dark original: the
+   eyebrow stayed brand gold (1.52:1 on white), the zoom buttons stayed #fff —
+   white on white, invisible — and the zoom percentage stayed #ffe173, near
+   enough to invisible too. So the one control that undoes a zoom could not be
+   seen, which is what left people stuck at 175%. */
+.sos-plate-viewer-eyebrow {
+  color: var(--design-muted);
+}
+
+.sos-plate-viewer-stage {
+  /* The artwork is mostly dark and was floating in bare white. A faint canvas
+     gives it an edge to sit against and reads as a deliberate viewing surface. */
+  background: var(--design-canvas);
+  border-block: 1px solid var(--line-soft);
+}
+
+.sos-plate-viewer-tools {
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.sos-plate-viewer-tools button {
+  border-right-color: var(--line-soft);
+  color: var(--design-ink);
+}
+
+.sos-plate-viewer-tools button:hover:not(:disabled),
+.sos-plate-viewer-tools button:focus-visible {
+  background: var(--navy-tint);
+  color: var(--design-ink);
+}
+
+.sos-plate-viewer-tools .sos-plate-zoom-value {
+  color: var(--design-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sos-plate-viewer-stage:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus);
 }
 
 .settings-group {

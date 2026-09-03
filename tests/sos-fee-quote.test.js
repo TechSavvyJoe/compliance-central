@@ -204,12 +204,12 @@ test("selected plate artwork expands in a fast in-sidebar viewer", () => {
     assert.match(sidepanelHtml, new RegExp(`id="${id}"`));
   }
   assert.match(sidepanelHtml, /class="modal sos-plate-viewer hidden"[^>]+role="dialog"/);
-  assert.match(sidepanelHtml, /Design sample only · non-personalized/);
+  assert.match(sidepanelHtml, /The number shown is a sample\. Personalized text is not pictured\./);
   assert.match(sidepanelScript, /showModal\(elements\.sosPlateViewer/);
   assert.match(sidepanelScript, /hideModal\(elements\.sosPlateViewer\)/);
   assert.match(sidepanelScript, /SOS_PLATE_ZOOM_MIN\s*=\s*0\.75/);
   assert.match(sidepanelScript, /SOS_PLATE_ZOOM_MAX\s*=\s*2\.5/);
-  assert.match(sidepanelScript, /Loading the largest official artwork/);
+  assert.match(sidepanelScript, /Loading the full-size design/);
   assert.match(sidepanelScript, /const fullImage = new Image\(\)/);
   assert.match(sidepanelScript, /fullImage\.onerror/);
   assert.match(sidepanelScript, /credentials:\s*"omit"/);
@@ -218,6 +218,23 @@ test("selected plate artwork expands in a fast in-sidebar viewer", () => {
   assert.match(sidepanelScript, /SOS_PLATE_IMAGE_MAX_BYTES/);
   assert.match(sidepanelScript, /new AbortController\(\)/);
   assert.match(sidepanelScript, /response\.body\.getReader\(\)/);
+
+  // The viewer was written dark and the light redesign repainted the shell but
+  // not the controls inside it: the zoom buttons stayed #fff on a now-white
+  // footer, so the only control that undoes a zoom was invisible.
+  assert.match(sidepanelCss, /\.sos-plate-viewer-tools button \{[^}]*color:\s*var\(--design-ink\)/s);
+  assert.match(sidepanelCss, /\.sos-plate-viewer-eyebrow \{[^}]*color:\s*var\(--design-muted\)/s);
+  // The shell sized itself to the viewport, so a 2:1 plate sat in a column of
+  // dead white space. It fits the artwork now.
+  assert.match(sidepanelCss, /\.sos-plate-viewer-shell \{[^}]*height:\s*auto/s);
+  // The viewport allowance survives only as a ceiling, never as a fixed height.
+  assert.match(sidepanelCss, /\.sos-plate-viewer-shell \{[^}]*max-height:\s*calc\(100% - 14px\)/s);
+  assert.doesNotMatch(sidepanelCss, /\.sos-plate-viewer-shell \{[^}]*[^-]height:\s*calc\(100% - 14px\)/s);
+  // preventDefault() on the pan pointerdown swallowed the dblclick that resets
+  // the zoom, so once zoomed in the only way back was those invisible buttons.
+  assert.match(sidepanelScript, /if \(event\.detail >= 2\) return;/);
+  // And the zoom must be reachable without a mouse at all.
+  assert.match(sidepanelScript, /sosPlateViewerStage\?\.addEventListener\("keydown"/);
   assert.match(sidepanelScript, /reader\.cancel\(/);
   assert.match(sidepanelScript, /decodedImage\.onerror/);
   assert.match(sidepanelScript, /addEventListener\("pagehide",\s*disposeSosPlateImages/);

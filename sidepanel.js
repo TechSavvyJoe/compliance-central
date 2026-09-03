@@ -1205,8 +1205,8 @@ function openSosPlatePreview() {
   if (elements.sosPlateViewerNote) {
     elements.sosPlateViewerNote.textContent =
       fullSource === source
-        ? "Official published resolution · non-personalized"
-        : "Loading the largest official artwork…";
+        ? "The number shown is a sample. Personalized text is not pictured."
+        : "Loading the full-size design…";
   }
   elements.sosPlateViewerStage?.scrollTo({ top: 0, left: 0 });
   setSosPlateZoom(1);
@@ -1247,7 +1247,7 @@ function openSosPlatePreview() {
           elements.sosPlateViewerImage.src = displaySource;
           if (elements.sosPlateViewerNote) {
             elements.sosPlateViewerNote.textContent =
-              "Largest official artwork available · non-personalized";
+              "The number shown is a sample. Personalized text is not pictured.";
           }
         };
         fullImage.onerror = () => {
@@ -1255,7 +1255,7 @@ function openSosPlatePreview() {
           if (loadToken !== sosPlateViewerLoadToken) return;
           if (elements.sosPlateViewerNote) {
             elements.sosPlateViewerNote.textContent =
-              "Official published preview resolution · non-personalized";
+              "The number shown is a sample. Personalized text is not pictured.";
           }
         };
         fullImage.src = displaySource;
@@ -1265,7 +1265,7 @@ function openSosPlatePreview() {
         sosPlateViewerAbortController = null;
         if (elements.sosPlateViewerNote) {
           elements.sosPlateViewerNote.textContent =
-            "Official published preview resolution · non-personalized";
+            "The number shown is a sample. Personalized text is not pictured.";
         }
       });
   }
@@ -1273,6 +1273,12 @@ function openSosPlatePreview() {
 
 function beginSosPlatePan(event) {
   if (sosPlateZoom <= 1 || !elements.sosPlateViewerStage) return;
+  // The second press of a double-click must not be swallowed. This handler
+  // calls preventDefault() to stop the drag selecting the image, and that also
+  // suppresses the dblclick that resets the zoom — so once you were zoomed in,
+  // double-clicking to get back out silently stopped working and the only way
+  // down was the zoom buttons.
+  if (event.detail >= 2) return;
   sosPlatePan = {
     pointerId: event.pointerId,
     x: event.clientX,
@@ -2029,9 +2035,27 @@ function initEventListeners() {
     setSosPlateZoom(sosPlateZoom + SOS_PLATE_ZOOM_STEP)
   );
   elements.sosPlateZoomReset?.addEventListener("click", () => setSosPlateZoom(1));
-  elements.sosPlateViewerImage?.addEventListener("dblclick", () =>
-    setSosPlateZoom(sosPlateZoom === 1 ? 1.75 : 1)
+  // Bound on the stage rather than the image so it still fires in the margin
+  // around a zoomed plate, and toggles off from any zoom level rather than
+  // only from exactly 100%.
+  elements.sosPlateViewerStage?.addEventListener("dblclick", () =>
+    setSosPlateZoom(sosPlateZoom > 1 ? 1 : 1.75)
   );
+  // A viewer with only mouse-driven zoom is unusable from the keyboard, and
+  // leaves anyone who cannot see the buttons with no way out of a zoom.
+  elements.sosPlateViewerStage?.addEventListener("keydown", (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "+" || event.key === "=") {
+      setSosPlateZoom(sosPlateZoom + SOS_PLATE_ZOOM_STEP);
+    } else if (event.key === "-" || event.key === "_") {
+      setSosPlateZoom(sosPlateZoom - SOS_PLATE_ZOOM_STEP);
+    } else if (event.key === "0") {
+      setSosPlateZoom(1);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  });
   elements.sosPlateViewerStage?.addEventListener("pointerdown", beginSosPlatePan);
   elements.sosPlateViewerStage?.addEventListener("pointermove", moveSosPlatePan);
   elements.sosPlateViewerStage?.addEventListener("pointerup", endSosPlatePan);

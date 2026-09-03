@@ -1683,12 +1683,22 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   const designOptions = plateDesignOptionsForType(elements.sosPlateType?.value);
   const previousDesign = elements.sosPlateDesign?.value;
   replaceSosOptions(elements.sosPlateDesign, designOptions, previousDesign);
+  // Two places set `hidden` on this control: the mode switch, which hides every
+  // [data-new-plate-only] node, and this function. This one used to decide
+  // purely on how many designs exist, so it overrode the mode — and any edit
+  // that re-ran it, such as switching the vehicle between new and used, made
+  // the plate-design picker reappear during a transfer. A transfer moves an
+  // existing plate, so its design is already fixed: the state is never asked
+  // for one and the submission never sends one, which made the control a
+  // choice that did nothing.
+  const choosesPlate = selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate;
   if (elements.sosPlateDesignControl) {
-    elements.sosPlateDesignControl.hidden = designOptions.length <= 1;
+    elements.sosPlateDesignControl.hidden = !choosesPlate || designOptions.length <= 1;
   }
   const selectedDesign = plateDesignByValue(elements.sosPlateDesign?.value);
   if (elements.sosPlateEligibility) {
-    elements.sosPlateEligibility.hidden = !selectedDesign?.eligibilityNote;
+    elements.sosPlateEligibility.hidden =
+      !choosesPlate || !selectedDesign?.eligibilityNote;
     elements.sosPlateEligibility.textContent = selectedDesign?.eligibilityNote || "";
   }
   clearSosValidation();
@@ -2340,7 +2350,7 @@ function initEventListeners() {
     const results = entry?.savedResults;
     if (!results?.customer || !results?.checks) {
       showToast(
-        "This older audit entry does not include a restorable customer record.",
+        "This record was saved before the app kept customer details, so it cannot be reopened or reprinted. The decision it recorded is still shown on the row.",
         "warning"
       );
       return;
@@ -2942,7 +2952,7 @@ async function handleRunAllChecks() {
     if (!isCurrentRun()) return;
     if (!response?.success) {
       throw new Error(
-        response?.error || "Failed to start background checks"
+        response?.error || "The checks could not be started. Try again."
       );
     }
   } catch (e) {

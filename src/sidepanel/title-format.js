@@ -83,7 +83,7 @@ export function titlePresentation(title) {
       subtitle: noRecord
         ? "Michigan records did not return a title for this VIN. Verify the VIN and review before proceeding."
         : value.error ||
-          "The Title/Lien response was not confirmed clear. Review the result before proceeding.",
+          "Michigan did not confirm this title as clear. Review it before proceeding.",
     };
   }
 
@@ -125,6 +125,6 @@ export function titlePresentation(title) {
     label: "Review",
     title: "TITLE RESULT NEEDS REVIEW",
     subtitle:
-      "The Title/Lien response did not include a confirmed clean status. Review before proceeding.",
+      "Michigan did not report this title as clean. Review it before proceeding.",
   };
 }

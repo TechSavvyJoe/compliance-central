@@ -280,14 +280,14 @@ export async function populateHistoryModal(historyListEl) {
 
     if (history.length === 0) {
       historyListEl.innerHTML =
-        '<div class="history-empty"><strong>No saved checks yet</strong><span>Run a compliance check to create the first history record.</span></div>';
+        '<div class="history-empty"><strong>No saved checks yet</strong><span>Run a compliance check and the deal will be saved here.</span></div>';
       return;
     }
 
     const shown = history.slice(0, MAX_ENTRIES);
-    const summary = `<div class="history-summary">${history.length} local record${
+    const summary = `<div class="history-summary">${history.length} saved record${
       history.length === 1 ? "" : "s"
-    } · retained up to ${CONFIG.limits.dataRetentionDays} days</div>`;
+    } · kept for up to ${CONFIG.limits.dataRetentionDays} days</div>`;
 
     historyListEl.innerHTML =
       summary +

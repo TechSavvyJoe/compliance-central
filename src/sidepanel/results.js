@@ -407,13 +407,13 @@ function animateProgress(elements) {
 
   if (elements.progressLabel && !elements.progressLabel.dataset.locked) {
     if (displayPercent < 20) {
-      elements.progressLabel.textContent = "Running OFAC check...";
+      elements.progressLabel.textContent = "Running OFAC check…";
     } else if (displayPercent < 50) {
-      elements.progressLabel.textContent = "Checking Repeat Offender...";
+      elements.progressLabel.textContent = "Checking Repeat Offender…";
     } else if (displayPercent < 90) {
-      elements.progressLabel.textContent = "Verifying Title & Lien...";
+      elements.progressLabel.textContent = "Verifying Title & Lien…";
     } else if (displayPercent < 100) {
-      elements.progressLabel.textContent = "Finalizing report...";
+      elements.progressLabel.textContent = "Finalizing report…";
     } else {
       elements.progressLabel.textContent = "Complete";
     }

@@ -43,7 +43,7 @@ function stateLabel(kind, value) {
       potential_match: "Potential match",
       confirmed_match: "Confirmed match — blocked",
       false_positive: "False positive (reviewed)",
-      stale: "Stale data — review",
+      stale: "Clear, but list not current — review",
       error: "Unavailable",
       review: "Review",
       not_run: "Not run",

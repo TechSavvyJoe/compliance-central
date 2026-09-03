@@ -5394,9 +5394,21 @@ button, input, select, textarea { font-family: inherit; }
 /* At 360px the fee-reference disclosure broke its title at the hyphen
    ("fee add-" / "ons") while the right-hand note wrapped beside it. Let the
    note drop to its own line whole instead of both halves splintering. */
-.sos-fee-reference summary { flex-wrap: wrap; gap: 4px 10px; }
+.sos-fee-reference summary { position: relative; flex-wrap: wrap; gap: 4px 10px; padding-right: 34px; }
 .sos-fee-reference summary > span { flex: 1 1 auto; hyphens: none; overflow-wrap: normal; }
 .sos-fee-reference summary small { white-space: nowrap; }
+/* Letting the summary wrap fixed the title splitting at its hyphen, but the
+   +/- marker is a flex item too, so it wrapped as well — and once the note
+   needed its own row the marker dropped to a third line on its own, reading as
+   a stray dash under the heading rather than as the control that opens the
+   section. Taking it out of the flow pins it to the right edge whatever the
+   text does; the padding above reserves its column. */
+.sos-fee-reference summary::after {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
 
 /* One focus language. Controls with their own focus style keep it (this is
    zero-specificity via :where); anything that had none gets the panel ring,

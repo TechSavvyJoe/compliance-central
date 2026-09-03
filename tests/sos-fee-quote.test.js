@@ -282,7 +282,12 @@ test("local form builds one semantic SOS batch and validates commercial details"
   // The caption moved out of the label and under the input: inside the label it
   // wrapped to two lines and made its cell taller than the control beside it.
   assert.match(sidepanelHtml, /<label for="sosPurchaseDate">Plate purchase date<\/label>/);
-  assert.match(sidepanelHtml, /<small id="sosPurchaseDateHint">Changes the fee · defaults to today<\/small>/);
+  const purchaseHint = /<small id="sosPurchaseDateHint">([^<]+)<\/small>/.exec(sidepanelHtml);
+  assert.ok(purchaseHint, "the caption must stay a <small> sibling, not move back into the label");
+  // The two things the hint exists to tell a salesperson: the date moves the
+  // price, and leaving it empty is a real choice rather than an omission.
+  assert.match(purchaseHint[1], /fee/i);
+  assert.match(purchaseHint[1], /blank|empty|today/i);
   assert.doesNotMatch(sidepanelHtml, /Passport &amp; purchase date/);
 });
 

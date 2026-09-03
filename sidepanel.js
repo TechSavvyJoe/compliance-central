@@ -906,6 +906,10 @@ function renderSosReadiness() {
     errors = [];
   }
   const n = errors.length;
+  // Once a fee has been calculated there is nothing left to be ready for, and
+  // "Ready to calculate." printed under a finished total reads as if the run
+  // never happened. The status bar above already reports the outcome.
+  if (n === 0 && currentSosFeeQuote) { el.textContent = ""; el.classList.remove("is-ready"); return; }
   el.textContent = n === 0 ? "Ready to calculate." : `${n} detail${n === 1 ? "" : "s"} left`;
   el.classList.toggle("is-ready", n === 0);
   if (sosSubmitAttempted) showSosValidation(errors, { focusFirst: false });
@@ -1330,7 +1334,7 @@ function renderSosFeeQuote() {
       ? sourceLabel(quote.source)
       : sosWorkspaceBusy
         ? "Checking SOS"
-        : "Ready locally";
+        : "Not calculated yet";
     elements.sosQuoteSource.classList.toggle(
       "is-calculated",
       quote?.source === SOS_QUOTE_SOURCE.calculated
@@ -1349,6 +1353,10 @@ function renderSosFeeQuote() {
   }
   if (quote) setSosQuoteMode(quote.mode);
   renderSosPlatePreview();
+  // The readiness line now depends on whether a quote exists, so it has to be
+  // repainted wherever the quote changes — clearing one, or having it
+  // invalidated by an edit — not only on keystrokes into the form.
+  renderSosReadiness();
 }
 
 async function restoreSosFeeQuote() {
@@ -1728,7 +1736,7 @@ async function invalidateSosQuoteAfterEdit() {
       await clearSosFeeQuote();
     } catch (error) {
       console.error("Could not remove the stale SOS fee quote:", error);
-      showToast("The older SOS quote could not be removed from this session.", "error");
+      showToast("The previous fee quote could not be cleared. Calculate again to replace it.", "error");
     }
   }
   setSosWorkspaceStatus("Selections changed. Calculate again when complete.");
@@ -1769,7 +1777,7 @@ async function calculateSosFee() {
   sosWorkspaceBusy = true;
   setSosProgress(true);
   renderSosWorkspace();
-  setSosWorkspaceStatus("Sending all completed choices to the official calculator…", "busy");
+  setSosWorkspaceStatus("Running the official Michigan SOS calculator…", "busy");
   try {
     const response = await chrome.runtime.sendMessage({
       type: "SOS_FEE_CALCULATE",
@@ -1799,13 +1807,12 @@ async function calculateSosFee() {
       { msrpCents }
     );
     if (!quote) {
-      throw new Error("Michigan SOS returned an incomplete fee result. No quote was created.");
+      throw new Error("Michigan SOS returned an incomplete fee. Try calculating again.");
     }
     currentSosFeeQuote = await saveSosFeeQuote(quote);
     pendingVinDecode = null;
     renderSosFeeQuote();
-    setSosWorkspaceStatus("Official SOS fee returned to the sidebar. Nothing opened on this computer.");
-    showToast("Official SOS fee calculated for this browser session.", "success");
+    setSosWorkspaceStatus("Official SOS calculation complete.", "ok");
   } catch (error) {
     setSosWorkspaceStatus(
       error?.message || "Michigan SOS could not calculate the fee.",
@@ -1840,13 +1847,13 @@ async function handleSosVinLookup() {
     const applied = await applyPendingVinSuggestions();
     if (elements.sosVinLookupStatus) {
       elements.sosVinLookupStatus.textContent = decoded.partial
-        ? `Partial decode: ${summary}. Filled ${applied} supported field${applied === 1 ? "" : "s"}; review all selections.`
-        : `${summary}: filled ${applied} supported field${applied === 1 ? "" : "s"}. Review before calculating.`;
+        ? `Partial VIN match — ${summary}. Filled ${applied} field${applied === 1 ? "" : "s"}; check every selection.`
+        : `${summary}: filled ${applied} field${applied === 1 ? "" : "s"}. Check them before calculating.`;
     }
     setSosWorkspaceStatus(
       applied
-        ? `VIN assist filled ${applied} easy field${applied === 1 ? "" : "s"} locally. Nothing was sent to SOS.`
-        : "NHTSA identified the vehicle, but did not provide a safe match for these SOS fields.",
+        ? `NHTSA filled ${applied} field${applied === 1 ? "" : "s"} from the VIN. Check them, then calculate.`
+        : "NHTSA identified the vehicle but could not fill any of these fields. Set them by hand.",
       applied ? "" : "error"
     );
   } catch (error) {
@@ -1927,7 +1934,7 @@ async function clearCurrentSosFeeQuote() {
     renderSosFeeQuote();
     renderSosWorkspace();
     setSosWorkspaceStatus("Quote cleared. Complete the fields, then calculate.");
-    showToast("SOS fee quote cleared from this browser session.", "success");
+    showToast("Fee quote cleared.", "success");
   } catch (error) {
     console.error("Could not clear SOS fee quote:", error);
     showToast("Could not clear the SOS fee quote.", "error");
@@ -1943,7 +1950,7 @@ async function handleSosQuoteModeChange() {
   }
   renderSosFeeQuote();
   renderSosWorkspace();
-  setSosWorkspaceStatus("Registration choice changed. Complete the local fields, then calculate.");
+  setSosWorkspaceStatus("Registration choice changed. Complete the fields, then calculate.");
 }
 
 async function printSosFeeQuote() {

@@ -195,14 +195,27 @@ export async function clearSosFeeQuote() {
   await chrome.storage.session.remove(STORAGE_KEYS.sosFeeQuote);
 }
 
+/**
+ * The line under the headline total. It used to repeat the source, the amount
+ * and the term that are already set in large type directly above it, then
+ * finish with a raw toLocaleString() — seconds and all. It now carries only
+ * what is not already on screen: which registration this was, which vehicle,
+ * and when it was run. The time of day is enough for a quote calculated today;
+ * an older one keeps its date so nobody quotes a stale fee to a customer.
+ */
 export function quoteStatusText(quote) {
   if (!quote) {
     return "No fee calculated yet.";
   }
-  const when = new Date(quote.calculatedAt).toLocaleString();
-  return `${sourceLabel(quote.source)}: ${formatMoney(quote.feeCents)} for ${modeLabel(quote.mode)}${
+  const at = new Date(quote.calculatedAt);
+  const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const sameDay = at.toDateString() === new Date().toDateString();
+  const when = sameDay
+    ? time
+    : `${at.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
+  return `${modeLabel(quote.mode)}${
     quote.vehicleDescription ? ` · ${quote.vehicleDescription}` : ""
-  } · ${when}`;
+  } · calculated ${when}`;
 }
 
 /** "8 months · expires Mar 14, 2027" — empty when the state gave neither. */

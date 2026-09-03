@@ -156,18 +156,18 @@
           <div class="form-row">
             <div class="form-group">
               <label for="firstName">First Name <span class="required">*</span></label>
-              <input type="text" id="firstName" placeholder="John" autocomplete="off" aria-required="true" />
+              <input type="text" id="firstName" autocomplete="off" aria-required="true" />
             </div>
             <div class="form-group">
               <label for="middleName">Middle Name</label>
-              <input type="text" id="middleName" placeholder="Robert" autocomplete="off" />
+              <input type="text" id="middleName" autocomplete="off" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label for="lastName">Last Name <span class="required">*</span></label>
-              <input type="text" id="lastName" placeholder="Smith" autocomplete="off" aria-required="true" />
+              <input type="text" id="lastName" autocomplete="off" aria-required="true" />
             </div>
             <div class="form-group form-group-small">
               <label for="suffix">Suffix</label>
@@ -203,7 +203,7 @@
             </div>
             <div class="form-group">
               <label for="dlnPid">DLN/PID <span class="required">*</span></label>
-              <input type="text" id="dlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" aria-describedby="dlnPidHelp" />
+              <input type="text" id="dlnPid" placeholder="e.g. S123456789012" autocomplete="off" aria-required="true" aria-describedby="dlnPidHelp" />
               <small id="dlnPidHelp" class="helper-text">Front of the ID — letter + 12 digits, or a 9–12 digit PID</small>
             </div>
           </div>
@@ -228,18 +228,18 @@
           <div class="form-row">
             <div class="form-group">
               <label for="cbFirstName">First Name <span class="required">*</span></label>
-              <input type="text" id="cbFirstName" placeholder="Jane" autocomplete="off" aria-required="true" />
+              <input type="text" id="cbFirstName" autocomplete="off" aria-required="true" />
             </div>
             <div class="form-group">
               <label for="cbMiddleName">Middle Name</label>
-              <input type="text" id="cbMiddleName" placeholder="Marie" autocomplete="off" />
+              <input type="text" id="cbMiddleName" autocomplete="off" />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label for="cbLastName">Last Name <span class="required">*</span></label>
-              <input type="text" id="cbLastName" placeholder="Doe" autocomplete="off" aria-required="true" />
+              <input type="text" id="cbLastName" autocomplete="off" aria-required="true" />
             </div>
             <div class="form-group form-group-small">
               <label for="cbSuffix">Suffix</label>
@@ -275,7 +275,7 @@
             </div>
             <div class="form-group">
               <label for="cbDlnPid">DLN/PID <span class="required">*</span></label>
-              <input type="text" id="cbDlnPid" placeholder="S123456789012" autocomplete="off" aria-required="true" aria-describedby="cbDlnPidHelp" />
+              <input type="text" id="cbDlnPid" placeholder="e.g. S123456789012" autocomplete="off" aria-required="true" aria-describedby="cbDlnPidHelp" />
               <small id="cbDlnPidHelp" class="helper-text">Front of the ID — letter + 12 digits, or a 9–12 digit PID</small>
             </div>
           </div>
@@ -302,7 +302,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="tradeVin">VIN</label>
-                <input type="text" id="tradeVin" placeholder="1HGBH41JXMN109186" maxlength="17" autocomplete="off" aria-describedby="tradeVinHelp" />
+                <input type="text" id="tradeVin" placeholder="e.g. 1HGBH41JXMN109186" maxlength="17" autocomplete="off" aria-describedby="tradeVinHelp" />
                 <small id="tradeVinHelp" class="helper-text">Leave blank if no trade-in — the title/lien check runs only when a VIN is provided</small>
               </div>
             </div>
@@ -390,7 +390,7 @@
               </div>
               <div class="sos-control">
                 <label for="sosMsrp">MSRP</label>
-                <input id="sosMsrp" type="text" inputmode="decimal" maxlength="10" autocomplete="off" placeholder="$42,500" />
+                <input id="sosMsrp" type="text" inputmode="decimal" maxlength="10" autocomplete="off" placeholder="e.g. $42,500" />
               </div>
               <fieldset id="sosFirstTitle" class="sos-control sos-segmented-field">
                 <legend>Vehicle status</legend>
@@ -430,19 +430,19 @@
               <div>
                 <span class="sos-preview-kicker">Selected artwork</span>
                 <strong id="sosPlatePreviewLabel">Pure Michigan</strong>
-                <small>Click to inspect · zoomable official image</small>
+                <small>Open the full-size design</small>
               </div>
             </button>
             <div id="sosPlatePreviewUnavailable" class="sos-plate-preview-unavailable" hidden>
-              <strong>Official image after calculation</strong>
-              <span>SOS does not publish a separate gallery image for this exact choice. The live calculator image will appear here when available.</span>
+              <strong>No preview for this combination</strong>
+              <span>Michigan does not publish a sample image for this plate type and design together. Calculate the fee and the state's own image will appear here if it has one.</span>
             </div>
 
             <div class="sos-timing-row">
               <div class="sos-control sos-purchase-date">
                 <label for="sosPurchaseDate">Plate purchase date</label>
                 <input id="sosPurchaseDate" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="MM/DD/YYYY" aria-describedby="sosPurchaseDateHint" />
-                <small id="sosPurchaseDateHint">Changes the fee · defaults to today</small>
+                <small id="sosPurchaseDateHint">A later date can change the fee. Leave blank for today.</small>
               </div>
               <fieldset class="sos-control sos-segmented-field">
                 <legend>Recreation Passport</legend>
@@ -455,7 +455,7 @@
           <div id="sosTransferFields" class="sos-local-workbench" hidden>
             <div class="sos-control">
               <label for="sosTransferPlateNumber">Plate being transferred</label>
-              <input id="sosTransferPlateNumber" type="text" inputmode="text" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC 1234" />
+              <input id="sosTransferPlateNumber" type="text" inputmode="text" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. ABC 1234" />
               <small>The vehicle details above describe the vehicle being purchased.</small>
             </div>
             <fieldset id="sosTransferChangePlate" class="sos-control sos-segmented-field">
@@ -504,7 +504,7 @@
           <details class="sos-fee-reference">
             <summary>
               <span>2026 Michigan fee add-ons</span>
-              <small>Official amounts · verified Aug 18</small>
+              <small>Published amounts, checked Aug 18, 2026</small>
             </summary>
             <div class="sos-fee-reference-body">
               <p class="sos-fee-reference-note">These are published reference amounts. The official calculation above remains the amount to use.</p>
@@ -542,7 +542,7 @@
               <p class="sos-fee-catch">Digital plates are no longer valid in Michigan. Owners were required to replace them with standard metal plates by Aug. 9, 2026.</p>
             </div>
           </details>
-          <p class="sos-quote-privacy">Session only. Nothing is filed; no SOS login, VIN, plate, customer, or quote data is kept after the browser session.</p>
+          <p class="sos-quote-privacy">Nothing here is filed with the state. No SOS login, VIN, plate number, customer detail or quote is kept once you close Chrome.</p>
         </section>
 
         <section class="action-section" data-workspace-panel="screening">
@@ -920,7 +920,7 @@
 
       <div id="loadingOverlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
         <div class="loading-spinner" aria-hidden="true"></div>
-        <p class="loading-text" id="loadingText">Processing...</p>
+        <p class="loading-text" id="loadingText">Working…</p>
       </div>
     </div>
 

@@ -701,15 +701,35 @@ export function getOfacReportPageHTML({
  * default the screening actually ran at.
  */
 export function screeningScopeSentence(ofac, lastUpdate) {
-  const retrieved = lastUpdate || ofac?.lastUpdate || "Unknown";
   const published =
     ofac?.publishDate && ofac.publishDate !== "Unknown"
       ? ` (published by OFAC ${ofac.publishDate})`
       : "";
-  const entries = Number.isFinite(Number(ofac?.entriesSearched))
-    ? `${Number(ofac.entriesSearched).toLocaleString()} entries were compared`
-    : "Every entry on that list was compared";
-  return `The subject above was compared against the U.S. Treasury OFAC Specially Designated Nationals (SDN) list, retrieved ${retrieved}${published}. ${entries} at a name-similarity threshold of ${ofacThreshold(ofac)}% or higher.`;
+
+  // The worker stores the literal string "Unknown" when the device has no
+  // retrieval date, so this sentence used to read "retrieved Unknown" on a
+  // record a dealership hands to an auditor. A formal document should not
+  // assert what it does not know: with no date the clause is dropped and the
+  // running head's "Database Updated" field carries the absence instead.
+  const retrieved = lastUpdate || ofac?.lastUpdate || "";
+  const source =
+    retrieved && retrieved !== "Unknown"
+      ? `, retrieved ${retrieved}${published}`
+      : published;
+
+  // Likewise for coverage. The fallback claimed "Every entry on that list was
+  // compared" precisely when the count was missing — an unevidenced claim of
+  // completeness, which is the one thing a screening record must never make.
+  // A genuine passing result always carries a count (an empty list fails
+  // closed in the worker), so this only fires on a malformed or legacy record.
+  const count = Number(ofac?.entriesSearched);
+  const threshold = `a name-similarity threshold of ${ofacThreshold(ofac)}% or higher`;
+  const scope =
+    Number.isFinite(count) && count > 0
+      ? `${count.toLocaleString()} entries were compared at ${threshold}.`
+      : `Names were compared at ${threshold}. This record does not state how many list entries were compared.`;
+
+  return `The subject above was compared against the U.S. Treasury OFAC Specially Designated Nationals (SDN) list${source}. ${scope}`;
 }
 
 export function screeningScopeHTML(ofac, lastUpdate) {

@@ -394,3 +394,41 @@ test("no trade-in is explicitly not applicable rather than incomplete", () => {
   assert.equal(titleRow.incomplete, false);
   assert.equal(summary.decision.level, "APPROVED");
 });
+
+// A screening record is handed to auditors and customers, so it must never
+// assert something it does not know. The sentence used to read "retrieved
+// Unknown" (the worker stores that literal string when the device has no
+// retrieval date), and — precisely when the entry count was missing — claimed
+// "Every entry on that list was compared", which is an unevidenced claim of
+// full coverage.
+test("the screening sentence states only what the result actually knows", async () => {
+  const { screeningScopeSentence } = await import("../src/sidepanel/export.js");
+
+  const known = screeningScopeSentence(
+    { entriesSearched: 17342, threshold: 85, lastUpdate: "8/30/2026", publishDate: "8/29/2026" },
+    null
+  );
+  assert.match(known, /retrieved 8\/30\/2026/);
+  assert.match(known, /published by OFAC 8\/29\/2026/);
+  assert.match(known, /17,342 entries were compared/);
+
+  // No retrieval date: the clause goes, rather than printing the placeholder.
+  const undated = screeningScopeSentence(
+    { entriesSearched: 17342, threshold: 85, lastUpdate: "Unknown" },
+    null
+  );
+  assert.doesNotMatch(undated, /Unknown/);
+  assert.doesNotMatch(undated, /retrieved/);
+  assert.match(undated, /17,342 entries were compared/);
+
+  // No count: say so, never claim the whole list was covered.
+  const uncounted = screeningScopeSentence({ threshold: 85, lastUpdate: "8/30/2026" }, null);
+  assert.doesNotMatch(uncounted, /Every entry/i);
+  assert.match(uncounted, /does not state how many/i);
+  assert.match(uncounted, /threshold of 85% or higher/);
+
+  // A zero count is not evidence of coverage either.
+  const zero = screeningScopeSentence({ entriesSearched: 0, threshold: 85 }, null);
+  assert.doesNotMatch(zero, /Every entry/i);
+  assert.doesNotMatch(zero, /0 entries were compared/);
+});

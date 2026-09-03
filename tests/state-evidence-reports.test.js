@@ -63,6 +63,8 @@ function pdfContext() {
   const doc = {
     addImage: (...args) => calls.images.push(args),
     addPage() { calls.addPages++; },
+    // A verdict draws its own glyph: neither mark exists in the shipped faces.
+    circle() {},
     getImageProperties: () => ({ width: 1280, height: 1800 }),
     // The running head measures each half of a "label: value" pair so the two
     // cannot overprint; the double needs the same call jsPDF provides.
@@ -311,9 +313,10 @@ test("PDF fallback labels missing or invalid state evidence honestly", () => {
   ).render(fallbackPdf.ctx);
 
   assert.equal(fallbackPdf.calls.images.length, 0);
+  // The download says word for word what the printed sheet says.
   assert.ok(
     fallbackPdf.calls.text.includes(
-      "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE"
+      "Actual Michigan state-site screenshot unavailable."
     )
   );
   assert.ok(
@@ -344,7 +347,7 @@ test("PDF fallbacks never embed unconfirmed Michigan captures", () => {
     assert.equal(pdf.calls.images.length, 0);
     assert.ok(
       pdf.calls.text.includes(
-        "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE"
+        "Actual Michigan state-site screenshot unavailable."
       )
     );
   }

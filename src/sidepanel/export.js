@@ -10,6 +10,9 @@
 import { sanitizeHTML, buildSanitizedName } from "./dom-utils.js";
 import { registerPdfFonts, PDF_FACE } from "../../lib/pdf-fonts.js";
 import { showToast } from "./toast.js";
+import { sanitizeDealerLogo } from "./sos-fee-quote.js";
+import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { CONFIG } from "../../lib/config.js";
 import {
   formatTitleType,
   cleanLienHolder,
@@ -34,6 +37,24 @@ import {
   reportDocumentCSS,
   schedulePrint,
 } from "../../lib/print-html.js";
+
+/**
+ * Two glyphs carry a verdict at a glance: a check for a result that cleared,
+ * and an exclamation for one that did not. Both are drawn in the status colour
+ * the box already uses, so the icon repeats the outcome rather than adding a
+ * third signal to read.
+ */
+const VERDICT_ICON_PATH = Object.freeze({
+  check:
+    "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z",
+  alert:
+    "M11 7h2v6h-2zm0 8h2v2h-2zm1-13C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z",
+});
+
+function verdictIconHTML(variant) {
+  const path = variant === "pass" ? VERDICT_ICON_PATH.check : VERDICT_ICON_PATH.alert;
+  return `<svg class="verdict-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
+}
 
 // DOB-disambiguation confidence labels for the OFAC report (mirrors the card).
 const OFAC_CONF_LABEL = {
@@ -128,6 +149,80 @@ export function formatDlnForMdos(dln) {
 
 function optionalReportValue(value) {
   return sanitizeHTML(String(value || "").trim());
+}
+
+/* ------------------------------------------------------------------ *
+ * Dealership branding
+ *
+ * A screening record is filed and emailed by a dealership, so the sheet
+ * should read as that dealership's paperwork. The name and the logo are a
+ * per-install setting — never compiled in, because a publicly listed
+ * extension must not hand every installer one store's name or a
+ * manufacturer's trade dress — and both are optional: with neither set,
+ * every document falls back to exactly the masthead it had before.
+ *
+ * Compliance Central stays on the page as the system that produced the
+ * record: it names the record type, the running head, and the footer.
+ * ------------------------------------------------------------------ */
+
+/** The longest dealership name a masthead can hold on one line. */
+const MAX_DEALER_NAME = 80;
+
+/**
+ * Read the branding straight from the setting rather than making every call
+ * site remember to pass it, so one Settings entry brands every document and
+ * no export path can be left unbranded.
+ *
+ * @returns {Promise<{dealerName: string, logoUrl: string}>}
+ */
+export async function loadReportBranding() {
+  try {
+    const stored = await chrome.storage.local.get([
+      STORAGE_KEYS.dealershipName,
+      STORAGE_KEYS.dealershipLogo,
+    ]);
+    return normalizeReportBranding({
+      dealerName: stored[STORAGE_KEYS.dealershipName],
+      logoUrl: stored[STORAGE_KEYS.dealershipLogo],
+    });
+  } catch {
+    return normalizeReportBranding();
+  }
+}
+
+/** Accept only a name we can print and a logo we produced ourselves. */
+export function normalizeReportBranding(branding = {}) {
+  return {
+    dealerName: String(branding.dealerName || "")
+      .trim()
+      .slice(0, MAX_DEALER_NAME),
+    logoUrl: sanitizeDealerLogo(branding.logoUrl),
+  };
+}
+
+/**
+ * The masthead every printed record wears: the dealership's logo and name
+ * lead, the record's own title follows, and the shared navy rule with its one
+ * gold hairline closes it. With no dealership configured this collapses to
+ * the title over the same rule.
+ */
+function brandedMastheadHTML(title, branding = {}) {
+  const { dealerName, logoUrl } = normalizeReportBranding(branding);
+  if (!dealerName && !logoUrl) {
+    return `<h1 class="main-title">${sanitizeHTML(title)}</h1>`;
+  }
+  const logo = logoUrl
+    ? `<img class="brand-logo" src="${sanitizeHTML(logoUrl)}" alt="${sanitizeHTML(dealerName || "Dealership")}" />`
+    : "";
+  const name = dealerName
+    ? `<p class="brand-name">${sanitizeHTML(dealerName)}</p>`
+    : "";
+  return `<header class="brand-masthead">
+    ${logo}
+    <div class="brand-copy">${name}<h1 class="brand-title">${sanitizeHTML(title)}</h1></div>
+  </header>
+  <div class="masthead-rule"></div>
+  <div class="masthead-accent"></div>`;
 }
 
 /**
@@ -509,6 +604,7 @@ export function ofacReportHTML({
   ofac,
   lastUpdate,
   subjectLabel = "SUBJECT SCREENED",
+  branding,
 }) {
   return numberPrintedPages(`<!DOCTYPE html>
 <html>
@@ -519,7 +615,7 @@ export function ofacReportHTML({
   </style>
 </head>
 <body>
-  ${getOfacReportPageHTML({ customer, ofac, lastUpdate, subjectLabel })}
+  ${getOfacReportPageHTML({ customer, ofac, lastUpdate, subjectLabel, branding })}
 </body>
 </html>`);
 }
@@ -537,6 +633,7 @@ export function getOfacReportPageHTML({
   lastUpdate,
   subjectLabel = "SUBJECT SCREENED",
   screenedAt,
+  branding,
 }) {
   const subject = customer || {};
   const timestamp = reportDate(Date.now());
@@ -558,7 +655,7 @@ export function getOfacReportPageHTML({
     </div>
   </div>
   <p class="app-notice">App-generated record · Not issued or endorsed by the U.S. Treasury or OFAC</p>
-  <h1 class="main-title">Compliance Central OFAC Screening Record</h1>
+  ${brandedMastheadHTML("Compliance Central OFAC Screening Record", branding)}
   <p class="doc-sub">Screening against the U.S. Treasury OFAC SDN list<br><em>User-requested automated name comparison; potential matches require human review.</em></p>
   <div class="subject">
     <h3>${sanitizeHTML(subjectLabel)}</h3>
@@ -570,10 +667,11 @@ export function getOfacReportPageHTML({
     </table>
   </div>
   <div class="result ${outcome.variant}">
-    <h2>${sanitizeHTML(outcome.title)}</h2>
+    <h2>${verdictIconHTML(outcome.variant)}${sanitizeHTML(outcome.title)}</h2>
     <p>${sanitizeHTML(outcome.subtitle)}</p>
     ${ofacMatchesHTML(ofac, outcome)}
   </div>
+  ${screeningScopeHTML(ofac, lastUpdate)}
   ${
     ofac?.stale
       ? `<div class="certification is-alert"><p><strong>Data Freshness Notice:</strong> This screening used cached SDN data (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
@@ -587,6 +685,45 @@ export function getOfacReportPageHTML({
     <p>Generated by Compliance Central — Michigan Dealer Compliance Hub.</p>`
   )}
 </div>`;
+}
+
+/**
+ * What the screening actually compared, and against what.
+ *
+ * A cleared result used to be an empty page: a verdict word and a disclaimer,
+ * with nothing saying which list was searched, when it was retrieved, or how
+ * close a name had to be to count. One affirmative sentence turns the same
+ * page into a record a compliance file can stand on, and it costs four lines
+ * rather than the inch and a half a parameter table would take from a sheet
+ * that already has to hold the verdict and the certification.
+ *
+ * Every value comes from the result itself; the threshold falls back to the
+ * default the screening actually ran at.
+ */
+export function screeningScopeSentence(ofac, lastUpdate) {
+  const retrieved = lastUpdate || ofac?.lastUpdate || "Unknown";
+  const published =
+    ofac?.publishDate && ofac.publishDate !== "Unknown"
+      ? ` (published by OFAC ${ofac.publishDate})`
+      : "";
+  const entries = Number.isFinite(Number(ofac?.entriesSearched))
+    ? `${Number(ofac.entriesSearched).toLocaleString()} entries were compared`
+    : "Every entry on that list was compared";
+  return `The subject above was compared against the U.S. Treasury OFAC Specially Designated Nationals (SDN) list, retrieved ${retrieved}${published}. ${entries} at a name-similarity threshold of ${ofacThreshold(ofac)}% or higher.`;
+}
+
+export function screeningScopeHTML(ofac, lastUpdate) {
+  return `<div class="note screening-scope"><p><strong>What was screened:</strong> ${sanitizeHTML(
+    screeningScopeSentence(ofac, lastUpdate)
+  )}</p></div>`;
+}
+
+/** The similarity score a name had to reach to be reported as a match. */
+export function ofacThreshold(ofac) {
+  const reported = Number(ofac?.threshold);
+  return Number.isFinite(reported) && reported > 0
+    ? reported
+    : CONFIG.ofac.defaultThreshold;
 }
 
 export function ofacMatchesHTML(ofac, outcome = ofacResultArgs(ofac)) {
@@ -623,7 +760,7 @@ export function ofacMatchesHTML(ofac, outcome = ofacResultArgs(ofac)) {
   return `<div class="matches"><strong>Potential Matches (${totalMatches}):</strong><ul>${list}</ul>${omitted}</div>`;
 }
 
-export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
+export function getRepeatReportPageHTML(currentResults, isCoBuyer = false, branding) {
   const c = isCoBuyer ? currentResults.customer?.coBuyer : currentResults.customer;
   if (!c) return "";
   const result = isCoBuyer
@@ -638,9 +775,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
   const resultClass = outcome.variant === "pass" ? "eligible-card" : "eligible-card result-review";
   const dlnPid = sanitizeHTML(formatDlnForMdos(c.dlnPid));
   const resultIconPath =
-    outcome.variant === "pass"
-      ? "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
-      : "M11 7h2v6h-2zm0 8h2v2h-2zm1-13C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z";
+    outcome.variant === "pass" ? VERDICT_ICON_PATH.check : VERDICT_ICON_PATH.alert;
 
   return `
     <div class="page repeat-page">
@@ -652,7 +787,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
           <strong>Report generated:</strong> ${sanitizeHTML(generatedAt)}
         </div>
       </div>
-      <div class="main-title">Michigan Repeat Offender Check</div>
+      ${brandedMastheadHTML("Michigan Repeat Offender Check", branding)}
 
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
@@ -713,7 +848,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false) {
   `;
 }
 
-export function getTitleReportPageHTML(currentResults) {
+export function getTitleReportPageHTML(currentResults, branding) {
   const c = currentResults.customer;
   if (!c) return "";
   const title = currentResults.checks?.title || {};
@@ -749,7 +884,7 @@ export function getTitleReportPageHTML(currentResults) {
           <strong>Report generated:</strong> ${sanitizeHTML(generatedAt)}
         </div>
       </div>
-      <div class="main-title">Michigan Title & Lien Check</div>
+      ${brandedMastheadHTML("Michigan Title & Lien Check", branding)}
 
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
@@ -764,6 +899,9 @@ export function getTitleReportPageHTML(currentResults) {
         </div>
 
         <div class="eligible-card ${outcome.statusKey === "pass" ? "" : "result-review"}">
+          <svg class="eligible-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${
+            outcome.statusKey === "pass" ? VERDICT_ICON_PATH.check : VERDICT_ICON_PATH.alert
+          }"/></svg>
           <div class="eligible-text"><strong>${sanitizeHTML(outcome.title)}</strong>${sanitizeHTML(outcome.subtitle)}
           <div class="eligible-note">This generated summary is not an MDOS-issued document. State-site evidence was unavailable or could not be verified; re-run the check before relying on this record.</div></div>
         </div>
@@ -919,7 +1057,7 @@ export function reportDecisionSummary(currentResults) {
   return { decision, rows, incomplete };
 }
 
-export function getFinalDecisionReportPageHTML(currentResults) {
+export function getFinalDecisionReportPageHTML(currentResults, branding) {
   const summary = reportDecisionSummary(currentResults);
   const level = ["APPROVED", "DENIED", "REVIEW"].includes(summary.decision.level)
     ? summary.decision.level
@@ -954,9 +1092,11 @@ export function getFinalDecisionReportPageHTML(currentResults) {
         <strong>Report generated:</strong> ${sanitizeHTML(reportDate(Date.now()))}
       </div>
     </div>
-    <div class="main-title">Overall Compliance Decision</div>
+    ${brandedMastheadHTML("Overall Compliance Decision", branding)}
     <div class="overall-decision decision-${level.toLowerCase()}">
-      <strong>${sanitizeHTML(level === "REVIEW" ? "REVIEW REQUIRED" : level)}</strong>
+      <strong>${verdictIconHTML(level === "APPROVED" ? "pass" : "warn")}${sanitizeHTML(
+        level === "REVIEW" ? "REVIEW REQUIRED" : level
+      )}</strong>
       <span>${sanitizeHTML(summary.decision.reason)}</span>
     </div>
     <h2 class="check-summary-title">Check summary</h2>
@@ -971,7 +1111,7 @@ export function getFinalDecisionReportPageHTML(currentResults) {
   </div>`;
 }
 
-export function combinedAllReportHTML(currentResults, selectedKeys) {
+export function combinedAllReportHTML(currentResults, selectedKeys, branding) {
   const customer = currentResults?.customer || {};
   const ofac = currentResults?.checks?.ofac;
   const repeatOffender = currentResults?.checks?.repeatOffender;
@@ -985,7 +1125,7 @@ export function combinedAllReportHTML(currentResults, selectedKeys) {
 
   const sections = [];
   if (selected.has(REPORT_KEYS.decision)) {
-    sections.push(getFinalDecisionReportPageHTML(currentResults));
+    sections.push(getFinalDecisionReportPageHTML(currentResults, branding));
   }
 
   if (ofac && selected.has(REPORT_KEYS.buyerOfac)) {
@@ -995,6 +1135,7 @@ export function combinedAllReportHTML(currentResults, selectedKeys) {
         ofac,
         lastUpdate: ofac.lastUpdate,
         screenedAt: currentResults.timestamp,
+        branding,
       })
     );
   }
@@ -1007,20 +1148,21 @@ export function combinedAllReportHTML(currentResults, selectedKeys) {
         lastUpdate: cbOfac.lastUpdate,
         subjectLabel: "CO-BUYER SUBJECT SCREENED",
         screenedAt: currentResults.timestamp,
+        branding,
       })
     );
   }
 
   if (repeatOffender && selected.has(REPORT_KEYS.buyerRepeat)) {
-    sections.push(getRepeatReportPageHTML(currentResults, false));
+    sections.push(getRepeatReportPageHTML(currentResults, false, branding));
   }
 
   if (cbRepeat && coBuyer && selected.has(REPORT_KEYS.coBuyerRepeat)) {
-    sections.push(getRepeatReportPageHTML(currentResults, true));
+    sections.push(getRepeatReportPageHTML(currentResults, true, branding));
   }
 
   if (title && selected.has(REPORT_KEYS.title)) {
-    sections.push(getTitleReportPageHTML(currentResults));
+    sections.push(getTitleReportPageHTML(currentResults, branding));
   }
 
   return numberPrintedPages(`<!DOCTYPE html>
@@ -1074,6 +1216,7 @@ export async function printOfacReport(currentResults) {
       customer: currentResults.customer,
       ofac,
       lastUpdate,
+      branding: await loadReportBranding(),
     })
   );
 }
@@ -1113,32 +1256,33 @@ export async function printCoBuyerOfacReport(currentResults) {
       ofac: cbOfac,
       lastUpdate,
       subjectLabel: "CO-BUYER SUBJECT SCREENED",
+      branding: await loadReportBranding(),
     })
   );
 }
 
-export function printRepeatScreenshot(currentResults) {
+export async function printRepeatScreenshot(currentResults) {
   if (!currentResults?.checks?.repeatOffender) {
     showToast("No Repeat Offender results available.", "info");
     return;
   }
-  openAndPrint(repeatReportHTML(currentResults, false));
+  openAndPrint(repeatReportHTML(currentResults, false, await loadReportBranding()));
 }
 
-export function printCoBuyerRepeatScreenshot(currentResults) {
+export async function printCoBuyerRepeatScreenshot(currentResults) {
   if (!currentResults?.checks?.coBuyerRepeatOffender || !currentResults?.customer?.coBuyer) {
     showToast("No Co-Buyer Repeat Offender results available.", "info");
     return;
   }
-  openAndPrint(repeatReportHTML(currentResults, true));
+  openAndPrint(repeatReportHTML(currentResults, true, await loadReportBranding()));
 }
 
-export function printTitleScreenshot(currentResults) {
+export async function printTitleScreenshot(currentResults) {
   if (!currentResults?.checks?.title) {
     showToast("No Title/Lien results available.", "info");
     return;
   }
-  openAndPrint(titleReportHTML(currentResults));
+  openAndPrint(titleReportHTML(currentResults, await loadReportBranding()));
 }
 
 export async function printAllReports(currentResults, selectedKeys) {
@@ -1453,20 +1597,73 @@ function drawAppNotice(ctx, text) {
  * and the single gold hairline flush beneath it. Identical in geometry to
  * `.main-title` in the print stylesheet, down to the rule weights.
  */
-function drawMasthead(ctx, title) {
+/**
+ * jsPDF can only place a raster image. The setting also accepts an SVG or a
+ * packaged asset URL, which the printed HTML can use but a PDF cannot, so the
+ * download falls back to the dealership's name alone rather than to a gap.
+ */
+function pdfLogoDataUrl(logoUrl) {
+  return /^data:image\/(?:png|jpe?g|webp);base64,/i.test(String(logoUrl || ""))
+    ? logoUrl
+    : "";
+}
+
+/** The logo box: 0.5in tall and 2in wide at most, same as `.brand-logo`. */
+function drawBrandLogo(doc, logo, x, bottom) {
+  const maxHeight = 36;
+  const maxWidth = 144;
+  try {
+    const props = doc.getImageProperties(logo);
+    const scale = Math.min(maxWidth / props.width, maxHeight / props.height);
+    const width = props.width * scale;
+    const height = props.height * scale;
+    doc.addImage(logo, x, bottom - height, width, height);
+    return width;
+  } catch {
+    // An unreadable upload must never cost the record its masthead.
+    return 0;
+  }
+}
+
+/**
+ * The shared masthead. With a dealership configured, its logo and name lead
+ * and the record's title follows; with neither set this is exactly the
+ * unbranded masthead — a title over the heavy navy rule and its gold hairline.
+ */
+function drawMasthead(ctx, title, branding = {}) {
   const { doc, pageWidth, margin } = ctx;
+  const { dealerName, logoUrl } = normalizeReportBranding(branding);
+  const logo = pdfLogoDataUrl(logoUrl);
   const right = pageWidth - margin;
+  const nameHeight = dealerName ? TYPE.lead * 1.2 + SPACE.s1 : 0;
   const titleHeight = TYPE.masthead * LEADING.display;
-  ensureSpace(ctx, titleHeight + SPACE.s2 + RULE.heavy + RULE.accent + SPACE.s4);
+  const blockHeight = Math.max(nameHeight + titleHeight, logo ? 36 : 0);
+  ensureSpace(ctx, blockHeight + SPACE.s2 + RULE.heavy + RULE.accent + SPACE.s4);
+
+  const bottom = ctx.y + blockHeight;
+  let textLeft = margin;
+  if (logo) {
+    const width = drawBrandLogo(doc, logo, margin, bottom);
+    if (width > 0) textLeft = margin + width + SPACE.s4;
+  }
+
+  if (dealerName) {
+    doc.setFont(PDF_FACE.display, "bold");
+    doc.setFontSize(TYPE.lead);
+    setText(doc, PALETTE.navy);
+    doc.text(dealerName, textLeft, bottom - titleHeight - SPACE.s1);
+  }
 
   doc.setFont(PDF_FACE.display, "bold");
   doc.setFontSize(TYPE.masthead);
-  setText(doc, PALETTE.navy);
-  doc.text(String(title), margin, ctx.y + TYPE.masthead);
+  // Branded, the store's name is the navy line and the record title steps back
+  // to ink; unbranded, the title is the only line and keeps the navy.
+  setText(doc, dealerName ? PALETTE.ink : PALETTE.navy);
+  doc.text(String(title), textLeft, bottom - titleHeight + TYPE.masthead);
 
   // The rule is stroked on its centre line, so half of it sits below `ruleY`;
   // the gold accent starts there, leaving no paper gap between the two.
-  const ruleY = ctx.y + titleHeight + SPACE.s2 + RULE.heavy / 2;
+  const ruleY = ctx.y + blockHeight + SPACE.s2 + RULE.heavy / 2;
   setDraw(doc, PALETTE.navy);
   doc.setLineWidth(RULE.heavy);
   doc.line(margin, ruleY, right, ruleY);
@@ -1505,6 +1702,7 @@ function drawOfacRecordHeader(ctx, opts = {}) {
       "User-requested automated name comparison; potential matches require human review.",
     ],
     meta = [],
+    branding,
   } = opts;
 
   drawPageHeader(ctx, {
@@ -1512,7 +1710,7 @@ function drawOfacRecordHeader(ctx, opts = {}) {
     right: meta.filter((item) => item.side === "right"),
   });
   drawAppNotice(ctx, eyebrow);
-  drawMasthead(ctx, title);
+  drawMasthead(ctx, title, branding);
   drawDocSubtitle(ctx, subtitle);
 }
 
@@ -1522,12 +1720,12 @@ function drawOfacRecordHeader(ctx, opts = {}) {
  * order — `.page-header`, then `.main-title`.
  */
 function drawCheckHeader(ctx, opts) {
-  const { title, meta = [], metaRight = [] } = opts;
+  const { title, meta = [], metaRight = [], branding } = opts;
   drawPageHeader(ctx, {
     left: meta.filter((item) => item && item.value),
     right: metaRight.filter((item) => item && item.value),
   });
-  drawMasthead(ctx, title);
+  drawMasthead(ctx, title, branding);
 }
 
 /**
@@ -1605,6 +1803,34 @@ function drawSubjectBox(ctx, opts) {
   ctx.y += totalH + SPACE.s4;
 }
 
+/**
+ * The verdict glyph the printed page draws as an SVG: a filled disc in the
+ * status colour carrying a white check when the check cleared, or a white
+ * exclamation when it did not. Neither mark exists in the shipped faces, so
+ * both are drawn rather than typed. Returns the width it consumed.
+ */
+const VERDICT_GLYPH_WIDTH = TYPE.verdict + PRINT_METRICS.s2;
+
+function drawVerdictGlyph(doc, variant, x, top, color) {
+  const size = TYPE.verdict;
+  const r = size / 2;
+  const cx = x + r;
+  const cy = top + r;
+  setFill(doc, color);
+  doc.circle(cx, cy, r, "F");
+  setDraw(doc, PALETTE.paper);
+  doc.setLineWidth(size * 0.13);
+  if (variant === "pass") {
+    doc.line(cx - r * 0.42, cy + r * 0.02, cx - r * 0.1, cy + r * 0.36);
+    doc.line(cx - r * 0.1, cy + r * 0.36, cx + r * 0.45, cy - r * 0.36);
+  } else {
+    doc.line(cx, cy - r * 0.48, cx, cy + r * 0.12);
+    setFill(doc, PALETTE.paper);
+    doc.circle(cx, cy + r * 0.45, size * 0.075, "F");
+  }
+  return VERDICT_GLYPH_WIDTH;
+}
+
 function drawResultBox(ctx, opts) {
   const { variant = "pass", title, subtitle, extraLines = [] } = opts;
   const { doc, pageWidth, margin } = ctx;
@@ -1643,7 +1869,10 @@ function drawResultBox(ctx, opts) {
   const innerWidth = pageWidth - margin * 2 - barWidth - padding * 2;
   doc.setFont(PDF_FACE.display, "bold");
   doc.setFontSize(TYPE.verdict);
-  const titleLines = doc.splitTextToSize(String(title || "RESULT"), innerWidth);
+  const titleLines = doc.splitTextToSize(
+    String(title || "RESULT"),
+    innerWidth - VERDICT_GLYPH_WIDTH
+  );
   doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(TYPE.body);
   const subtitleLines = subtitle
@@ -1677,8 +1906,9 @@ function drawResultBox(ctx, opts) {
   doc.setFontSize(TYPE.verdict);
   setText(doc, palette.text);
   let textY = ctx.y + padding + TYPE.verdict;
+  drawVerdictGlyph(doc, variant, textLeft, textY - TYPE.verdict * 0.72, palette.text);
   for (const line of titleLines) {
-    doc.text(line, textLeft, textY);
+    doc.text(line, textLeft + VERDICT_GLYPH_WIDTH, textY);
     textY += titleLineHeight;
   }
 
@@ -1770,7 +2000,7 @@ function drawScreeningRecord(ctx, text, leadIn = "Screening record:") {
  * these as bare running text, so the one thing on the page that qualifies the
  * result read as an afterthought.
  */
-function drawNoticeCard(ctx, { lead, body, accent = PALETTE.yellowBorder }) {
+function drawNoticeCard(ctx, { lead, body, accent = PALETTE.yellowBorder, inline = false }) {
   const { doc, pageWidth, margin } = ctx;
   const padding = SPACE.s4;
   const barWidth = RULE.heavy;
@@ -1780,9 +2010,21 @@ function drawNoticeCard(ctx, { lead, body, accent = PALETTE.yellowBorder }) {
 
   doc.setFontSize(TYPE.body);
   doc.setFont(PDF_FACE.body, "bold");
-  const leadLines = doc.splitTextToSize(String(lead), innerWidth);
+  // `inline` runs the bold lead into the sentence, the way a card whose lead is
+  // a label rather than a heading reads on the printed sheet.
+  const leadWidth = inline ? doc.getTextWidth(`${lead} `) : 0;
+  const leadLines = inline ? [] : doc.splitTextToSize(String(lead), innerWidth);
   doc.setFont(PDF_FACE.body, "normal");
-  const bodyLines = body ? doc.splitTextToSize(String(body), innerWidth) : [];
+  let bodyLines = body ? doc.splitTextToSize(String(body), innerWidth) : [];
+  if (inline && body) {
+    const [first = "", ...rest] = doc.splitTextToSize(
+      String(body),
+      innerWidth - leadWidth
+    );
+    bodyLines = [first, ...doc.splitTextToSize(rest.join(" "), innerWidth)].filter(
+      (line) => line !== ""
+    );
+  }
   const totalH = padding * 2 + (leadLines.length + bodyLines.length) * lineHeight;
   ensureSpace(ctx, totalH + SPACE.s3);
 
@@ -1800,11 +2042,17 @@ function drawNoticeCard(ctx, { lead, body, accent = PALETTE.yellowBorder }) {
     doc.text(line, textLeft, ly);
     ly += lineHeight;
   }
-  doc.setFont(PDF_FACE.body, "normal");
-  for (const line of bodyLines) {
-    doc.text(line, textLeft, ly);
+  bodyLines.forEach((line, index) => {
+    if (inline && index === 0) {
+      doc.setFont(PDF_FACE.body, "bold");
+      setText(doc, PALETTE.navy);
+      doc.text(String(lead), textLeft, ly);
+      setText(doc, PALETTE.ink);
+    }
+    doc.setFont(PDF_FACE.body, "normal");
+    doc.text(line, textLeft + (inline && index === 0 ? leadWidth : 0), ly);
     ly += lineHeight;
-  }
+  });
 
   ctx.y += totalH + SPACE.s4;
 }
@@ -1999,6 +2247,7 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
   const omittedMatches = Math.max(0, totalMatches - shownMatches.length);
 
   drawOfacRecordHeader(ctx, {
+    branding: opts.branding,
     meta: [
       { label: "Screening Date", value: reportDate(ofac.timestamp) },
       { label: "Entries Searched", value: entries },
@@ -2045,6 +2294,15 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
         : [],
   });
 
+  // What was actually compared, and against what. A cleared result used to be
+  // a verdict word and a disclaimer with nothing behind it.
+  drawNoticeCard(ctx, {
+    lead: "What was screened:",
+    body: screeningScopeSentence(ofac, lastUpdate),
+    accent: PALETTE.neutralBorder,
+    inline: true,
+  });
+
   if (ofac.stale) {
     drawNoticeCard(ctx, {
       lead: "Data Freshness Notice:",
@@ -2084,8 +2342,8 @@ function subjectFullName(customer) {
 // portal returned one, else an honest note) + footer. The screenshot scales to
 // the remaining space (drawScreenshotPage), so each check stays on ONE page.
 function drawMdosResultSection(ctx, opts) {
-  const { title, meta = [], metaRight = [], subject, result, screenshot } = opts;
-  drawCheckHeader(ctx, { title, meta, metaRight });
+  const { title, meta = [], metaRight = [], subject, result, screenshot, branding } = opts;
+  drawCheckHeader(ctx, { title, meta, metaRight, branding });
   // The same standing notice the printed page leads with, so neither rendering
   // can be mistaken for a state webpage.
   drawNoticeCard(ctx, {
@@ -2113,9 +2371,11 @@ function drawMdosResultSection(ctx, opts) {
     return;
   }
 
+  // Word for word what the printed sheet's `.evidence-unavailable` card says,
+  // so one record cannot qualify itself two different ways.
   drawNoticeCard(ctx, {
-    lead: "ACTUAL MICHIGAN STATE-SITE SCREENSHOT UNAVAILABLE",
-    body: "The result above is an app-generated summary, not a Michigan Department of State webpage or document. Re-run the check before relying on it when state-site evidence is required.",
+    lead: "Actual Michigan state-site screenshot unavailable.",
+    body: "This is an app-generated summary, not a Michigan Department of State webpage or document. Re-run the check before relying on it when state-site evidence is required.",
   });
   // This page carries no capture, so it must not close with a footer claiming
   // one was captured — the download used to contradict its own notice.
@@ -2128,7 +2388,13 @@ function drawMdosResultSection(ctx, opts) {
 // portal and printing it — we do NOT rebuild the result with our own boxes.
 // (Reconstruction is reserved for OFAC, which has no portal page to capture.)
 function drawPortalCapture(ctx, opts) {
-  const { title, metaLine, screenshot, footerLines = MDOS_CAPTURE_FOOTER } = opts;
+  const {
+    title,
+    metaLine,
+    screenshot,
+    branding,
+    footerLines = MDOS_CAPTURE_FOOTER,
+  } = opts;
   const { doc, pageWidth, pageHeight, margin } = ctx;
   // The capture is someone else's page, so it is given more of the sheet than
   // the text margin allows — the same relationship `.state-evidence img` has
@@ -2138,10 +2404,21 @@ function drawPortalCapture(ctx, opts) {
   ctx.y = 24;
 
   // The same masthead every other sheet wears: title in the display face, the
-  // heavy navy rule, and the one gold hairline flush beneath it.
+  // heavy navy rule, and the one gold hairline flush beneath it. The
+  // dealership's name leads here too, but its logo does not: this page frames
+  // a state webpage, and a store's mark beside that capture would be one
+  // ambiguity too many about who issued what.
+  const { dealerName } = normalizeReportBranding(branding);
+  if (dealerName) {
+    doc.setFont(PDF_FACE.display, "bold");
+    doc.setFontSize(TYPE.lead);
+    setText(doc, PALETTE.navy);
+    doc.text(dealerName, evidenceMargin, ctx.y + TYPE.lead);
+    ctx.y += TYPE.lead * 1.2 + SPACE.s1;
+  }
   doc.setFont(PDF_FACE.display, "bold");
   doc.setFontSize(TYPE.masthead);
-  setText(doc, PALETTE.navy);
+  setText(doc, dealerName ? PALETTE.ink : PALETTE.navy);
   doc.text(`${title} — State-Site Capture`, evidenceMargin, ctx.y + TYPE.masthead);
 
   doc.setFont(PDF_FACE.body, "normal");
@@ -2190,7 +2467,7 @@ function drawPortalCapture(ctx, opts) {
 
 /** A combined-report section that renders the actual Repeat Offender portal
  * capture when a screenshot exists, else a labeled summary. */
-export function repeatSection(ro, person, title, subjectLabel) {
+export function repeatSection(ro, person, title, subjectLabel, branding) {
   const screenshot = stateEvidenceDataUrl(ro);
   const verifiedScreenshot = verifiedRepeatEvidence(ro) ? screenshot : null;
   if (verifiedScreenshot) {
@@ -2199,6 +2476,7 @@ export function repeatSection(ro, person, title, subjectLabel) {
       render: (ctx) =>
         drawPortalCapture(ctx, {
           title,
+          branding,
           metaLine: `Customer: ${subjectFullName(person)}   ·   DLN/PID: ${person?.dlnPid || "—"}   ·   Captured: ${reportDate(ro?.timestamp)}`,
           screenshot: verifiedScreenshot,
         }),
@@ -2209,6 +2487,7 @@ export function repeatSection(ro, person, title, subjectLabel) {
     render: (ctx) =>
       drawMdosResultSection(ctx, {
         title,
+        branding,
         meta: [{ label: "Screened", value: reportDate(ro?.timestamp) }],
         metaRight: [
           { label: "Customer", value: subjectFullName(person) },
@@ -2230,7 +2509,7 @@ export function repeatSection(ro, person, title, subjectLabel) {
 
 /** A combined-report section that renders the actual Title & Lien portal
  * capture when a screenshot exists, else a labeled summary. */
-export function titleSection(t, customer) {
+export function titleSection(t, customer, branding) {
   const vin = customer?.tradeVin || "N/A";
   const vehicle = [t?.year, t?.make, t?.model].filter(Boolean).join(" ");
   const screenshot = stateEvidenceDataUrl(t);
@@ -2241,6 +2520,7 @@ export function titleSection(t, customer) {
       render: (ctx) =>
         drawPortalCapture(ctx, {
           title: "Michigan Title & Lien Check",
+          branding,
           metaLine: `VIN: ${vin}${vehicle ? "   ·   " + vehicle : ""}   ·   Captured: ${reportDate(t?.timestamp)}`,
           screenshot: verifiedScreenshot,
         }),
@@ -2251,6 +2531,7 @@ export function titleSection(t, customer) {
     render: (ctx) =>
       drawMdosResultSection(ctx, {
         title: "Michigan Title & Lien Check",
+        branding,
         meta: [{ label: "Screened", value: reportDate(t?.timestamp) }],
         metaRight: [
           { label: "VIN", value: vin },
@@ -2409,7 +2690,7 @@ function drawSummaryTable(ctx, { columns, rows }) {
 }
 
 /** First page of a combined PDF: final decision plus every expected check. */
-export function finalDecisionSection(currentResults) {
+export function finalDecisionSection(currentResults, branding) {
   const summary = reportDecisionSummary(currentResults);
   const decisionVariant =
     summary.decision.level === "APPROVED"
@@ -2424,6 +2705,7 @@ export function finalDecisionSection(currentResults) {
     render: (ctx) => {
       drawCheckHeader(ctx, {
         title: "Overall Compliance Decision",
+        branding,
         meta: [{ label: "Screened", value: reportDate(currentResults?.timestamp) }],
         metaRight: [
           { label: "Customer", value: subjectFullName(customer) },
@@ -2543,7 +2825,9 @@ export async function downloadOfacReportPDF(currentResults) {
     showToast("Could not load PDF library. Try the Print button instead.", "error");
     return;
   }
-  await drawOfacSection(ctx, currentResults.customer, currentResults.checks.ofac);
+  await drawOfacSection(ctx, currentResults.customer, currentResults.checks.ofac, {
+    branding: await loadReportBranding(),
+  });
   stampPageNumbers(ctx);
   ctx.doc.save(
     `OFAC_${safeFileName([
@@ -2570,6 +2854,7 @@ export async function downloadCoBuyerOfacReportPDF(currentResults) {
   }
   await drawOfacSection(ctx, coBuyer, cbOfac, {
     subjectLabel: "CO-BUYER SUBJECT SCREENED",
+    branding: await loadReportBranding(),
   });
   stampPageNumbers(ctx);
   ctx.doc.save(
@@ -2588,7 +2873,13 @@ export async function downloadRepeatOffenderPDF(currentResults) {
   }
   const c = currentResults.customer;
   const fileName = `RepeatOffender_${safeFileName([c?.firstName, c?.lastName])}_${Date.now()}.pdf`;
-  const section = repeatSection(ro, c, "Michigan Repeat Offender Check", "SUBJECT SCREENED");
+  const section = repeatSection(
+    ro,
+    c,
+    "Michigan Repeat Offender Check",
+    "SUBJECT SCREENED",
+    await loadReportBranding()
+  );
 
   let ctx;
   try {
@@ -2615,7 +2906,8 @@ export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
     ro,
     co,
     "Michigan Repeat Offender Check (Co-Buyer)",
-    "CO-BUYER SCREENED"
+    "CO-BUYER SCREENED",
+    await loadReportBranding()
   );
 
   let ctx;
@@ -2639,7 +2931,11 @@ export async function downloadTitleReportPDF(currentResults) {
   }
   const vin = currentResults.customer?.tradeVin || "N/A";
   const fileName = `Title_${safeFileName([vin])}_${Date.now()}.pdf`;
-  const section = titleSection(title, currentResults.customer);
+  const section = titleSection(
+    title,
+    currentResults.customer,
+    await loadReportBranding()
+  );
 
   let ctx;
   try {
@@ -2662,7 +2958,8 @@ export async function downloadTitleReportPDF(currentResults) {
 export function reportPdfEntries(
   currentResults,
   selectedKeys,
-  timestamp = Date.now()
+  timestamp = Date.now(),
+  branding
 ) {
   const customer = currentResults?.customer || {};
   const checks = currentResults?.checks || {};
@@ -2672,13 +2969,13 @@ export function reportPdfEntries(
   const factories = {
     [REPORT_KEYS.decision]: () => ({
       fileName: `Compliance_Decision_${buyerName}_${timestamp}.pdf`,
-      section: finalDecisionSection(currentResults),
+      section: finalDecisionSection(currentResults, branding),
     }),
     [REPORT_KEYS.buyerOfac]: () => ({
       fileName: `OFAC_${buyerName}_${timestamp}.pdf`,
       section: {
         orientation: "portrait",
-        render: (ctx) => drawOfacSection(ctx, customer, checks.ofac),
+        render: (ctx) => drawOfacSection(ctx, customer, checks.ofac, { branding }),
       },
     }),
     [REPORT_KEYS.buyerRepeat]: () => ({
@@ -2687,12 +2984,13 @@ export function reportPdfEntries(
         checks.repeatOffender,
         customer,
         "Michigan Repeat Offender Check",
-        "SUBJECT SCREENED"
+        "SUBJECT SCREENED",
+        branding
       ),
     }),
     [REPORT_KEYS.title]: () => ({
       fileName: `Title_${safeFilePart([customer.tradeVin || "N-A"])}_${timestamp}.pdf`,
-      section: titleSection(checks.title, customer),
+      section: titleSection(checks.title, customer, branding),
     }),
     [REPORT_KEYS.coBuyerOfac]: () => ({
       fileName: `OFAC_CoBuyer_${coBuyerName}_${timestamp}.pdf`,
@@ -2701,6 +2999,7 @@ export function reportPdfEntries(
         render: (ctx) =>
           drawOfacSection(ctx, coBuyer, checks.coBuyerOfac, {
             subjectLabel: "CO-BUYER SUBJECT SCREENED",
+            branding,
           }),
       },
     }),
@@ -2710,7 +3009,8 @@ export function reportPdfEntries(
         checks.coBuyerRepeatOffender,
         coBuyer,
         "Michigan Repeat Offender Check (Co-Buyer)",
-        "CO-BUYER SCREENED"
+        "CO-BUYER SCREENED",
+        branding
       ),
     }),
   };
@@ -2721,8 +3021,8 @@ export function reportPdfEntries(
   });
 }
 
-export function combinedPdfSections(currentResults, selectedKeys) {
-  return reportPdfEntries(currentResults, selectedKeys).map(
+export function combinedPdfSections(currentResults, selectedKeys, branding) {
+  return reportPdfEntries(currentResults, selectedKeys, Date.now(), branding).map(
     (entry) => entry.section
   );
 }
@@ -2872,7 +3172,12 @@ function downloadBlob(blob, fileName) {
 }
 
 async function openReportsPdfForPrint(currentResults, selectedKeys) {
-  const entries = reportPdfEntries(currentResults, selectedKeys);
+  const entries = reportPdfEntries(
+    currentResults,
+    selectedKeys,
+    Date.now(),
+    await loadReportBranding()
+  );
   if (!entries.length) {
     showToast("Select at least one document to print.", "info");
     return;
@@ -2924,7 +3229,11 @@ export async function downloadAllReportsPDF(currentResults, selectedKeys) {
   // Build the section list. OFAC renders its official letterhead; the MDOS/SOS
   // checks render the actual portal capture (the page the dealer would print).
   // All pages are portrait.
-  const sections = combinedPdfSections(currentResults, selectedKeys);
+  const sections = combinedPdfSections(
+    currentResults,
+    selectedKeys,
+    await loadReportBranding()
+  );
 
   if (!sections.length) {
     showToast("Select at least one document to download.", "info");
@@ -2950,7 +3259,12 @@ export async function downloadAllReportPDFs(currentResults, selectedKeys) {
     return;
   }
   const timestamp = Date.now();
-  const entries = reportPdfEntries(currentResults, selectedKeys, timestamp);
+  const entries = reportPdfEntries(
+    currentResults,
+    selectedKeys,
+    timestamp,
+    await loadReportBranding()
+  );
   if (!entries.length) {
     showToast("Select at least one document to download.", "info");
     return;
@@ -2981,7 +3295,7 @@ export async function downloadAllReportPDFs(currentResults, selectedKeys) {
 }
 
 
-export function repeatReportHTML(currentResults, isCoBuyer = false) {
+export function repeatReportHTML(currentResults, isCoBuyer = false, branding) {
   const c = isCoBuyer ? currentResults.customer?.coBuyer : currentResults.customer;
   if (!c) return "";
   return numberPrintedPages(`<!DOCTYPE html>
@@ -2993,12 +3307,12 @@ export function repeatReportHTML(currentResults, isCoBuyer = false) {
   </style>
 </head>
 <body>
-  ${getRepeatReportPageHTML(currentResults, isCoBuyer)}
+  ${getRepeatReportPageHTML(currentResults, isCoBuyer, branding)}
 </body>
 </html>`);
 }
 
-export function titleReportHTML(currentResults) {
+export function titleReportHTML(currentResults, branding) {
   const c = currentResults.customer;
   if (!c) return "";
   return numberPrintedPages(`<!DOCTYPE html>
@@ -3010,7 +3324,7 @@ export function titleReportHTML(currentResults) {
   </style>
 </head>
 <body>
-  ${getTitleReportPageHTML(currentResults)}
+  ${getTitleReportPageHTML(currentResults, branding)}
 </body>
 </html>`);
 }

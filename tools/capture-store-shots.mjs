@@ -19,7 +19,8 @@
  * Requires Google Chrome at the standard macOS path. No npm dependencies.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -319,11 +320,21 @@ function promoHtml({ width, height, marquee }) {
 }
 
 // ---------- render ----------
-function render(html, outFile, width, height, budgetMs) {
+const execFileAsync = promisify(execFile);
+
+// Chrome is spawned asynchronously and awaited. It used to be execFileSync,
+// which blocks Node's event loop for as long as Chrome runs — and this script
+// serves the page from an HTTP server on that same loop. So Chrome would
+// request the page, the server could not answer while blocked, and Chrome sat
+// there until execFileSync's own 60s timeout killed it. The failure only
+// appeared when the script started its own server; against an already-running
+// external one it worked every time, which is what made it look like a Chrome
+// problem rather than a self-inflicted deadlock.
+async function render(html, outFile, width, height, budgetMs) {
   const page = join(BUILD, "page.html");
   writeFileSync(page, html);
   const url = `http://127.0.0.1:${PORT}/store-assets/.build/page.html`;
-  execFileSync(CHROME, [
+  await execFileAsync(CHROME, [
     "--headless",
     "--disable-gpu",
     "--hide-scrollbars",
@@ -346,25 +357,41 @@ if (needServer) {
   server = http.createServer((req, res) => {
     try {
       const path = join(ROOT, decodeURIComponent(new URL(req.url, "http://x").pathname));
-      if (!path.startsWith(ROOT) || !statSync(path).isFile()) throw new Error("nope");
+      const stat = statSync(path);
+      if (!path.startsWith(ROOT) || !stat.isFile()) throw new Error("nope");
       res.setHeader("Content-Type", types[path.split(".").pop()] || "application/octet-stream");
       res.setHeader("Cache-Control", "no-store");
-      createReadStream(path).pipe(res);
+      // Length lets the browser see the end of the body without waiting on the
+      // socket to close, and the error handler keeps a failed read from
+      // stranding the request open — Chrome advances virtual time only once
+      // every request has settled, so any unanswered response hangs the render.
+      res.setHeader("Content-Length", stat.size);
+      const stream = createReadStream(path);
+      stream.on("error", () => {
+        res.statusCode = 500;
+        res.end();
+        stream.destroy();
+      });
+      stream.pipe(res);
     } catch {
       res.statusCode = 404;
       res.end();
     }
   }).listen(PORT, "127.0.0.1");
+  // A request that arrives just as the socket idles out would otherwise be cut
+  // off mid-flight and never answered.
+  server.keepAliveTimeout = 30_000;
+  server.headersTimeout = 35_000;
   await new Promise((r) => server.on("listening", r));
 }
 
 for (const shot of SCREENSHOTS) {
-  render(screenshotHtml(shot), join(SHOTS, shot.file), 1280, 800, 9000);
+  await render(screenshotHtml(shot), join(SHOTS, shot.file), 1280, 800, 9000);
   console.log("wrote", shot.file);
 }
-render(promoHtml({ width: 440, height: 280 }), join(OUT, "promo-small-440x280.png"), 440, 280, 3000);
+await render(promoHtml({ width: 440, height: 280 }), join(OUT, "promo-small-440x280.png"), 440, 280, 3000);
 console.log("wrote promo-small-440x280.png");
-render(promoHtml({ width: 1400, height: 560, marquee: true }), join(OUT, "promo-marquee-1400x560.png"), 1400, 560, 3000);
+await render(promoHtml({ width: 1400, height: 560, marquee: true }), join(OUT, "promo-marquee-1400x560.png"), 1400, 560, 3000);
 console.log("wrote promo-marquee-1400x560.png");
 
 server?.close();

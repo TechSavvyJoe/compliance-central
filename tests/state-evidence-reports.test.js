@@ -64,6 +64,9 @@ function pdfContext() {
     addImage: (...args) => calls.images.push(args),
     addPage() { calls.addPages++; },
     getImageProperties: () => ({ width: 1280, height: 1800 }),
+    // The running head measures each half of a "label: value" pair so the two
+    // cannot overprint; the double needs the same call jsPDF provides.
+    getTextWidth: (value) => String(value).length * 5,
     line() {},
     rect() {},
     roundedRect: (...args) => calls.roundedRects.push(args),
@@ -262,7 +265,13 @@ test("Repeat and Title PDF sections embed the validated real captures", () => {
   assert.equal(titlePdf.calls.images[0][0], TITLE_SCREENSHOT);
   assert.equal(repeatPdf.calls.addPages, 0);
   assert.equal(titlePdf.calls.addPages, 0);
-  assert.ok(repeatPdf.calls.images[0][4] > 480);
+  // The capture fills the sheet between the masthead and the footer. Its
+  // ceiling is the same one the printed page applies (max-height: 8.3in), so a
+  // portrait capture is height-limited: this 1280x1800 fixture lands near
+  // 447pt wide in the PDF and 425pt on the printed sheet. It used to be drawn
+  // at 501pt, wider than the printed sheet ever renders it.
+  assert.ok(repeatPdf.calls.images[0][4] > 400);
+  assert.ok(repeatPdf.calls.images[0][4] < 525.6, "never wider than the text column");
   for (const textCalls of [repeatPdf.calls.text, titlePdf.calls.text]) {
     assert.ok(
       textCalls.includes("ACTUAL MICHIGAN STATE-SITE CAPTURE · ONE-PAGE RECORD")
@@ -367,8 +376,9 @@ test("downloaded PDF rows grow and wrap instead of drawing values across lines",
     "SUBJECT SCREENED"
   ).render(wrapped.ctx);
 
+  // The page draws several cards; the subject box is the one that has to grow.
   assert.ok(
-    wrapped.calls.roundedRects[0][3] >= 128,
+    Math.max(...wrapped.calls.roundedRects.map((rect) => rect[3])) >= 128,
     "the subject box should grow to contain the wrapped name"
   );
   assert.ok(

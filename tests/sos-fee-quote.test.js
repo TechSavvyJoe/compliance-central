@@ -1151,9 +1151,12 @@ test("the customer worksheet states the MSRP, the plate and the real title fee",
   assert.match(html, /\$42,500\.00/);
   // The plate the customer is actually getting.
   assert.match(html, /<img src="https:\/\/dsvsesvc\.sos\.state\.mi\.us[^"]*"/);
-  // $15 title + $1 lien recording = $16, itemised rather than implied.
+  // $15 title + $1 lien recording = $16, itemised rather than implied. Money
+  // now sits in its own right-aligned column so the decimals line up down the
+  // sheet, which is why the total carries the amount class.
   assert.match(html, /Michigan lien recording fee/);
-  assert.match(html, /<td>\$16\.00<\/td>/);
+  assert.match(html, /<td class="amount">\$16\.00<\/td>/);
+  assert.match(html, /th\.amount, td\.amount \{[^}]*text-align: right/);
   // The SOS breakdown is still itemised above its own total.
   assert.match(html, /MSRP Based Reg Fee/);
   assert.match(html, /8 months/);

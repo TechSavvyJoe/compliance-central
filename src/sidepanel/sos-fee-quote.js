@@ -260,7 +260,7 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   const officialRows = normalized.feeBreakdown
     .map(
       (row) =>
-        `<tr><th>${sanitizeHTML(row.label)}</th><td>${sanitizeHTML(formatMoney(row.feeCents))}</td></tr>`
+        `<tr><th>${sanitizeHTML(row.label)}</th><td></td><td class="amount">${sanitizeHTML(formatMoney(row.feeCents))}</td></tr>`
     )
     .join("");
 
@@ -277,37 +277,47 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
     header { display: flex; align-items: flex-end; gap: var(--s5); }
     .worksheet-logo { flex: none; max-height: 0.55in; max-width: 2.2in; object-fit: contain; }
     .head-copy { min-width: 0; flex: 1; }
-    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; }
-    .sub { margin: var(--s1) 0 0; color: var(--slate); font-size: var(--t-small); }
+    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: var(--lh-display); letter-spacing: -0.015em; }
+    .sub { margin: var(--s1) 0 0; color: var(--slate); font-size: var(--t-body); }
     main { display: block; }
+    /* One sheet is the whole point of a customer handoff: the headings open
+       tighter than they do inside a multi-page jacket, and a fee row is a
+       single line of figures rather than a paragraph, so it needs less air. */
+    h2 { margin: var(--s3) 0 var(--s1); }
+    th, td { padding: var(--s1) 0; line-height: 1.3; }
+    tr.total th, tr.total td { padding-top: var(--s2); }
     .status {
       display: inline-block; padding: var(--s1) var(--s2); margin: 0 0 var(--s2);
       border: var(--rule) solid var(--line); border-left: var(--rule-heavy) solid var(--ok);
       border-radius: var(--radius); color: var(--ok);
-      font-size: 8pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      font-size: var(--t-caption); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
     }
     .status.unverified { border-left-color: var(--gold); color: var(--navy); }
     .headline {
       display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s5);
-      margin: var(--s4) 0; padding: var(--s4);
+      margin: var(--s3) 0; padding: var(--s2) var(--s4);
       border: var(--rule) solid var(--line); border-left: var(--rule-heavy) solid var(--navy);
       border-radius: var(--radius);
       break-inside: avoid; page-break-inside: avoid;
     }
-    .headline span { display: block; color: var(--slate); font-size: var(--t-micro); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-    .headline strong { display: block; margin-top: var(--s1); color: var(--navy); font-family: var(--font-display); font-size: var(--t-hero); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
-    .headline .term { margin-top: var(--s1); color: var(--ink); font-size: 11pt; font-weight: 700; line-height: 1.3; }
+    .headline span { display: block; color: var(--slate); font-size: var(--t-caption); font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .headline strong { display: block; margin-top: var(--s1); color: var(--navy); font-family: var(--font-display); font-size: var(--t-hero); font-weight: 700; line-height: var(--lh-display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+    .headline .term { margin-top: var(--s1); color: var(--ink); font-size: var(--t-lead); font-weight: 700; line-height: 1.3; }
     .plate {
-      display: grid; grid-template-columns: 2.6in 1fr; align-items: center; gap: var(--s5);
-      margin: var(--s4) 0; padding: var(--s4);
+      display: grid; grid-template-columns: 1.8in 1fr; align-items: center; gap: var(--s4);
+      margin: var(--s3) 0; padding: var(--s2) var(--s4);
       border: var(--rule) solid var(--line); border-radius: var(--radius);
       break-inside: avoid; page-break-inside: avoid;
     }
-    .plate img { width: 2.6in; height: auto; border: var(--rule) solid var(--line); border-radius: var(--radius); background: var(--paper); }
-    .plate strong { display: block; color: var(--ink); font-size: 11pt; }
-    .plate small { display: block; margin-top: var(--s1); color: var(--slate); font-size: var(--t-small); line-height: 1.4; }
-    th { width: 58%; }
-    footer { margin-top: var(--s5); padding-top: var(--s3); border-top: var(--rule) solid var(--line); color: var(--slate); font-size: var(--t-micro); line-height: 1.5; }
+    .plate img { width: 1.8in; height: auto; border: var(--rule) solid var(--line); border-radius: var(--radius); background: var(--paper); }
+    .plate strong { display: block; color: var(--ink); font-size: var(--t-lead); }
+    .plate small { display: block; margin-top: var(--s1); color: var(--slate); font-size: var(--t-body); line-height: 1.4; }
+    /* The label carries the width; the amount column is only as wide as the
+       longest figure, so every decimal point falls on one line down the page
+       and the figures stay next to what they are for. */
+    th { width: 46%; }
+    .note { margin: var(--s2) 0; }
+    footer { margin-top: var(--s3); padding-top: var(--s3); border-top: var(--rule) solid var(--line); color: var(--slate); font-size: var(--t-caption); line-height: 1.4; }
   </style></head><body>
   <section class="sheet">
     <header>
@@ -338,22 +348,22 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
 
       <h2>What the SOS calculated</h2>
       <table>
-        <tr><th>Registration choice</th><td>${sanitizeHTML(modeLabel(normalized.mode))}</td></tr>
-        ${normalized.vehicleDescription ? `<tr><th>Vehicle</th><td>${sanitizeHTML(normalized.vehicleDescription)}</td></tr>` : ""}
-        ${normalized.msrpCents ? `<tr><th>Vehicle base MSRP</th><td>${sanitizeHTML(formatMoney(normalized.msrpCents))}</td></tr>` : ""}
+        <tr><th>Registration choice</th><td>${sanitizeHTML(modeLabel(normalized.mode))}</td><td class="amount"></td></tr>
+        ${normalized.vehicleDescription ? `<tr><th>Vehicle</th><td>${sanitizeHTML(normalized.vehicleDescription)}</td><td class="amount"></td></tr>` : ""}
+        ${normalized.msrpCents ? `<tr><th>Vehicle base MSRP</th><td></td><td class="amount">${sanitizeHTML(formatMoney(normalized.msrpCents))}</td></tr>` : ""}
         ${officialRows}
-        <tr class="total"><th>Registration / plate fee total</th><td>${sanitizeHTML(formatMoney(normalized.feeCents))}</td></tr>
+        <tr class="total"><th>Registration / plate fee total</th><td></td><td class="amount">${sanitizeHTML(formatMoney(normalized.feeCents))}</td></tr>
       </table>
 
       <h2>Additional costs to expect</h2>
       <table>
-        <tr><th>Title fee</th><td>$15.00</td></tr>
-        <tr><th>Michigan lien recording fee</th><td>$1.00</td></tr>
-        <tr class="total"><th>Total title fee</th><td>$16.00</td></tr>
-        <tr><th>Instant title (if requested)</th><td>$5.00 &mdash; expedited same-day title</td></tr>
-        <tr><th>Sales tax</th><td>6% of the taxable price &mdash; purchase price less the Michigan trade-in credit (up to $12,000 for 2026); confirm final transaction amount</td></tr>
-        <tr><th>Optional Recreation Passport</th><td>${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
-        <tr><th>Quote time</th><td>${sanitizeHTML(calculatedAt)}</td></tr>
+        <tr><th>Title fee</th><td></td><td class="amount">$15.00</td></tr>
+        <tr><th>Michigan lien recording fee</th><td></td><td class="amount">$1.00</td></tr>
+        <tr class="total"><th>Total title fee</th><td></td><td class="amount">$16.00</td></tr>
+        <tr><th>Instant title (if requested)</th><td colspan="2">$5.00 &mdash; expedited same-day title</td></tr>
+        <tr><th>Sales tax</th><td colspan="2">6% of the taxable price &mdash; purchase price less the Michigan trade-in credit (up to $12,000 for 2026); confirm final transaction amount</td></tr>
+        <tr><th>Optional Recreation Passport</th><td colspan="2">${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
+        <tr><th>Quote time</th><td colspan="2">${sanitizeHTML(calculatedAt)}</td></tr>
       </table>
 
       <div class="note"><strong>Verify before final paperwork.</strong> The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service. Title, lien, and tax amounts are reference figures. Michigan SOS and dealership staff determine the final transaction amount, eligibility, documents, and any additional fees.</div>
@@ -377,8 +387,8 @@ export function createSosOfficialEvidencePrintHTML(quote) {
     /* The one gold accent, drawn under the masthead rule without adding a row
        to the grid that keeps the capture on a single page. */
     header::after { content: ""; position: absolute; right: 0; bottom: -3.75pt; left: 0; height: var(--rule-accent); background: var(--gold); }
-    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: 1.15; letter-spacing: -0.015em; }
-    header p, footer { margin: 0; color: var(--slate); font-size: var(--t-micro); }
+    h1 { margin: 0; color: var(--navy); font-family: var(--font-display); font-size: var(--t-masthead); font-weight: 700; line-height: var(--lh-display); letter-spacing: -0.015em; }
+    header p, footer { margin: 0; color: var(--slate); font-size: var(--t-caption); }
     .capture { min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border: var(--rule) solid var(--line); background: var(--paper); }
     .capture img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
     footer { display: flex; justify-content: space-between; gap: var(--s4); }

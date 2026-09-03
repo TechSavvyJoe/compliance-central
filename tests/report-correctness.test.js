@@ -52,6 +52,9 @@ function pdfContext() {
     addImage() {},
     addPage() {},
     getImageProperties: () => ({ width: 1280, height: 1800 }),
+    // The running head measures each half of a "label: value" pair so the two
+    // cannot overprint; the double needs the same call jsPDF provides.
+    getTextWidth: (value) => String(value).length * 5,
     line() {},
     rect() {},
     roundedRect() {},

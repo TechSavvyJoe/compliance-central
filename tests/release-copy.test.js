@@ -87,7 +87,12 @@ test("generated scanner and history media are transparently instructional and lo
 test("OFAC records are clearly app-generated and do not imitate government letterhead", () => {
   assert.match(reportBuilder, /Compliance Central OFAC Screening Record/);
   assert.match(reportBuilder, /Not issued or endorsed by the U\.S\. Treasury or OFAC/);
-  assert.match(reportBuilder, /NOT ISSUED OR ENDORSED BY TREASURY \/ OFAC/);
+  // The downloaded PDF now carries the printed page's own notice rather than a
+  // shorter paraphrase of it, so one record cannot disclaim itself two ways.
+  assert.match(
+    reportBuilder,
+    /APP-GENERATED RECORD · NOT ISSUED OR ENDORSED BY THE U\.S\. TREASURY OR OFAC/
+  );
   assert.doesNotMatch(reportBuilder, /Draws the official .* letterhead/);
   assert.doesNotMatch(reportBuilder, /U\.S\. DEPARTMENT OF THE TREASURY/);
 });

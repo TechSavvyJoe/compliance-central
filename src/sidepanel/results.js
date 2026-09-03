@@ -62,7 +62,12 @@ const STATUS_MAP = {
   skipped: { icon: ICONS.skip, label: "Skipped", cls: "status-skipped" },
 };
 
-const REPEAT_ELIGIBLE_DETAIL = "Eligible per MDOS repeat-offender response";
+// The most-read line in the app: what a clean Repeat Offender check says on
+// every ordinary deal. It used to cite the shape of the API reply ("per MDOS
+// repeat-offender response") rather than the finding, which is what the
+// printed report has always said and what a salesperson actually needs.
+const REPEAT_ELIGIBLE_DETAIL =
+  "No repeat-offender or ex parte record — eligible to purchase";
 
 function renderStatus(cfg, customLabel) {
   const label = customLabel != null ? sanitizeHTML(customLabel) : sanitizeHTML(cfg.label);
@@ -222,7 +227,7 @@ function renderOfacResult(
         : "warning",
     ofac.passed
       ? ofac.stale
-        ? "Pass (stale data)"
+        ? "Pass — list not current"
         : "Pass"
       : falsePositive
         ? "False positive cleared"
@@ -242,9 +247,14 @@ function renderOfacResult(
     } else {
       let txt = "No matches in SDN list";
       if (ofac.stale) {
+        // "screened against a cached SDN list (~26h old); could not refresh"
+        // described the app's storage. The finding a dealer has to weigh is
+        // that the list is old, by how much, and that it must be re-run.
         const age =
-          ofac.dataAgeHours != null ? ` (~${ofac.dataAgeHours}h old)` : "";
-        txt += ` — screened against a cached SDN list${age}; could not refresh. Re-run when online.`;
+          ofac.dataAgeHours != null
+            ? ` about ${ofac.dataAgeHours} hour${ofac.dataAgeHours === 1 ? "" : "s"} old`
+            : " out of date";
+        txt += `, but the list could not be refreshed and is${age}. Re-run once you are back online.`;
       }
       detailEl.textContent = txt;
     }
@@ -260,7 +270,7 @@ function repeatOffenderDetail(result) {
   if (result?.status === "ineligible") {
     return "Registration denied by MDOS. Do not issue a BFS-4 temporary permit or dealer plate, and do not deliver before the transaction is processed with the Secretary of State.";
   }
-  return result?.message || result?.status || "Review MDOS repeat-offender response";
+  return result?.message || result?.status || "Michigan did not return a clear eligibility answer — review before delivery";
 }
 
 function showPartialNotice(elements, label) {
@@ -582,7 +592,7 @@ export function displayResults(elements, results) {
       setResultStatus(elements.repeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
       elements.repeatResultDetail.textContent = friendlyCheckError(
         ro.error,
-        "Unknown error occurred"
+        "The check did not finish. Try running it again."
       );
     } else {
       setResultStatus(
@@ -674,7 +684,9 @@ export function displayResults(elements, results) {
       }
 
       elements.titleResultDetail.textContent =
-        lines.length > 0 ? lines.join("\n") : "Title information retrieved";
+        lines.length > 0
+          ? lines.join("\n")
+          : "Michigan returned a title record with no brand or lien detail — check the paperwork.";
 
       elements.printTitleBtn?.classList.remove("hidden");
       elements.downloadTitleBtn?.classList.remove("hidden");
@@ -717,7 +729,7 @@ export function displayResults(elements, results) {
         setResultStatus(elements.cbRepeatResultStatus, "warning", isKey ? "Unavailable" : "Error");
         elements.cbRepeatResultDetail.textContent = friendlyCheckError(
           cbRO.error,
-          "Unknown error occurred"
+          "The check did not finish. Try running it again."
         );
       } else {
         setResultStatus(
@@ -842,7 +854,8 @@ export function displayIndividualResult(elements, type, result) {
         );
       }
       elements.titleResultDetail.textContent =
-        dlines.join("\n") || "Title information retrieved";
+        dlines.join("\n") ||
+        "Michigan returned a title record with no brand or lien detail — check the paperwork.";
     }
     setActionVisibility(elements.printTitleBtn, !result.error);
     setActionVisibility(elements.downloadTitleBtn, !result.error);

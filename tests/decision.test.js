@@ -62,7 +62,13 @@ test("unknown or contradictory Repeat Offender responses require review", () => 
     const decision = calculateFinalDecision({ ...base, repeatOffender });
     assert.equal(decision.level, "REVIEW");
     assert.equal(decision.approved, false);
-    assert.match(decision.reason, /unrecognized or contradictory/i);
+    // The reason must attribute the ambiguity to the state's answer and must
+    // say it was contradictory — not merely that "a check failed", which a
+    // salesperson would read as a retryable outage rather than a real
+    // disagreement between the status and the eligibility flag.
+    assert.match(decision.reason, /contradictory/i);
+    assert.match(decision.reason, /repeat-offender/i);
+    assert.match(decision.reason, /review before proceeding/i);
   }
 });
 

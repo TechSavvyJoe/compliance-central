@@ -254,7 +254,7 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "DENIED",
-      reason: "OFAC match confirmed after comparison - do not proceed with the transaction",
+      reason: "OFAC match confirmed after comparison — do not proceed with the transaction",
     };
   }
 
@@ -266,7 +266,7 @@ export function calculateFinalDecision(checks) {
       approved: false,
       level: "REVIEW",
       reason:
-        "Potential OFAC match found - compare the buyer with the SDN entry before deciding",
+        "Potential OFAC match found — compare the buyer with the SDN entry before deciding",
     };
   }
 
@@ -274,7 +274,7 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "DENIED",
-      reason: "Repeat offender status - registration will be denied",
+      reason: "Repeat offender status — registration will be denied",
     };
   }
 
@@ -293,7 +293,7 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "REVIEW",
-      reason: "OFAC screening could not be completed - review before proceeding",
+      reason: "OFAC screening could not be completed — review before proceeding",
     };
   }
 
@@ -302,7 +302,7 @@ export function calculateFinalDecision(checks) {
       approved: false,
       level: "REVIEW",
       reason:
-        "OFAC screening was not run for this record - screen the buyer before proceeding",
+        "OFAC screening was not run for this record — screen the buyer before proceeding",
     };
   }
 
@@ -310,7 +310,7 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "REVIEW",
-      reason: "OFAC screening returned an unrecognized result - review before proceeding",
+      reason: "The OFAC screening result could not be read — review before proceeding",
     };
   }
 
@@ -329,7 +329,7 @@ export function calculateFinalDecision(checks) {
     return {
       approved: false,
       level: "REVIEW",
-      reason: "Repeat Offender check could not be completed - review before proceeding",
+      reason: "Repeat Offender check could not be completed — review before proceeding",
     };
   }
 
@@ -338,7 +338,7 @@ export function calculateFinalDecision(checks) {
       approved: false,
       level: "REVIEW",
       reason:
-        "Repeat Offender check returned an unrecognized or contradictory response - review before proceeding",
+        "Michigan's repeat-offender answer was unclear or contradictory — review before proceeding",
     };
   }
 
@@ -349,7 +349,7 @@ export function calculateFinalDecision(checks) {
       approved: false,
       level: "REVIEW",
       reason:
-        "OFAC SDN list could not be refreshed — screened against cached data. Re-run when back online before proceeding.",
+        "The OFAC list could not be refreshed, so this screening used an older copy. Re-run once you are back online, before proceeding.",
     };
   }
 
@@ -359,7 +359,7 @@ export function calculateFinalDecision(checks) {
         approved: false,
         level: "REVIEW",
         reason:
-          "Title/Lien check could not confirm a clear result - review trade documents before proceeding",
+          "Title/Lien check could not confirm a clear result — review trade documents before proceeding",
       };
     }
 
@@ -383,7 +383,7 @@ export function calculateFinalDecision(checks) {
       return {
         approved: false,
         level: "REVIEW",
-        reason: `Trade title branded as ${problemBrands.join(", ")} - requires disclosure`,
+        reason: `Trade title branded as ${problemBrands.join(", ")} — requires disclosure`,
         warnings: [],
       };
     }
@@ -392,7 +392,7 @@ export function calculateFinalDecision(checks) {
       return {
         approved: true,
         level: "APPROVED",
-        reason: "Customer checks passed - trade has active lien",
+        reason: "Customer checks passed — trade has an active lien",
         warnings: [lienSummary(checks.title)],
       };
     }
@@ -401,7 +401,7 @@ export function calculateFinalDecision(checks) {
   return {
     approved: true,
     level: "APPROVED",
-    reason: "All checks passed - clear to proceed",
+    reason: "All checks passed — clear to proceed",
     warnings: [],
   };
 }
@@ -442,7 +442,7 @@ export function finalDecisionForResults(results) {
     approved: false,
     level: "REVIEW",
     reason:
-      "One or more required checks are incomplete - review and re-run them before proceeding",
+      "One or more required checks are incomplete — review and re-run them before proceeding",
     warnings: base.warnings || [],
   };
 }

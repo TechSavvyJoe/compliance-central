@@ -104,3 +104,33 @@ test("Web Store declarations cover captured Michigan website content", () => {
   assert.match(submissionPrompt, /Check: Location/);
   assert.doesNotMatch(submissionPrompt, /Do NOT check: location/i);
 });
+
+// The store screenshots are captures of the real panel with a staged state, so
+// every string the staging writes has to be a string the app actually ships.
+// It staged "SOS calculated" where the panel says "Calculated by SOS", which
+// put copy in a listing image that the product does not contain.
+test("store screenshots stage only copy the app really uses", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const root = new URL("../", import.meta.url);
+  const capture = await readFile(new URL("tools/capture-store-shots.mjs", root), "utf8");
+  const quote = await readFile(new URL("src/sidepanel/sos-fee-quote.js", root), "utf8");
+  const panel = await readFile(new URL("sidepanel.js", root), "utf8");
+  const html = await readFile(new URL("sidepanel.html", root), "utf8");
+  const shipped = `${quote}\n${panel}\n${html}`;
+
+  for (const staged of [
+    "Calculated by SOS",
+    "Official SOS calculation complete.",
+  ]) {
+    assert.ok(
+      capture.includes(staged),
+      `capture script should stage "${staged}"`
+    );
+    assert.ok(
+      shipped.includes(staged),
+      `staged copy "${staged}" does not appear anywhere the app ships`
+    );
+  }
+  // And the string it used to stage must not come back.
+  assert.doesNotMatch(capture, /textContent = "SOS calculated"/);
+});

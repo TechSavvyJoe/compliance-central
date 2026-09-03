@@ -2347,27 +2347,12 @@ function initEventListeners() {
       );
       return;
     }
-    const results = entry?.savedResults;
-    if (!results?.customer || !results?.checks) {
-      showToast(
-        "This record was saved before the app kept customer details, so it cannot be reopened or reprinted. The decision it recorded is still shown on the row.",
-        "warning"
-      );
-      return;
-    }
-
-    if (btn.classList.contains("history-print-btn")) {
-      const keys = availableReportItems(results).map((item) => item.key);
-      await printAllReports(results, keys);
-      return;
-    }
-    if (btn.classList.contains("history-download-btn")) {
-      const keys = availableReportItems(results).map((item) => item.key);
-      await downloadAllReportsPDF(results, keys);
-      return;
-    }
-    // Deleting one record was only possible by clearing every record: the
-    // worker already supported removing a single entry, but nothing exposed it.
+    // Deleting is handled before the legacy guard below. Reopening, printing
+    // and re-screening all need the saved customer details, but removing a
+    // record does not — and a record from before 1.4 was the one thing a user
+    // could not delete individually, which is exactly backwards for the record
+    // they are most likely to want gone. Clearing the whole history was the
+    // only way out.
     if (btn.classList.contains("history-delete-btn")) {
       if (!confirm("Delete this one saved record?\n\nOther records are kept.")) return;
       try {
@@ -2389,6 +2374,27 @@ function initEventListeners() {
       return;
     }
 
+    const results = entry?.savedResults;
+    if (!results?.customer || !results?.checks) {
+      showToast(
+        "This record was saved before the app kept customer details, so it cannot be reopened or reprinted. The decision it recorded is still shown on the row.",
+        "warning"
+      );
+      return;
+    }
+
+    if (btn.classList.contains("history-print-btn")) {
+      const keys = availableReportItems(results).map((item) => item.key);
+      await printAllReports(results, keys);
+      return;
+    }
+    if (btn.classList.contains("history-download-btn")) {
+      const keys = availableReportItems(results).map((item) => item.key);
+      await downloadAllReportsPDF(results, keys);
+      return;
+    }
+    // Deleting one record was only possible by clearing every record: the
+    // worker already supported removing a single entry, but nothing exposed it.
     // Re-screening is the whole point of the aging reminder, but it took four
     // steps: open the record, switch tab, find the button, run. This does it.
     if (btn.classList.contains("history-rescreen-btn")) {

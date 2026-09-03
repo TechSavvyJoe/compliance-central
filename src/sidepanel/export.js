@@ -460,7 +460,7 @@ function tryPrintViaIframe(html, waitForImages) {
 function tryPrintViaPopup(html, waitForImages) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    showToast("Popup blocked. Allow popups for this extension.", "warning");
+    showToast("Your browser blocked the print window. Allow pop-ups for this extension, then print again.", "warning");
     return false;
   }
 
@@ -595,7 +595,7 @@ export function ofacResultArgs(ofac) {
     state: classification.state,
     variant: "pass",
     title: "NO MATCH FOUND",
-    subtitle: "No potential name match was found at the configured screening threshold.",
+    subtitle: "No potential name match was found at the screening threshold this report uses.",
   };
 }
 
@@ -674,7 +674,7 @@ export function getOfacReportPageHTML({
   ${screeningScopeHTML(ofac, lastUpdate)}
   ${
     ofac?.stale
-      ? `<div class="certification is-alert"><p><strong>Data Freshness Notice:</strong> This screening used cached SDN data (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
+      ? `<div class="certification is-alert"><p><strong>Data Freshness Notice:</strong> This screening used a stored copy of the SDN list (last updated ${sanitizeHTML(lastUpdate || "Unknown")}). A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.</p></div>`
       : ""
   }
   <div class="certification">
@@ -860,7 +860,7 @@ export function getRepeatReportPageHTML(currentResults, isCoBuyer = false, brand
 
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
-        <span>App-generated overview of the Michigan Repeat Offender response. It is not a state webpage.</span>
+        <span>App-generated overview of the Michigan Repeat Offender result. It is not a state webpage.</span>
       </div>
       
       <div class="content-box">
@@ -957,7 +957,7 @@ export function getTitleReportPageHTML(currentResults, branding) {
 
       <div class="summary-notice">
         <strong>Compliance Central summary</strong>
-        <span>App-generated overview of the Michigan Title &amp; Lien response. It is not a state webpage.</span>
+        <span>App-generated overview of the Michigan Title &amp; Lien result. It is not a state webpage.</span>
       </div>
       
       <div class="content-box">
@@ -2218,7 +2218,7 @@ function drawScreenshotPage(ctx, dataUrl, opts = {}) {
     ctx.y += renderH + 10;
   } catch (err) {
     console.error("PDF image error:", err);
-    writeText(ctx, "Screenshot could not be embedded.", {
+    writeText(ctx, "The state-site screenshot could not be added to this PDF.", {
       fontSize: 9,
       color: PALETTE.alert,
     });
@@ -2375,7 +2375,7 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
   if (ofac.stale) {
     drawNoticeCard(ctx, {
       lead: "Data Freshness Notice:",
-      body: `This screening used cached SDN data last updated ${lastUpdate}${
+      body: `This screening used a stored copy of the SDN list, last updated ${lastUpdate}${
         ofac.dataAgeHours != null ? ` (about ${ofac.dataAgeHours} hours ago)` : ""
       }. A live update was unavailable at screening time — re-run this check when back online to screen against the current OFAC SDN list.`,
       accent: PALETTE.dangerBorder,
@@ -2417,7 +2417,7 @@ function drawMdosResultSection(ctx, opts) {
   // can be mistaken for a state webpage.
   drawNoticeCard(ctx, {
     lead: "Compliance Central summary",
-    body: `App-generated overview of the ${title} response. It is not a state webpage.`,
+    body: `App-generated overview of the ${title} result. It is not a state webpage.`,
     accent: PALETTE.neutralBorder,
   });
   if (subject) drawSubjectBox(ctx, subject);
@@ -2644,7 +2644,7 @@ export function repeatOffenderResultArgs(ro) {
       subtitle:
         ro?.message ||
         ro?.rawText ||
-        "The state-site response was unrecognized or contradictory and was not confirmed eligible.",
+        "Michigan's answer was unclear or contradictory and was not confirmed eligible.",
     };
   }
   return {
@@ -2833,7 +2833,7 @@ export async function downloadSosOfficialEvidencePDF(quote) {
     ctx = await createPdfContext("portrait");
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load the PDF library. Try Print SOS instead.", "error");
+    showToast("The PDF could not be created. Use Print SOS instead.", "error");
     return false;
   }
 
@@ -2891,7 +2891,7 @@ export async function downloadOfacReportPDF(currentResults) {
     ctx = await createPdfContext();
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
   await drawOfacSection(ctx, currentResults.customer, currentResults.checks.ofac, {
@@ -2918,7 +2918,7 @@ export async function downloadCoBuyerOfacReportPDF(currentResults) {
     ctx = await createPdfContext();
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
   await drawOfacSection(ctx, coBuyer, cbOfac, {
@@ -2955,7 +2955,7 @@ export async function downloadRepeatOffenderPDF(currentResults) {
     ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
   await section.render(ctx);
@@ -2984,7 +2984,7 @@ export async function downloadCoBuyerRepeatOffenderPDF(currentResults) {
     ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
   await section.render(ctx);
@@ -3011,7 +3011,7 @@ export async function downloadTitleReportPDF(currentResults) {
     ctx = await createPdfContext(section.orientation);
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
   await section.render(ctx);
@@ -3314,7 +3314,7 @@ export async function downloadAllReportsPDF(currentResults, selectedKeys) {
     ctx = await renderPdfSections(sections);
   } catch (err) {
     console.error("jsPDF load error:", err);
-    showToast("Could not load PDF library. Try the Print button instead.", "error");
+    showToast("The PDF could not be created. Use Print instead.", "error");
     return;
   }
 

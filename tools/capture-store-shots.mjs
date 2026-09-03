@@ -137,7 +137,10 @@ const SCREENSHOTS = [
       document.getElementById("sosQuoteTotal").textContent = "$179.00";
       document.getElementById("sosQuoteTerm").textContent = "12 months \\u00b7 expires Apr 15, 2027";
       const src = document.getElementById("sosQuoteSource");
-      src.textContent = "SOS calculated";
+      // Must match sosSourceLabel() in src/sidepanel/sos-fee-quote.js — a
+      // listing image showing copy the product does not ship is a
+      // misrepresentation, however small.
+      src.textContent = "Calculated by SOS";
       src.classList.add("is-calculated");
       const ws = document.getElementById("sosWorkspaceStatus");
       ws.classList.add("is-ok");

@@ -59,10 +59,38 @@
              and is never told the result. -->
         <p id="verdictAnnouncer" class="visually-hidden" role="status" aria-live="polite"></p>
         <div id="screeningWorkspace" class="workspace-pane" role="tabpanel" aria-labelledby="screeningTabBtn" data-workspace-panel="screening">
+        <!-- This block introduces one button, and it used to spend an eyebrow,
+             a headline, two lines of prose and a helper line doing it: 153px
+             tall, of which only 44px was the button, pushing the first buyer
+             field to 386px down a panel people came to type in. The diagram
+             now carries the explanation — it shows the wide barcode being the
+             target, which no sentence did — and the privacy line moved to the
+             button's accessible description, where it already pointed. -->
         <section id="firstRunHero" class="first-run-hero" aria-labelledby="firstRunTitle">
-          <span class="first-run-eyebrow">Start a deal</span>
-          <h2 id="firstRunTitle">Scan the buyer's ID</h2>
-          <p>Fill the buyer fields from a license scan, then review the details and run the checks when you are ready.</p>
+          <svg class="first-run-id-art" viewBox="0 0 86 54" role="img"
+            aria-label="Illustration of the back of a Michigan ID. Of the two barcodes, the wide one below is what gets scanned.">
+            <defs>
+              <pattern id="ccBarWide" width="2.5" height="1" patternUnits="userSpaceOnUse">
+                <rect width="1.15" height="1" fill="#12314f" />
+              </pattern>
+              <pattern id="ccBarThin" width="1.7" height="1" patternUnits="userSpaceOnUse">
+                <rect width="0.7" height="1" fill="#5b7c9e" />
+              </pattern>
+            </defs>
+            <rect x="0.9" y="0.9" width="84.2" height="52.2" rx="5.5" fill="#eef3f9" stroke="#31547a" />
+            <path d="M0.9 6.4a5.5 5.5 0 0 1 5.5-5.5h73.2a5.5 5.5 0 0 1 5.5 5.5v5.4H0.9z" fill="#123c60" />
+            <rect x="7" y="17.5" width="17" height="2.1" rx="1.05" fill="#aabed3" />
+            <rect x="7" y="22.4" width="12" height="2.1" rx="1.05" fill="#aabed3" />
+            <rect x="7" y="27.3" width="15" height="2.1" rx="1.05" fill="#aabed3" />
+            <rect x="34" y="15.6" width="44" height="4.2" fill="url(#ccBarThin)" />
+            <rect x="30.5" y="25.5" width="47.5" height="14.5" fill="url(#ccBarWide)" />
+            <rect x="28.4" y="23.4" width="51.7" height="18.7" rx="2.6" fill="none"
+              stroke="#ffcb05" stroke-width="2.2" />
+          </svg>
+          <div class="first-run-copy">
+            <h2 id="firstRunTitle">Scan the buyer's ID</h2>
+            <p>The wide barcode on the back fills the form.</p>
+          </div>
           <div class="first-run-actions">
             <button type="button"
               id="scanLicenseBtn"
@@ -74,7 +102,7 @@
             </button>
             <kbd>&#8984;S</kbd>
           </div>
-          <span id="scanLicenseHint" class="first-run-hint">Secure phone pairing opens only when you choose Scan.</span>
+          <span id="scanLicenseHint" class="visually-hidden">Secure phone pairing opens only when you choose Scan.</span>
         </section>
         <div id="sdnWarning" class="sdn-warning hidden" role="status" aria-live="polite"></div>
 

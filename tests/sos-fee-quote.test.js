@@ -965,17 +965,40 @@ test("a finished screening can be cleared from the results header", () => {
 // The scan prompt is a step above the form, not a landing page. At its old size
 // it filled roughly half a 700px panel before the first field was reachable.
 test("the scan prompt stays compact above the form", () => {
-  const hero = sidepanelCss.slice(
-    sidepanelCss.indexOf(".first-run-hero {"),
-    sidepanelCss.indexOf(".first-run-hero {") + 400
-  );
+  // Slice to the rule's own closing brace rather than a fixed character count:
+  // a comment explaining why the block is compact should not push the property
+  // being checked out of the window and fail the guard.
+  const heroStart = sidepanelCss.indexOf(".first-run-hero {");
+  const hero = sidepanelCss.slice(heroStart, sidepanelCss.indexOf("}", heroStart));
   assert.match(hero, /padding:\s*9px 20px 11px/);
+  // The diagram spans both rows beside the copy, which is what lets it explain
+  // the barcode without costing any height.
+  assert.match(hero, /grid-template-areas:\s*\n?\s*"art copy"\s*\n?\s*"art actions"/);
   // The headline must stay well under the old 2rem cap in a 400px panel.
   const heading = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-hero h2 {"));
   assert.match(heading, /font-size:\s*clamp\(1\.02rem, 4\.4vw, 1\.15rem\)/);
   // Trimming the box must not shrink the tap target below the 44px minimum.
   const scan = sidepanelCss.slice(sidepanelCss.indexOf(".first-run-scan-btn {"));
   assert.match(scan, /min-height:\s*44px/);
+
+  // The framing that cost 109px of the old 153px must not creep back: an
+  // eyebrow and a visible helper line to introduce a single button. The
+  // privacy sentence stays in the DOM for screen readers, where the button
+  // already pointed at it.
+  const heroHtml = sidepanelHtml.slice(
+    sidepanelHtml.indexOf('id="firstRunHero"'),
+    sidepanelHtml.indexOf("</section>", sidepanelHtml.indexOf('id="firstRunHero"'))
+  );
+  assert.doesNotMatch(heroHtml, /first-run-eyebrow/);
+  assert.doesNotMatch(heroHtml, /class="first-run-hint"/);
+  assert.match(heroHtml, /id="scanLicenseHint" class="visually-hidden"/);
+  assert.match(heroHtml, /aria-describedby="scanLicenseHint"/);
+  // The diagram carries the explanation, so it must be a labelled image and
+  // must actually mark the wide barcode as the target.
+  assert.match(heroHtml, /class="first-run-id-art"[^>]*viewBox/s);
+  assert.match(heroHtml, /role="img"/);
+  assert.match(heroHtml, /aria-label="Illustration of the back of a Michigan ID[^"]*wide one below is what gets scanned/);
+  assert.match(heroHtml, /stroke="#ffcb05"/);
 });
 
 // A pending delivery was announced by a toast that vanished after seven seconds

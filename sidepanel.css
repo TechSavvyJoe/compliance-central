@@ -2250,10 +2250,32 @@ body.modal-open {
   margin: -14px -12px 4px;
   /* This is a prompt above the form, not a landing page: at 26px/24px with a
      32px headline it filled roughly half a 700px panel before the first field
-     was reachable. Tightened so the form starts near the top. */
+     was reachable. Tightened once, then again — the diagram sits beside the
+     copy and spans both rows, so showing what to scan costs no height at all
+     while the eyebrow and helper line that did cost height are gone. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "art copy"
+    "art actions";
+  align-items: center;
+  column-gap: 12px;
   padding: 9px 20px 11px;
   background: #0d2b4a;
   color: #fff;
+}
+
+.first-run-id-art {
+  grid-area: art;
+  align-self: center;
+  width: 78px;
+  height: auto;
+  filter: drop-shadow(0 2px 5px rgb(0 0 0 / 0.35));
+}
+
+.first-run-copy {
+  grid-area: copy;
+  align-self: end;
 }
 
 .first-run-eyebrow,
@@ -2276,7 +2298,7 @@ body.modal-open {
 
 .first-run-hero h2 {
   max-width: 330px;
-  margin: 4px 0 0;
+  margin: 0;
   color: #fff;
   font-family: var(--font-display);
   font-size: clamp(1.02rem, 4.4vw, 1.15rem);
@@ -2285,7 +2307,7 @@ body.modal-open {
   line-height: 1.06;
 }
 
-.first-run-hero > p {
+.first-run-copy > p {
   max-width: 310px;
   margin: 3px 0 0;
   color: #cfe0ef;
@@ -2294,10 +2316,12 @@ body.modal-open {
 }
 
 .first-run-actions {
+  grid-area: actions;
+  align-self: start;
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-top: 8px;
+  margin-top: 7px;
 }
 
 .first-run-scan-btn {
@@ -2325,14 +2349,6 @@ body.modal-open {
   color: #9fb8cf;
   box-shadow: none;
   font: 500 var(--fs-small)/1 var(--font-mono);
-}
-
-.first-run-hint {
-  display: block;
-  margin-top: 6px;
-  color: #9fb8cf;
-  font-size: var(--fs-caption);
-  line-height: 1.4;
 }
 
 #inputPanel > .typed-buyer-card {
@@ -4870,17 +4886,28 @@ body {
   padding: 8px 16px 10px;
 }
 
-.first-run-hero h2,
-.first-run-hero > p {
+.first-run-copy > p {
   margin-top: 2px;
 }
 
 .first-run-actions {
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
-.first-run-hint {
-  margin-top: 4px;
+/* Below roughly 340px the diagram and a 44px button cannot share a row
+   without squeezing the copy to a ragged two words per line, so the art
+   steps out of the grid and the block stacks. */
+@media (max-width: 340px) {
+  .first-run-hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "copy"
+      "actions";
+  }
+
+  .first-run-id-art {
+    display: none;
+  }
 }
 
 /* Workspace intros were capped near 28ch, which broke a two-sentence

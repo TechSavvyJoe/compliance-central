@@ -23,6 +23,7 @@ import {
   getFormData,
   applyCustomerData,
   validateCustomerFields,
+  planChecksForData,
   cacheFormData,
   loadCachedFormData,
   extractScanJurisdiction,
@@ -2852,8 +2853,35 @@ async function handleRunAllChecks() {
   // Drives Repeat Offender eligibility in the worker.
   customerData.buyerIsMichigan = scanJurisdiction.buyer;
   customerData.coBuyerIsMichigan = scanJurisdiction.coBuyer;
-  if (!validateCustomerFields(customerData)) return;
+
+  // Run whatever the entered data supports. This button used to demand all
+  // four buyer identity fields, so someone who only wanted a title and lien
+  // check on a VIN could not use it — they had to expand the trade section,
+  // scroll, and press a different button for the one thing they wanted.
+  const plan = planChecksForData(customerData);
+  if (!plan.buyer && !plan.coBuyer && !plan.title) {
+    showToast(
+      "Enter a buyer to screen, or a trade-in VIN to check title and lien.",
+      "warning"
+    );
+    elements.firstName?.focus();
+    return;
+  }
+  // A half-filled person is a mistake, not an instruction to skip them, so a
+  // partial identity is validated rather than quietly dropped.
+  if (!validateCustomerFields(customerData, plan)) return;
   if (getIsRunning()) return;
+
+  // Say plainly what will not run. A partial run must never be mistaken for a
+  // clean one — finalDecisionForResults already refuses to approve a record
+  // whose required checks did not complete, and this is the same honesty at
+  // the moment the run starts.
+  const skipped = [];
+  if (!plan.buyer) skipped.push("OFAC and Repeat Offender (no buyer entered)");
+  if (!plan.title) skipped.push("Title and lien (no trade-in VIN)");
+  if (skipped.length && (plan.buyer || plan.title)) {
+    showToast(`Running what you have. Skipping ${skipped.join("; ")}.`, "info");
+  }
 
   // Tell the user up front when an out-of-state subject will skip the Michigan
   // Repeat Offender check (OFAC still runs for everyone).
@@ -2902,7 +2930,7 @@ async function handleRunAllChecks() {
   try {
     const response = await chrome.runtime.sendMessage({
       type: "RUN_ALL_CHECKS",
-      data: { customer: customerData, hasTrade, runId },
+      data: { customer: customerData, hasTrade, runId, plan },
     });
     if (!isCurrentRun()) return;
     if (!response?.success) {

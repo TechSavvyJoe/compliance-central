@@ -180,6 +180,18 @@ export async function startRunAllChecks(data) {
 async function runAllChecks(data, runId, signal, onInitialized) {
   const { customer, hasTrade } = data;
   const isAborted = () => abortedRunId === runId || signal.aborted;
+  // "Run all checks" now runs whatever the entered data supports, so the panel
+  // sends a plan. A message without one predates that and means "everything",
+  // which is also what a worker restarted mid-run should assume.
+  const plan = data.plan || {
+    buyer: true,
+    coBuyer: Boolean(customer?.hasCoBuyer),
+    title: Boolean(hasTrade),
+  };
+  // A check that was never run is not a check that passed. `passed: null`
+  // classifies as incomplete, which is what stops finalDecisionForResults
+  // approving a partial record.
+  const notRun = (why) => ({ passed: null, status: "skipped", message: why });
 
   const results = {
     customer,
@@ -302,10 +314,20 @@ async function runAllChecks(data, runId, signal, onInitialized) {
   };
 
   try {
-    const hasCoBuyer = customer.hasCoBuyer && customer.coBuyer;
+    const hasCoBuyer = customer.hasCoBuyer && customer.coBuyer && plan.coBuyer !== false;
 
     // OFAC checks (parallel).
-    const ofacPromise = handleOfacCheck(customer).then(async (result) => {
+    const ofacPromise = !plan.buyer
+      ? (async () => {
+          results.checks.ofac = notRun(
+            "Not run — no buyer details were entered for this check."
+          );
+          results.checks.repeatOffender = notRun(
+            "Not run — no buyer details were entered for this check."
+          );
+          await saveState(hasCoBuyer ? 15 : 20);
+        })()
+      : handleOfacCheck(customer).then(async (result) => {
       if (isAborted()) return;
       if (result.success) {
         results.checks.ofac = {
@@ -343,8 +365,10 @@ async function runAllChecks(data, runId, signal, onInitialized) {
 
     // MDOS checks (sequential).
     const mdosPromise = (async () => {
-      const totalMdosChecks =
-        1 + (hasCoBuyer ? 1 : 0) + (hasTrade ? 1 : 0);
+      const totalMdosChecks = Math.max(
+        1,
+        (plan.buyer ? 1 : 0) + (hasCoBuyer ? 1 : 0) + (hasTrade ? 1 : 0)
+      );
       let completedMdos = 0;
 
       const mdosStart = 20;
@@ -363,7 +387,12 @@ async function runAllChecks(data, runId, signal, onInitialized) {
 
       // 1. Buyer Repeat Offender (Michigan license/ID only).
       if (isAborted()) return;
-      if (customer.buyerIsMichigan === false) {
+      if (!plan.buyer) {
+        // Already recorded as not run alongside OFAC; nothing to do but keep
+        // the progress arithmetic honest.
+        completedMdos++;
+        await updateMdosProgress(0);
+      } else if (customer.buyerIsMichigan === false) {
         // Flash the in-flight indicator so the progress row still reflects the
         // check before it resolves to skipped (parity with the run path).
         await setInFlight(IN_FLIGHT.repeatOffender);

@@ -302,8 +302,15 @@ export function validateField(
   return { valid: true, error: null };
 }
 
-export function collectCustomerValidationErrors(data) {
+export function collectCustomerValidationErrors(data, plan = null) {
   const issues = [];
+  // With no plan supplied every field is required, which is what the
+  // individual-check buttons still want. "Run all checks" passes a plan so an
+  // empty buyer or an absent trade is a skip rather than an error.
+  const runPlan = plan || { buyer: true, coBuyer: Boolean(data?.hasCoBuyer), title: true };
+  if (!runPlan.buyer) {
+    return collectTradeOnlyValidationErrors(data);
+  }
 
   const buyer = [
     { id: "firstName", name: "firstName", value: data.firstName, label: "First Name", required: true },
@@ -321,7 +328,7 @@ export function collectCustomerValidationErrors(data) {
     if (!r.valid) issues.push({ fieldId: f.id, error: r.error });
   }
 
-  if (data.hasCoBuyer && data.coBuyer) {
+  if (data.hasCoBuyer && data.coBuyer && runPlan.coBuyer) {
     const co = [
       { id: "cbFirstName", name: "firstName", value: data.coBuyer.firstName, label: "Co-Buyer First Name", required: true },
       { id: "cbMiddleName", name: "middleName", value: data.coBuyer.middleName, label: "Co-Buyer Middle Name", required: false },
@@ -341,8 +348,63 @@ export function collectCustomerValidationErrors(data) {
   return issues;
 }
 
-export function validateCustomerFields(data) {
-  const issues = collectCustomerValidationErrors(data);
+/**
+ * Decide which checks the entered data can actually support.
+ *
+ * "Run all checks" used to demand all four buyer identity fields before it
+ * would do anything, so a dealer who only wanted a title and lien check on a
+ * VIN could not use it at all — they had to expand the trade section, scroll,
+ * and press a separate button. The button now runs whatever the data supports.
+ *
+ * The rule is all-or-nothing per unit, deliberately. A half-filled identity is
+ * a mistake, not an intention, and silently skipping a screening because a
+ * birthdate was missing is exactly the failure this product exists to prevent.
+ * So: fill the buyer out, or leave the buyer empty. Same for the co-buyer.
+ *
+ * Nothing here decides whether a run is APPROVED. `finalDecisionForResults`
+ * already refuses to approve a record whose required checks did not complete,
+ * so a partial run lands on REVIEW rather than reading as a clean result.
+ */
+/**
+ * A run with no buyer still has to validate what it was given: a malformed VIN
+ * is a typo to fix, not a check to skip.
+ */
+function collectTradeOnlyValidationErrors(data) {
+  const issues = [];
+  const result = validateField("tradeVin", data?.tradeVin, "Trade-In VIN", true);
+  if (!result.valid) issues.push({ fieldId: "tradeVin", error: result.error });
+  return issues;
+}
+
+export function planChecksForData(data) {
+  const filled = (value) => String(value ?? "").trim().length > 0;
+  const buyerFields = [data?.firstName, data?.lastName, data?.dob, data?.dlnPid];
+  const buyerFilled = buyerFields.filter(filled).length;
+
+  const co = data?.coBuyer || {};
+  const coFields = [co.firstName, co.lastName, co.dob, co.dlnPid];
+  const coFilled = data?.hasCoBuyer ? coFields.filter(filled).length : 0;
+
+  return {
+    // Partly-filled means the person meant to enter it and did not finish, so
+    // it is validated rather than skipped.
+    buyer: buyerFilled > 0,
+    buyerPartial: buyerFilled > 0 && buyerFilled < buyerFields.length,
+    coBuyer: Boolean(data?.hasCoBuyer) && coFilled > 0,
+    coBuyerPartial:
+      Boolean(data?.hasCoBuyer) && coFilled > 0 && coFilled < coFields.length,
+    title: filled(data?.tradeVin),
+  };
+}
+
+/** True when there is at least one check worth starting. */
+export function hasRunnableChecks(data) {
+  const plan = planChecksForData(data);
+  return plan.buyer || plan.coBuyer || plan.title;
+}
+
+export function validateCustomerFields(data, plan = null) {
+  const issues = collectCustomerValidationErrors(data, plan);
 
   if (issues.length > 0) {
     renderValidationFeedback(issues);

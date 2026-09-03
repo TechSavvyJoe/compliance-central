@@ -193,6 +193,13 @@ export function classifyOfacResult(result) {
       complete: true,
     };
   }
+  // A check the run never attempted is its own state. It is still incomplete —
+  // nothing here can approve a record — but calling it an unrecognized result
+  // told the reader the screening had run and come back strange, which is the
+  // opposite of what happened.
+  if (result.status === "skipped" && result.passed === null) {
+    return { state: "not_run", blocker: false, complete: false };
+  }
   if (result.passed === false) {
     if (result.disposition === "confirmed_match") {
       return { state: "confirmed_match", blocker: true, complete: true };
@@ -287,6 +294,15 @@ export function calculateFinalDecision(checks) {
       approved: false,
       level: "REVIEW",
       reason: "OFAC screening could not be completed - review before proceeding",
+    };
+  }
+
+  if (buyerOfac.state === "not_run" || coBuyerOfac?.state === "not_run") {
+    return {
+      approved: false,
+      level: "REVIEW",
+      reason:
+        "OFAC screening was not run for this record - screen the buyer before proceeding",
     };
   }
 

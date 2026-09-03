@@ -397,3 +397,83 @@ test("every panel verdict flows through the shared downgrade", async () => {
     "sidepanel.js must not compute a verdict without the incomplete-checks downgrade"
   );
 });
+
+// "Run all checks" used to demand all four buyer identity fields, so a dealer
+// who only wanted a title and lien check on a VIN could not use it: they had to
+// expand the trade section, scroll, and press a different button. It now runs
+// whatever the entered data supports.
+test("run all plans the checks the entered data can support", async () => {
+  const { planChecksForData, hasRunnableChecks } = await import(
+    "../src/sidepanel/form.js"
+  );
+
+  // A VIN on its own is a title-and-lien check, not an error.
+  const vinOnly = planChecksForData({ tradeVin: "1FTFW1E84PFA10397" });
+  assert.equal(vinOnly.title, true);
+  assert.equal(vinOnly.buyer, false);
+  assert.equal(vinOnly.buyerPartial, false);
+  assert.equal(hasRunnableChecks({ tradeVin: "1FTFW1E84PFA10397" }), true);
+
+  // A buyer on their own screens without needing a trade.
+  const buyerOnly = planChecksForData({
+    firstName: "Marcus", lastName: "Delaney", dob: "04/12/1986", dlnPid: "D123456789012",
+  });
+  assert.equal(buyerOnly.buyer, true);
+  assert.equal(buyerOnly.buyerPartial, false);
+  assert.equal(buyerOnly.title, false);
+
+  // A half-filled person is a mistake, not an instruction to skip them — it
+  // must be flagged for correction rather than silently dropped, which is the
+  // exact failure this product exists to prevent.
+  const partial = planChecksForData({ firstName: "Marcus", lastName: "Delaney" });
+  assert.equal(partial.buyer, true);
+  assert.equal(partial.buyerPartial, true);
+
+  // A co-buyer is only planned when one was actually added.
+  const noCo = planChecksForData({ tradeVin: "1FTFW1E84PFA10397", coBuyer: { firstName: "Dana" } });
+  assert.equal(noCo.coBuyer, false);
+  const withCo = planChecksForData({
+    hasCoBuyer: true,
+    coBuyer: { firstName: "Dana", lastName: "Whitfield", dob: "01/02/1990", dlnPid: "W987654321098" },
+  });
+  assert.equal(withCo.coBuyer, true);
+  assert.equal(withCo.coBuyerPartial, false);
+
+  // Nothing entered is nothing to run.
+  assert.equal(hasRunnableChecks({}), false);
+  assert.equal(hasRunnableChecks({ firstName: "   " }), false);
+});
+
+// The whole point of allowing a partial run is that it must never be mistaken
+// for a complete one.
+test("a partial run can never read as approved", async () => {
+  const { finalDecisionForResults } = await import("../src/sidepanel/checks.js");
+  const now = Date.now();
+
+  // Everything clear and complete: approved, as a control.
+  const full = finalDecisionForResults({
+    customer: { firstName: "Marcus", lastName: "Delaney" },
+    checks: {
+      ofac: { passed: true, timestamp: now },
+      repeatOffender: { passed: true, status: "eligible", timestamp: now },
+    },
+  });
+  assert.equal(full.level, "APPROVED");
+
+  // The trade-only run the owner asked for: title clear, buyer never screened.
+  // A clear title must not carry the record to APPROVED on its own.
+  const tradeOnly = finalDecisionForResults({
+    customer: { tradeVin: "1FTFW1E84PFA10397" },
+    checks: {
+      ofac: { passed: null, status: "skipped", message: "Not run — no buyer details were entered for this check." },
+      repeatOffender: { passed: null, status: "skipped", message: "Not run — no buyer details were entered for this check." },
+      title: { passed: true, status: "clear", timestamp: now },
+    },
+  });
+  assert.notEqual(tradeOnly.level, "APPROVED");
+  assert.equal(tradeOnly.approved, false);
+  // And it must say the screening was not run, rather than implying it ran and
+  // returned something strange.
+  assert.match(tradeOnly.reason, /not run/i);
+  assert.doesNotMatch(tradeOnly.reason, /unrecognized/i);
+});

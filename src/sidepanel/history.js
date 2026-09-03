@@ -218,6 +218,26 @@ function historyDecision(results) {
   return calculateFinalDecision(results.checks || {});
 }
 
+/**
+ * Reflect an empty History on the controls that act on it.
+ *
+ * "Clear local history" and "Export CSV" stayed fully enabled with nothing to
+ * clear or export, so the only way to learn there were no records was to press
+ * one and watch nothing happen.
+ */
+export function syncHistoryActionState(count, { clearBtn, exportBtn } = {}) {
+  const empty = !count;
+  for (const [btn, emptyTitle] of [
+    [clearBtn, "There are no saved records to clear"],
+    [exportBtn, "There are no saved records to export"],
+  ]) {
+    if (!btn) continue;
+    btn.disabled = empty;
+    if (empty) btn.setAttribute("title", emptyTitle);
+    else btn.removeAttribute("title");
+  }
+}
+
 export async function updateHistoryCount(historyCountEl) {
   if (!historyCountEl) return;
   try {

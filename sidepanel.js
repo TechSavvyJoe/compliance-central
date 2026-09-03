@@ -54,6 +54,7 @@ import {
   purgeOldHistoryEntries,
   saveToHistory,
   updateHistoryCount,
+  syncHistoryActionState,
   populateHistoryModal,
   clearAllHistory,
   findAgingDeals,
@@ -421,7 +422,7 @@ async function resolveOfacTriage(checkKey, disposition) {
   displayResults(elements, results);
   syncReportSelection(results);
   await saveToHistory(results);
-  await updateHistoryCount(elements.historyCount);
+  await refreshHistoryCountAndActions();
   showToast(
     disposition === "confirmed_match"
       ? "OFAC match confirmed — delivery is blocked."
@@ -514,6 +515,27 @@ function activateWorkspace(name, { focusTab = false } = {}) {
   closeCommandMenu();
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
+}
+
+/**
+ * Refresh the History count and the controls that act on it.
+ *
+ * "Clear local history" and "Export CSV" stayed fully enabled with nothing to
+ * clear or export, so the only way to find out the list was empty was to press
+ * one and watch nothing happen.
+ */
+async function refreshHistoryCountAndActions() {
+  await updateHistoryCount(elements.historyCount);
+  try {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
+    syncHistoryActionState((stored[STORAGE_KEYS.complianceHistory] || []).length, {
+      clearBtn: elements.clearAllHistoryBtn,
+      exportBtn: elements.exportAuditLogBtn,
+    });
+  } catch {
+    // Storage being unavailable is not a reason to disable a control the
+    // salesperson may still need; leave both as they are.
+  }
 }
 
 function filterHistoryWorkspace(query = "") {
@@ -649,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
   restoreCachedForm();
   applyPersistedResults();
   restoreSosFeeQuote();
-  updateHistoryCount(elements.historyCount);
+  refreshHistoryCountAndActions();
   checkSdnDataStatus();
 
   // Truly background — purge old history entries when idle.
@@ -2316,7 +2338,7 @@ function initEventListeners() {
           return;
         }
         filterHistoryWorkspace(elements.historySearchInput?.value || "");
-        await updateHistoryCount(elements.historyCount);
+        await refreshHistoryCountAndActions();
         showToast("Record deleted. Other records are unchanged.", "success");
       } catch (error) {
         console.error("Delete history entry failed:", error);
@@ -2890,7 +2912,7 @@ async function saveHistoryAndRefresh(results, shouldSave = () => true) {
     showHistorySaveWarning();
     return false;
   }
-  await updateHistoryCount(elements.historyCount);
+  await refreshHistoryCountAndActions();
   return true;
 }
 
@@ -3373,7 +3395,7 @@ function handleSearchStatusChange(changes) {
               showHistorySaveWarning();
               return;
             }
-            return updateHistoryCount(elements.historyCount);
+            return refreshHistoryCountAndActions();
           })
           .catch((err) => console.error("History save failed:", err));
       } catch (e) {

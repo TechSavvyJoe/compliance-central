@@ -81,13 +81,25 @@ export async function openSettings() {
 async function handleClearHistory() {
   if (typeof clearHistory !== "function") return;
   const button = els.settingsClearHistoryBtn;
-  if (button) button.disabled = true;
+  // Clearing reads and rewrites the whole record set, so on a full History it
+  // is not instant. A button that only greys out reads as broken; keep the
+  // label and say what is happening.
+  const label = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    button.textContent = "Clearing\u2026";
+  }
   try {
     const cleared = await clearHistory();
     if (cleared) showToast("Audit history cleared.", "success");
   } catch {
     showToast("Could not clear audit history. Please try again.", "error");
   } finally {
-    if (button) button.disabled = false;
+    if (button) {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+      if (label) button.textContent = label;
+    }
   }
 }

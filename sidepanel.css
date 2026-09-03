@@ -1954,6 +1954,15 @@ body.modal-open {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+.loading-detail {
+  min-height: 16px;
+  margin: 5px 0 0;
+  color: #cfe0ef;
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  text-align: center;
+}
+
 .loading-text {
   margin-top: var(--spacing-md);
   color: #fff;

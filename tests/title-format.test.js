@@ -75,3 +75,17 @@ test("lienSummary never prints 'Unknown' and uses the holder when known", () => 
     /unknown/i
   );
 });
+
+// Every other branch of this verdict names who reported the finding —
+// "Michigan did not report this title as clean" — but the clear branch was an
+// anonymous passive, so the good-news case was the one line that never said
+// where it came from. On a compliance record the source is the point.
+test("a clear title names the state that reported it", async () => {
+  const { titlePresentation } = await import("../src/sidepanel/title-format.js");
+  const clear = titlePresentation({ titleBrand: "CLEAN", passed: true });
+  assert.equal(clear.state, "clear");
+  assert.match(clear.subtitle, /^Michigan reported/);
+  assert.match(clear.subtitle, /no title brands and no active liens/);
+  // It must stay a statement about what was reported, never a guarantee.
+  assert.doesNotMatch(clear.subtitle, /\b(guarantee|certified|verified clear)\b/i);
+});

@@ -115,7 +115,7 @@ export function titlePresentation(title) {
       statusKey: "pass",
       label: "Clear",
       title: "CLEAR TITLE",
-      subtitle: "No title brands or active liens were reported.",
+      subtitle: "Michigan reported no title brands and no active liens.",
     };
   }
 

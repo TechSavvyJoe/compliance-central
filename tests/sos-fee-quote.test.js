@@ -1533,3 +1533,26 @@ test("a plate transfer never offers a plate design", () => {
     false
   );
 });
+
+// These checks drive a real browser against a state website; Title & Lien
+// measured 7 seconds in a recorded session, behind a full-panel scrim showing
+// a spinner and one static line. Nothing on screen changed, so there was no way
+// to tell a working check from a hung one.
+test("the loading overlay reports how long it has been waiting", () => {
+  const show = sidepanelScript.slice(
+    sidepanelScript.indexOf("function showLoading("),
+    sidepanelScript.indexOf("// ---------- Workspace navigation ----------")
+  );
+  // Elapsed seconds, held back until a wait is worth remarking on.
+  assert.match(show, /secs >= 3/);
+  assert.match(show, /secs >= 10/);
+  assert.match(show, /the state site is slow right now/);
+  // No invented percentage — the count must come from real elapsed time.
+  assert.match(show, /Math\.round\(\(Date\.now\(\) - started\) \/ 1000\)/);
+  assert.doesNotMatch(show, /Math\.random|fakeProgress|\bpercent\b/);
+  // Started per check, so it has to be cleared on both paths or every check
+  // leaves another interval running behind the panel.
+  assert.match(show, /function showLoading\([\s\S]*?clearInterval\(loadingTimer\)/);
+  assert.match(show, /function hideLoading\(\)[\s\S]*?clearInterval\(loadingTimer\)/);
+  assert.match(sidepanelHtml, /id="loadingDetail"/);
+});

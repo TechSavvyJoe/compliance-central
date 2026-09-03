@@ -326,6 +326,7 @@ const elements = {
   // Loading
   loadingOverlay: $("loadingOverlay"),
   loadingText: $("loadingText"),
+  loadingDetail: $("loadingDetail"),
 
   // SDN data warning
   sdnWarning: $("sdnWarning"),
@@ -471,13 +472,41 @@ function applyIcons() {
 
 // ---------- Loading overlay ----------
 
+let loadingTimer = null;
+
+// These checks drive a real browser against a state website, so the wait is
+// several seconds and varies with how the portal is behaving — a measured 7s
+// for Title & Lien in one recorded session. A spinner that never changes gives
+// a reader no way to tell "working" from "hung", so the elapsed count follows
+// the same honest treatment the plate calculator already uses: no invented
+// percentage, just the seconds actually spent, and an explanation once the
+// wait is long enough to worry about.
 function showLoading(text = "Processing...") {
   if (!elements.loadingOverlay) return;
+  clearInterval(loadingTimer);
+  loadingTimer = null;
   if (elements.loadingText) elements.loadingText.textContent = text;
+  if (elements.loadingDetail) elements.loadingDetail.textContent = "";
   elements.loadingOverlay.classList.remove("hidden");
+
+  const started = Date.now();
+  const tick = () => {
+    const secs = Math.round((Date.now() - started) / 1000);
+    if (!elements.loadingDetail) return;
+    if (secs >= 10) {
+      elements.loadingDetail.textContent = `${secs}s \u00b7 the state site is slow right now, still working`;
+    } else if (secs >= 3) {
+      elements.loadingDetail.textContent = `${secs}s`;
+    }
+  };
+  tick();
+  loadingTimer = setInterval(tick, 1000);
 }
 
 function hideLoading() {
+  clearInterval(loadingTimer);
+  loadingTimer = null;
+  if (elements.loadingDetail) elements.loadingDetail.textContent = "";
   elements.loadingOverlay?.classList.add("hidden");
 }
 

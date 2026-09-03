@@ -1478,3 +1478,58 @@ test("every history row action carries an id the worker will accept", async () =
   assert.match(sidepanelScript, /Delete this one saved record\?/);
   assert.match(sidepanelScript, /Other records are kept/);
 });
+
+// Two places set `hidden` on the plate-design control: the mode switch, which
+// hides every [data-new-plate-only] node, and syncSosVehicleOptions. The second
+// decided purely on how many designs exist, so it overrode the first — and any
+// edit that re-ran it, such as switching the vehicle between new and used, made
+// the picker reappear mid-transfer. A transfer moves an existing plate, so its
+// design is already fixed: validateSosLocalValues never requires one and
+// buildSosSubmission never sends one, which made the control a choice with no
+// effect on the fee.
+test("a plate transfer never offers a plate design", () => {
+  // Search forward from the block's own start: "clearSosValidation();" also
+  // appears earlier in the file, and slicing to that gives an empty string that
+  // passes doesNotMatch and fails match for the wrong reason.
+  const designStart = sidepanelScript.indexOf(
+    "const designOptions = plateDesignOptionsForType"
+  );
+  const designBlock = sidepanelScript.slice(
+    designStart,
+    sidepanelScript.indexOf("clearSosValidation();", designStart)
+  );
+  assert.ok(designBlock.length > 200, "expected to find the plate-design block");
+  // Visibility must depend on the mode, not only on the option count.
+  assert.match(designBlock, /selectedSosQuoteMode\(\) === SOS_QUOTE_MODE\.newPlate/);
+  assert.match(
+    designBlock,
+    /sosPlateDesignControl\.hidden\s*=\s*!choosesPlate \|\| designOptions\.length <= 1/
+  );
+  assert.doesNotMatch(
+    designBlock,
+    /sosPlateDesignControl\.hidden\s*=\s*designOptions\.length <= 1;/
+  );
+  // The eligibility note hangs off the same choice and must go with it.
+  assert.match(designBlock, /sosPlateEligibility\.hidden\s*=\s*\n?\s*!choosesPlate/);
+
+  // And the reason it is right to hide: a transfer's payload has no plate
+  // design in it at all.
+  const transfer = buildSosSubmission({
+    mode: "plate_transfer",
+    transferPlateNumber: "ABC1234",
+    vehicleType: "Passenger",
+    bodyStyle: "4D",
+    vehicleUse: "PASS",
+    fuelType: "GAS",
+    modelYear: "2026",
+    msrp: "42500",
+    firstTitle: "no",
+    plateDesign: "mackinac_bridge",
+  });
+  const labels = transfer.map((field) => field.label).join(" | ");
+  assert.doesNotMatch(labels, /Plate Type|Plate Background/i);
+  assert.equal(
+    transfer.some((field) => String(field.optionValue) === "mackinac_bridge"),
+    false
+  );
+});

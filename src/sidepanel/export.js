@@ -661,7 +661,7 @@ export function getOfacReportPageHTML({
     <h3>${sanitizeHTML(subjectLabel)}</h3>
     <table>
       <tr><td>Full Name:</td><td>${buildSanitizedName(subject)}</td></tr>
-      <tr><td>Date of Birth:</td><td>${sanitizeHTML(subject.dob) || "Not Provided"}</td></tr>
+      <tr><td>Date of Birth:</td><td>${sanitizeHTML(formatSubjectDate(subject.dob)) || "Not Provided"}</td></tr>
       <tr><td>Driver License / PID:</td><td>${dlnPid ? `<span class="ref">${dlnPid}</span>` : "Not Provided"}</td></tr>
       ${tradeVin ? `<tr><td>Trade-In VIN:</td><td><span class="ref">${tradeVin}</span></td></tr>` : ""}
     </table>
@@ -700,10 +700,59 @@ export function getOfacReportPageHTML({
  * Every value comes from the result itself; the threshold falls back to the
  * default the screening actually ran at.
  */
+/**
+ * Render a subject field the way a printed record should read.
+ *
+ * These went onto the page exactly as they were captured, so a real screening
+ * record printed the birthdate as "1985-08-08" — an ISO string in a US dealer
+ * document whose own form asks for MM/DD/YYYY — and the licence number in
+ * whatever case it was typed, "g453441429620". Small things, but they are the
+ * first two lines an auditor reads.
+ */
+export function formatSubjectDate(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  // Bare ISO dates are parsed as UTC, so build them locally to avoid printing
+  // the day before in a US timezone.
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = iso
+    ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    : new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(
+    date.getDate()
+  ).padStart(2, "0")}/${date.getFullYear()}`;
+}
+
+/** A licence number is an identifier, so it prints in its canonical case. */
+export function formatSubjectReference(value) {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+/**
+ * OFAC publishes its own date as a full ISO timestamp, and it went onto the
+ * page verbatim: "published by OFAC 2026-08-28T00:00:00.000Z". Nobody reading
+ * a compliance record needs the milliseconds or the UTC marker.
+ */
+export function formatPublishedDate(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "Unknown") return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: /^\d{4}-\d{2}-\d{2}(?:T00:00:00(?:\.000)?Z)?$/.test(raw)
+      ? "UTC"
+      : undefined,
+  });
+}
+
 export function screeningScopeSentence(ofac, lastUpdate) {
   const published =
-    ofac?.publishDate && ofac.publishDate !== "Unknown"
-      ? ` (published by OFAC ${ofac.publishDate})`
+    formatPublishedDate(ofac?.publishDate)
+      ? ` (published by OFAC ${formatPublishedDate(ofac.publishDate)})`
       : "";
 
   // The worker stores the literal string "Unknown" when the device has no
@@ -2278,8 +2327,8 @@ async function drawOfacSection(ctx, customer, ofac, opts = {}) {
 
   const rows = [
     { label: "Full Name", value: subjectFullName(customer) },
-    { label: "Date of Birth", value: customer.dob },
-    { label: "Driver License / PID", value: customer.dlnPid, reference: true },
+    { label: "Date of Birth", value: formatSubjectDate(customer.dob) },
+    { label: "Driver License / PID", value: formatSubjectReference(customer.dlnPid), reference: true },
   ];
   if (customer.tradeVin) {
     rows.push({ label: "Trade-In VIN", value: customer.tradeVin, reference: true });
@@ -2517,7 +2566,7 @@ export function repeatSection(ro, person, title, subjectLabel, branding) {
           title: subjectLabel,
           rows: [
             { label: "Full Name", value: subjectFullName(person) },
-            { label: "Date of Birth", value: person?.dob },
+            { label: "Date of Birth", value: formatSubjectDate(person?.dob) },
             { label: "Driver License / PID", value: person?.dlnPid, reference: true },
           ],
         },

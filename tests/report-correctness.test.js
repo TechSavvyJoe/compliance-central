@@ -374,7 +374,10 @@ test("a cleared OFAC record states what was screened, not just that nothing hit"
   assert.match(html, /What was screened:/);
   assert.match(html, /Specially Designated Nationals \(SDN\) list/);
   assert.match(html, /retrieved 8\/30\/2026/);
-  assert.match(html, /published by OFAC 2026-08-29/);
+  // Formatted for a reader, not echoed as captured — the field arrives from
+  // OFAC as an ISO timestamp.
+  assert.match(html, /published by OFAC August 29, 2026/);
+  assert.doesNotMatch(html, /T00:00:00|\.000Z/);
   assert.match(html, /18,342 entries were compared/);
   assert.match(html, /name-similarity threshold of 85% or higher/);
   // The reviewed certification paragraph is untouched.
@@ -409,7 +412,7 @@ test("the screening sentence states only what the result actually knows", async 
     null
   );
   assert.match(known, /retrieved 8\/30\/2026/);
-  assert.match(known, /published by OFAC 8\/29\/2026/);
+  assert.match(known, /published by OFAC August 29, 2026/);
   assert.match(known, /17,342 entries were compared/);
 
   // No retrieval date: the clause goes, rather than printing the placeholder.
@@ -431,4 +434,46 @@ test("the screening sentence states only what the result actually knows", async 
   const zero = screeningScopeSentence({ entriesSearched: 0, threshold: 85 }, null);
   assert.doesNotMatch(zero, /Every entry/i);
   assert.doesNotMatch(zero, /0 entries were compared/);
+});
+
+// From a real screening record the owner generated and printed: the birthdate
+// read "1985-08-08" in a US dealer document whose own form asks for
+// MM/DD/YYYY, the licence read "g453441429620" in whatever case it was typed,
+// and the OFAC publication date read "2026-08-28T00:00:00.000Z" — a raw ISO
+// timestamp, milliseconds and all, in a document handed to an auditor.
+test("a printed record formats the subject the way a record should read", async () => {
+  const { formatSubjectDate, formatSubjectReference, formatPublishedDate } =
+    await import("../src/sidepanel/export.js");
+
+  assert.equal(formatSubjectDate("1985-08-08"), "08/08/1985");
+  // A bare ISO date parses as UTC, which would print the day before in every
+  // US timezone. It must not drift.
+  assert.equal(formatSubjectDate("2026-01-01"), "01/01/2026");
+  assert.equal(formatSubjectDate("08/08/1985"), "08/08/1985");
+  // Anything unparseable is shown as captured rather than silently blanked —
+  // losing a subject's stated birthdate from a compliance record is worse than
+  // printing it oddly.
+  assert.equal(formatSubjectDate("not a date"), "not a date");
+  assert.equal(formatSubjectDate(""), "");
+  assert.equal(formatSubjectDate(null), "");
+
+  assert.equal(formatSubjectReference("g453441429620"), "G453441429620");
+  assert.equal(formatSubjectReference("  g4534 "), "G4534");
+  assert.equal(formatSubjectReference(null), "");
+
+  assert.equal(formatPublishedDate("2026-08-28T00:00:00.000Z"), "August 28, 2026");
+  assert.equal(formatPublishedDate("2026-08-28"), "August 28, 2026");
+  // An absent date must produce no clause at all, never the word "Unknown".
+  assert.equal(formatPublishedDate("Unknown"), "");
+  assert.equal(formatPublishedDate(""), "");
+
+  // And the sentence that carries it must not leak the timestamp.
+  const { screeningScopeSentence } = await import("../src/sidepanel/export.js");
+  const sentence = screeningScopeSentence(
+    { entriesSearched: 19321, threshold: 85, lastUpdate: "9/2/2026", publishDate: "2026-08-28T00:00:00.000Z" },
+    null
+  );
+  assert.match(sentence, /published by OFAC August 28, 2026/);
+  assert.doesNotMatch(sentence, /T00:00:00/);
+  assert.doesNotMatch(sentence, /\.000Z/);
 });

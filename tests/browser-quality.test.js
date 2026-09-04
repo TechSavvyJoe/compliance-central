@@ -4,6 +4,7 @@ import test from "node:test";
 
 const sidepanelHtml = readFileSync(new URL("../sidepanel.html", import.meta.url), "utf8");
 const sidepanelCss = readFileSync(new URL("../sidepanel.css", import.meta.url), "utf8");
+const sidepanelScript = readFileSync(new URL("../sidepanel.js", import.meta.url), "utf8");
 const datePickerSource = readFileSync(
   new URL("../src/sidepanel/date-picker.js", import.meta.url),
   "utf8"
@@ -167,4 +168,19 @@ test("results-view exports are real targets and the icon-only ones say what they
       `${id} should name itself on hover`
     );
   }
+});
+
+test("clearing the form puts the Trade-in section back the way it starts", () => {
+  // Clear resets the buyer, the co-buyer and the SOS owner birthdate, but it
+  // used to leave Trade-in expanded over an empty VIN: the next customer began
+  // 118px lower, under a chevron pointing up beside a label reading "Add".
+  // One helper owns the panel, aria-expanded and the chevron together, so a
+  // caller cannot set two of the three and forget the last.
+  assert.match(sidepanelScript, /function setTradeSectionOpen\(open\)/);
+  assert.match(sidepanelScript, /elements\.tradeVin\.value = "";\s*\n\s*setTradeSectionOpen\(false\);/);
+  // No call site should still be writing the three by hand.
+  assert.doesNotMatch(
+    sidepanelScript,
+    /classList\.remove\("collapsed"\)[\s\S]{0,200}?aria-expanded/
+  );
 });

@@ -2521,16 +2521,10 @@ function initEventListeners() {
 
   // Trade-In collapse — the native button provides keyboard activation.
   const tradeHeader = $("tradeSectionHeader");
-  const tradeContent = $("tradeSectionContent");
-  if (tradeHeader && tradeContent) {
-    const toggleTrade = () => {
-      const isCollapsed = tradeContent.classList.toggle("collapsed");
-      tradeHeader.setAttribute("aria-expanded", String(!isCollapsed));
-      tradeHeader
-        .querySelector(".section-toggle")
-        ?.classList.toggle("rotated", !isCollapsed);
-    };
-    tradeHeader.addEventListener("click", toggleTrade);
+  if (tradeHeader) {
+    tradeHeader.addEventListener("click", () =>
+      setTradeSectionOpen($("tradeSectionContent")?.classList.contains("collapsed"))
+    );
   }
 
   // Summary bar is a two-way toggle: collapse when open, expand when collapsed.
@@ -2555,11 +2549,7 @@ function initEventListeners() {
       return;
     }
     if (step === "trade") {
-      const header = $("tradeSectionHeader");
-      const content = $("tradeSectionContent");
-      content?.classList.remove("collapsed");
-      header?.setAttribute("aria-expanded", "true");
-      header?.querySelector(".section-toggle")?.classList.add("rotated");
+      setTradeSectionOpen(true);
       elements.tradeVin?.focus();
       return;
     }
@@ -2757,6 +2747,23 @@ function announceVerdict() {
   requestAnimationFrame(() => {
     announcer.textContent = verdict;
   });
+}
+
+/**
+ * Open or close the Trade-in section, keeping the panel, the header's
+ * aria-expanded and the chevron in step.
+ *
+ * The three lines used to be written out at each call site, and the one that
+ * cleared the deal did not write them at all: after Clear the section stayed
+ * open over an empty VIN, so the next customer started 118px lower with a
+ * chevron pointing up beside a label that still read "Add".
+ */
+function setTradeSectionOpen(open) {
+  const content = $("tradeSectionContent");
+  const header = $("tradeSectionHeader");
+  content?.classList.toggle("collapsed", !open);
+  header?.setAttribute("aria-expanded", String(Boolean(open)));
+  header?.querySelector(".section-toggle")?.classList.toggle("rotated", Boolean(open));
 }
 
 function resetInputPanel() {
@@ -3155,6 +3162,7 @@ async function handleClear() {
   setDateInputValue(elements.dob, "");
   elements.dlnPid.value = "";
   elements.tradeVin.value = "";
+  setTradeSectionOpen(false);
 
   // Clear co-buyer
   if (elements.cbFirstName) elements.cbFirstName.value = "";

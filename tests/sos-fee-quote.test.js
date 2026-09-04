@@ -10,6 +10,7 @@ import {
   SOS_QUOTE_SOURCE,
   createCalculatedQuote,
   createSosFeeQuotePrintHTML,
+  tradeInCreditPhrase,
   createSosOfficialEvidencePrintHTML,
   normalizeSosFeeQuote,
   sanitizePlatePreviewUrl,
@@ -1555,4 +1556,49 @@ test("the loading overlay reports how long it has been waiting", () => {
   assert.match(show, /function showLoading\([\s\S]*?clearInterval\(loadingTimer\)/);
   assert.match(show, /function hideLoading\(\)[\s\S]*?clearInterval\(loadingTimer\)/);
   assert.match(sidepanelHtml, /id="loadingDetail"/);
+});
+
+// The worksheet hard-coded "up to $12,000 for 2026". That was correct when it
+// was written, but Michigan's motor-vehicle trade-in sales-tax credit rises by
+// $1,000 a year under PA 159/160 of 2018 and is scheduled to end after 2028 —
+// so the figure goes wrong on the first of January and stays wrong, on a
+// document a dealer may hand a customer.
+test("the trade-in credit follows Michigan's schedule instead of freezing", () => {
+  const at = (year) => tradeInCreditPhrase(new Date(year, 5, 1));
+
+  assert.match(at(2026), /\$12,000 for 2026/);
+  assert.match(at(2027), /\$13,000 for 2027/);
+  assert.match(at(2028), /\$14,000 for 2028/);
+
+  // Past the scheduled removal it must stop asserting a cap rather than
+  // inventing one, and must send the reader to confirm.
+  assert.doesNotMatch(at(2029), /\$\d/);
+  assert.match(at(2029), /confirm the current limit/i);
+  assert.match(at(2035), /confirm the current limit/i);
+
+  // And the printed worksheet must carry whatever the schedule says today,
+  // never a literal that can drift away from it.
+  const html = createSosFeeQuotePrintHTML({
+    mode: "new_plate",
+    feeCents: 17900,
+    calculatedAt: Date.now(),
+    source: "calculated",
+  });
+  if (html) {
+    assert.ok(
+      html.includes(tradeInCreditPhrase()),
+      "the worksheet should print the scheduled figure"
+    );
+    // The literal check belongs on the source, not the render: this year the
+    // scheduled figure IS $12,000, so a rendered match proves nothing.
+    const src = readFileSync(
+      new URL("../src/sidepanel/sos-fee-quote.js", import.meta.url),
+      "utf8"
+    );
+    assert.doesNotMatch(
+      src,
+      /up to \$12,000 for 2026/,
+      "the cap must be computed from the year, not written into the page"
+    );
+  }
 });

@@ -1,4 +1,4 @@
-COMPLIANCE CENTRAL — CHROME WEB STORE LISTING COPY (v1.6.0)
+COMPLIANCE CENTRAL — CHROME WEB STORE LISTING COPY (v1.6.1)
 
 ⚠️ THIS IS A REFERENCE DOC — DO NOT PASTE THE WHOLE THING INTO ANY FIELD.
 Each section below goes in a DIFFERENT place in the dashboard:
@@ -89,7 +89,7 @@ Requirements:
 • Google Chrome. No account, API key, or setup is required.
 
 
-WHAT'S NEW IN 1.6.0
+WHAT'S NEW IN 1.6.1
 
 (1.3.1 is the version currently published on the Web Store, so this entry covers
 everything in 1.3.2 through 1.6.0 — those builds were never uploaded.)
@@ -177,7 +177,7 @@ SUBMISSION NOTES
 • The dashboard walk-through for this update lives in SUBMISSION-CHECKLIST.md (same directory). It is the master document; where it and older notes disagree, the checklist wins.
 • The published listing is at 1.3.1. This repo is at 1.6.0, so the next upload is an UPDATE to the existing listing, not a first submission. Upload compliance-central-1.6.0.zip (`npm run package`).
 • PERMISSION RE-CONSENT: 1.3.1 declared three host permissions; 1.6.0 declares five (adds dsvsesvc.sos.state.mi.us and vpic.nhtsa.dot.gov). When the update lands, Chrome DISABLES the extension for every existing user until they accept the new permissions. Expect support questions; the first WHAT'S NEW bullet above tells users what to do.
-• 1.3.2, 1.3.3, 1.4.0, 1.5.0, and 1.5.1 were built but never uploaded; the WHAT'S NEW IN 1.6.0 entry above covers all of them.
+• 1.3.2, 1.3.3, 1.4.0, 1.5.0, and 1.5.1 were built but never uploaded; the WHAT'S NEW IN 1.6.1 entry above covers all of them.
 • Screenshots and promo tiles for this update are being regenerated as store-assets/chrome-web-store/screenshots/screenshot-1.png through screenshot-5.png plus store-assets/chrome-web-store/promo-small-440x280.png and promo-marquee-1400x560.png. Review each against the captions in SUBMISSION-CHECKLIST.md before uploading. The older JPEGs in store-assets/chrome-web-store/images/ and store-assets/upload/ were rendered 2026-07-22 for 1.3.1 and predate both the side-panel redesign and the SOS plate fee workspace — do not upload those.
 • Screenshot 04 is visibly labeled as an instructional composite and uses fictional ID artwork; it is not a live scanner capture or a real identity document.
 • Developer contact email (shown publicly): joejgallant@gmail.com — already set in lib/config.js, the privacy policy, and the dashboard account settings.

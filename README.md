@@ -41,9 +41,8 @@ your dealership's name and logo on it.
 
 **Test build —** download the latest packaged zip:
 
-```
-https://github.com/TechSavvyJoe/compliance-central/releases/latest/download/compliance-central-1.6.0.zip
-```
+**https://github.com/TechSavvyJoe/compliance-central/releases/latest** — download the
+`compliance-central-<version>.zip` attached to the newest release.
 
 Extract it, then in Chrome go to `chrome://extensions`, turn on **Developer mode**, choose
 **Load unpacked**, and select the folder that has `manifest.json` sitting directly inside

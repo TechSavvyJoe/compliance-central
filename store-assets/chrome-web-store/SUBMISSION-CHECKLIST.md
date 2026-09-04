@@ -1,8 +1,8 @@
-# Chrome Web Store — 1.6.0 UPDATE Submission Checklist
+# Chrome Web Store — 1.6.1 UPDATE Submission Checklist
 
 **Item:** Compliance Central - Michigan Dealer Compliance Hub
 **Item ID:** `oijkbdclicekpggjblgknnphfdafdgod`
-**Live version:** 1.3.1 → **Uploading:** 1.6.0 (an UPDATE to the existing listing, not a new submission)
+**Live version:** 1.3.1 → **Uploading:** 1.6.1 (an UPDATE to the existing listing, not a new submission)
 **Prepared:** 2026-08-19
 
 This is the master document: a literal walk of the developer dashboard, tab by tab,
@@ -45,9 +45,9 @@ existing user until they re-consent.**
    `tests/release-copy.test.js` pins the store copy to the code and policy; if it fails, fix
    the copy, not the test.
 2. `npx eslint .` — clean.
-3. `npm run package` — produces `compliance-central-1.6.0.zip` and runs
+3. `npm run package` — produces `compliance-central-1.6.1.zip` and runs
    `tools/verify-extension-package.mjs`. Confirm in the printed contents:
-   - `manifest.json` says `"version": "1.6.0"`;
+   - `manifest.json` says `"version": "1.6.1"`;
    - **no** `assets/dealer-logo.webp` (the built-in dealership branding was removed in 1.6.0);
    - no `docs/`, `tests/`, `store-assets/`, or `tools/` inside the zip.
 4. Confirm the image set exists and matches the captions in "Graphic assets" below:
@@ -68,9 +68,9 @@ existing user until they re-consent.**
 
 | Field | Value |
 |---|---|
-| Upload | `compliance-central-1.6.0.zip` from the repo root (built in pre-flight step 3) |
+| Upload | `compliance-central-1.6.1.zip` from the repo root (built in pre-flight step 3) |
 
-After upload the dashboard shows the draft version as 1.6.0 and lists the permissions it
+After upload the dashboard shows the draft version as 1.6.1 and lists the permissions it
 parsed from the manifest. Verify it lists exactly: `sidePanel`, `storage`, `alarms`,
 `unlimitedStorage`, and the five hosts from the warning box above. If the dashboard shows a
 permission warning banner about new permissions, that is expected — it is the re-consent

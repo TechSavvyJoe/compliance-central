@@ -211,6 +211,22 @@ function renderOfacResult(
     return;
   }
 
+  // A screening this run never attempted. It has no finding to report and no
+  // record to print — offering the buttons produced an OFAC screening record
+  // for a person nobody screened.
+  if (classifyOfacResult(ofac).state === "not_run") {
+    setResultStatus(statusEl, "skipped", "Not run");
+    if (detailEl) {
+      detailEl.textContent =
+        ofac.message || "This run did not screen this person";
+    }
+    setActionVisibility(printBtn, false);
+    setActionVisibility(downloadBtn, false);
+    setResultTimestamp(timestampEl, null);
+    triagePanel?.classList.add("hidden");
+    return;
+  }
+
   // A stale screen (the SDN list could not be refreshed before screening) is a
   // weaker "Pass" — flag it on the row so a clean result isn't taken at face
   // value when the data might be out of date.
@@ -484,19 +500,15 @@ export function displayResults(elements, results) {
   let icon = ICONS.alertTriangle;
   let action = "";
 
+  // Settled findings lead, in the same order the verdict itself settles them.
+  // Asking for a comparison first meant a deal Michigan will refuse to
+  // register was headlined "Compare before you act".
   if (decision.level === "APPROVED") {
     tone = "verdict-approved";
     eyebrow = "All checks passed";
     headline = "Clear to deliver";
     summary = `${buyerFirstName} cleared every check that applied.`;
     icon = ICONS.shieldCheck;
-  } else if (hasPotentialMatch) {
-    tone = "verdict-action";
-    eyebrow = "Possible match · needs you";
-    headline = "Compare before you act";
-    summary = "A hit is not a finding. Work the four comparison checks.";
-    icon = ICONS.alertTriangle;
-    action = `<div class="decision-actions"><button type="button" class="decision-primary-action" data-open-ofac-comparison>Open the comparison</button><span class="decision-progress">0 of 4</span></div>`;
   } else if (hasConfirmedMatch) {
     tone = "verdict-denied";
     eyebrow = "Confirmed match · stop";
@@ -509,6 +521,13 @@ export function displayResults(elements, results) {
     headline = "Hold for review";
     summary = "Repeat-offender status requires manager review before delivery.";
     icon = ICONS.alertTriangle;
+  } else if (hasPotentialMatch) {
+    tone = "verdict-action";
+    eyebrow = "Possible match · needs you";
+    headline = "Compare before you act";
+    summary = "A hit is not a finding. Work the four comparison checks.";
+    icon = ICONS.alertTriangle;
+    action = `<div class="decision-actions"><button type="button" class="decision-primary-action" data-open-ofac-comparison>Open the comparison</button><span class="decision-progress">0 of 4</span></div>`;
   }
 
   elements.finalDecision.className = `final-decision ${tone}`;

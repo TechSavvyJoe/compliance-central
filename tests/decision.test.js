@@ -483,3 +483,151 @@ test("a partial run can never read as approved", async () => {
   assert.match(tradeOnly.reason, /not run/i);
   assert.doesNotMatch(tradeOnly.reason, /unrecognized/i);
 });
+
+// A dealership that cannot reach OFAC screens against the cached SDN list, and
+// the app's rule for that is explicit: a clean result on a list it could not
+// refresh is not a confident clear. Triaging a fuzzy hit as a false positive
+// escaped that rule entirely — the same record read REVIEW with no match and
+// APPROVED once a match had been found and cleared, which is the wrong way
+// round. Staleness is about the entries that were never compared, so no
+// disposition can answer it.
+test("a stale SDN list still requires review after a match is cleared", () => {
+  const clearedOnStaleList = {
+    passed: false,
+    matches: [{ name: "Cleared candidate" }],
+    matchCount: 1,
+    disposition: "false_positive",
+    stale: true,
+    dataAgeHours: 40,
+  };
+  const eligible = { passed: true, status: "eligible" };
+
+  const buyer = calculateFinalDecision({
+    ofac: clearedOnStaleList,
+    repeatOffender: eligible,
+  });
+  assert.equal(buyer.level, "REVIEW");
+  assert.equal(buyer.approved, false);
+  assert.match(buyer.reason, /could not be refreshed/i);
+
+  const coBuyer = calculateFinalDecision({
+    ofac: { passed: true },
+    repeatOffender: eligible,
+    coBuyerOfac: clearedOnStaleList,
+    coBuyerRepeatOffender: eligible,
+  });
+  assert.equal(coBuyer.level, "REVIEW");
+
+  // A false positive cleared against a current list still approves.
+  assert.equal(
+    calculateFinalDecision({
+      ofac: { ...clearedOnStaleList, stale: false },
+      repeatOffender: eligible,
+    }).level,
+    "APPROVED"
+  );
+});
+
+// Michigan will refuse to register the vehicle. That is a finding, not a
+// pending question, and an OFAC hit nobody has compared yet must not turn it
+// into one: the potential-match branch sat between the two blocker branches
+// and softened a denial into "compare before you decide".
+test("a repeat-offender denial is not softened by an untriaged OFAC match", () => {
+  const untriaged = { passed: false, matches: [{ name: "Candidate" }], matchCount: 1 };
+
+  const buyer = calculateFinalDecision({
+    ofac: untriaged,
+    repeatOffender: { status: "ineligible", passed: false },
+  });
+  assert.equal(buyer.level, "DENIED");
+  assert.match(buyer.reason, /repeat offender/i);
+
+  const coBuyer = calculateFinalDecision({
+    ofac: untriaged,
+    repeatOffender: { status: "eligible", passed: true },
+    coBuyerOfac: { passed: true },
+    coBuyerRepeatOffender: { status: "ineligible", passed: false },
+  });
+  assert.equal(coBuyer.level, "DENIED");
+
+  // A confirmed OFAC match still names itself first.
+  assert.match(
+    calculateFinalDecision({
+      ofac: { passed: false, disposition: "confirmed_match", matches: [{ name: "X" }] },
+      repeatOffender: { status: "ineligible", passed: false },
+    }).reason,
+    /OFAC match/i
+  );
+
+  // With no blocker, an untriaged match still asks for the comparison.
+  assert.match(
+    calculateFinalDecision({
+      ofac: untriaged,
+      repeatOffender: { status: "eligible", passed: true },
+    }).reason,
+    /compare the buyer/i
+  );
+});
+
+// Michigan reports a brand two ways: the title's own status, and a separate
+// vehicle-brand list. The final decision has always read both. Every surface
+// that describes the title read only the first, so a salvage trade printed
+// "CLEAR TITLE — Michigan reported no title brands and no active liens" on the
+// document that goes in the deal jacket, and the audit CSV recorded "Clear".
+test("a brand reported only in vehicleBrands never reads as a clear title", async () => {
+  const { titlePresentation } = await import("../src/sidepanel/title-format.js");
+  const { retainAuditHistory } = await import("../lib/history-retention.js");
+  const { reportDecisionSummary } = await import("../src/sidepanel/export.js");
+
+  const title = {
+    passed: true,
+    titleStatus: "Clear",
+    titleBrand: "CLEAN",
+    titleType: "Paper",
+    hasLien: false,
+    lienStatus: "No Active Liens",
+    vehicleBrands: ["SALVAGE"],
+  };
+
+  const presentation = titlePresentation(title);
+  assert.notEqual(presentation.statusKey, "pass");
+  assert.notEqual(presentation.state, "clear");
+  assert.match(presentation.title, /SALVAGE/i);
+  assert.doesNotMatch(presentation.subtitle, /no title brands/i);
+
+  const results = {
+    timestamp: "2026-09-03T12:00:00.000Z",
+    customer: { firstName: "A", lastName: "B", tradeVin: "1FTFW1E84PFA10397" },
+    checks: {
+      ofac: { passed: true },
+      repeatOffender: { status: "eligible", passed: true },
+      title,
+    },
+  };
+
+  // The decision already refused; the printed check summary must agree.
+  assert.equal(calculateFinalDecision(results.checks).level, "REVIEW");
+  const row = reportDecisionSummary(results).rows.find(
+    (item) => item.label === "Title / Lien"
+  );
+  assert.notEqual(row.state, "CLEAR");
+  assert.doesNotMatch(row.detail, /no title brands/i);
+
+  // And the audit trail must not record it as clear.
+  const stored = retainAuditHistory([
+    {
+      runId: "r-brand",
+      timestamp: Date.now(),
+      decision: "REVIEW",
+      runType: "full",
+      fullResults: results,
+    },
+  ]);
+  assert.equal(stored[0].checks.title, "branded");
+
+  // A genuinely clean title is untouched.
+  assert.equal(
+    titlePresentation({ ...title, vehicleBrands: [] }).statusKey,
+    "pass"
+  );
+});

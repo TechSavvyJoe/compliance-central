@@ -4,6 +4,7 @@
  */
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { problemTitleBrands } from "../../lib/title-brands.js";
 import { lienSummary } from "./title-format.js";
 
 /**
@@ -178,19 +179,26 @@ export async function runTitleCheck(customerData, operationId) {
  * Normalize an OFAC result before it is used for a final decision or report.
  * A service failure commonly carries `passed: false`; it must never be treated
  * as a confirmed match unless the result is otherwise a valid completed check.
+ *
+ * `stale` rides alongside the state rather than replacing it. Staleness is a
+ * fact about the list the screening compared against — about the entries that
+ * were never compared at all — so it survives whatever the screening found and
+ * whatever the dealership decided about it.
  */
 export function classifyOfacResult(result) {
+  const stale = Boolean(result?.stale);
   if (!result) {
-    return { state: "missing", blocker: false, complete: false };
+    return { state: "missing", blocker: false, complete: false, stale };
   }
   if (result.error || result.status === "error") {
-    return { state: "unavailable", blocker: false, complete: false };
+    return { state: "unavailable", blocker: false, complete: false, stale };
   }
   if (result.passed === true) {
     return {
-      state: result.stale ? "stale" : "clear",
+      state: stale ? "stale" : "clear",
       blocker: false,
       complete: true,
+      stale,
     };
   }
   // A check the run never attempted is its own state. It is still incomplete —
@@ -198,18 +206,18 @@ export function classifyOfacResult(result) {
   // told the reader the screening had run and come back strange, which is the
   // opposite of what happened.
   if (result.status === "skipped" && result.passed === null) {
-    return { state: "not_run", blocker: false, complete: false };
+    return { state: "not_run", blocker: false, complete: false, stale };
   }
   if (result.passed === false) {
     if (result.disposition === "confirmed_match") {
-      return { state: "confirmed_match", blocker: true, complete: true };
+      return { state: "confirmed_match", blocker: true, complete: true, stale };
     }
     if (result.disposition === "false_positive") {
-      return { state: "false_positive", blocker: false, complete: true };
+      return { state: "false_positive", blocker: false, complete: true, stale };
     }
-    return { state: "potential_match", blocker: false, complete: false };
+    return { state: "potential_match", blocker: false, complete: false, stale };
   }
-  return { state: "review", blocker: false, complete: false };
+  return { state: "review", blocker: false, complete: false, stale };
 }
 
 /**
@@ -248,13 +256,24 @@ export function calculateFinalDecision(checks) {
     ? classifyRepeatOffenderResult(checks.coBuyerRepeatOffender)
     : null;
 
-  // Known legal/compliance blockers take precedence over unrelated incomplete
-  // checks. An outage must not soften a confirmed denial into a generic review.
+  // Known legal/compliance blockers take precedence over every unresolved
+  // check, incomplete or not. An outage must not soften a confirmed denial into
+  // a generic review — and neither may an OFAC hit nobody has compared yet.
+  // Michigan refusing to register the vehicle is a finding, not a question, so
+  // both blockers are settled before anything asks for a comparison.
   if (buyerOfac.blocker || coBuyerOfac?.blocker) {
     return {
       approved: false,
       level: "DENIED",
       reason: "OFAC match confirmed after comparison — do not proceed with the transaction",
+    };
+  }
+
+  if (buyerRepeat.blocker || coBuyerRepeat?.blocker) {
+    return {
+      approved: false,
+      level: "DENIED",
+      reason: "Repeat offender status — registration will be denied",
     };
   }
 
@@ -267,14 +286,6 @@ export function calculateFinalDecision(checks) {
       level: "REVIEW",
       reason:
         "Potential OFAC match found — compare the buyer with the SDN entry before deciding",
-    };
-  }
-
-  if (buyerRepeat.blocker || coBuyerRepeat?.blocker) {
-    return {
-      approved: false,
-      level: "DENIED",
-      reason: "Repeat offender status — registration will be denied",
     };
   }
 
@@ -343,8 +354,13 @@ export function calculateFinalDecision(checks) {
   }
 
   // A clean OFAC result against a list that could not be refreshed is not a
-  // confident clear — require review rather than silently approving.
-  if (buyerOfac.state === "stale" || coBuyerOfac?.state === "stale") {
+  // confident clear — require review rather than silently approving. Gating on
+  // the state alone let a triaged hit walk past: a match cleared as a false
+  // positive reported state "false_positive", so the same unrefreshed list
+  // produced REVIEW with nothing found and APPROVED once something had been
+  // found and dismissed. The doubt is about the entries never compared, which
+  // no disposition answers, so it is the flag that gates.
+  if (buyerOfac.stale || coBuyerOfac?.stale) {
     return {
       approved: false,
       level: "REVIEW",
@@ -363,21 +379,7 @@ export function calculateFinalDecision(checks) {
       };
     }
 
-    const titleBrand = checks.title.titleBrand;
-    const allBrands = [titleBrand, ...(checks.title.vehicleBrands || [])].filter(
-      (brand) => typeof brand === "string"
-    );
-
-    const problemBrands = allBrands.filter(
-      (brand) =>
-        brand &&
-        brand !== "CLEAN" &&
-        brand !== "UNKNOWN" &&
-        brand !== "undefined" &&
-        brand.toLowerCase() !== "none" &&
-        brand.toLowerCase() !== "no brands" &&
-        !brand.toLowerCase().includes("no brand")
-    );
+    const problemBrands = problemTitleBrands(checks.title);
 
     if (problemBrands.length > 0) {
       return {

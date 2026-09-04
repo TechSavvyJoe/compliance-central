@@ -813,12 +813,16 @@
         </section>
 
         <section id="historyWorkspace" class="history-workspace workspace-pane" role="tabpanel" aria-labelledby="viewHistoryBtn" data-workspace-panel="history" hidden>
+          <!-- This heading used to run an "Audit trail" eyebrow, the word
+               History a second time under the tab that already says it, and
+               two lines naming the buttons that are printed on every card
+               below: 93px of introduction above a list whose first record
+               already needs 260px. Where the records are kept is the one fact
+               the cards do not carry, so it moved into the count line above
+               them — and into the empty state, which is the only place the
+               count line does not appear. -->
           <div class="history-workspace-heading">
-            <div>
-              <span class="workspace-eyebrow">Audit trail</span>
-              <h2>History</h2>
-              <p>Reopen a saved customer to re-screen, print, or download the completed reports. Records stay on this device.</p>
-            </div>
+            <h2>History</h2>
             <button type="button" id="exportAuditLogBtn" class="btn-secondary btn-sm" title="Export the local audit log as a CSV file">
               <span class="btn-icon icon icon-download" aria-hidden="true"></span>
               Export CSV

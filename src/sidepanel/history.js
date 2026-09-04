@@ -281,16 +281,21 @@ export async function populateHistoryModal(historyListEl) {
     const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
     const history = storage[STORAGE_KEYS.complianceHistory] || [];
 
+    // Where the records live used to be stated in a paragraph above the search
+    // box that also spent two lines naming the buttons printed on every card.
+    // The paragraph is gone; these two lines carry the fact instead, so it is
+    // still on screen whether the list is full or empty.
     if (history.length === 0) {
       historyListEl.innerHTML =
-        '<div class="history-empty"><strong>No saved checks yet</strong><span>Run a compliance check and the deal will be saved here.</span></div>';
+        '<div class="history-empty"><strong>No saved checks yet</strong><span>Run a compliance check and the deal is saved here, on this device, for ' +
+        `${CONFIG.limits.dataRetentionDays} days.</span></div>`;
       return;
     }
 
     const shown = history.slice(0, MAX_ENTRIES);
     const summary = `<div class="history-summary">${history.length} saved record${
       history.length === 1 ? "" : "s"
-    } · kept for up to ${CONFIG.limits.dataRetentionDays} days</div>`;
+    } · kept on this device for up to ${CONFIG.limits.dataRetentionDays} days</div>`;
 
     historyListEl.innerHTML =
       summary +

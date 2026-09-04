@@ -5,6 +5,8 @@
  * "Trade lien: Unknown" while another (the card) showed the real lien status.
  */
 
+import { problemTitleBrands } from "../../lib/title-brands.js";
+
 // A lienholder name is only shown if it looks like a real party — guards
 // against the MDOS page exposing a header/status word instead of a name, and
 // guarantees we never render "Unknown"/"Yes"/a status string as a holder.
@@ -61,6 +63,10 @@ export function lienSummary(title) {
  * Derive one fail-closed Title/Lien presentation for every UI/export surface.
  * A backend `passed:true` means no disqualifying brand; it does NOT mean there
  * is no lien, so brand/lien warnings must take precedence over a green state.
+ *
+ * "No disqualifying brand" has to mean the whole record. A title whose status
+ * reads clear can still carry a brand in `vehicleBrands`, which is why the
+ * final decision reads both — and why this does too.
  */
 export function titlePresentation(title) {
   const value = title || {};
@@ -87,12 +93,14 @@ export function titlePresentation(title) {
     };
   }
 
-  if (brand && !["CLEAN", "NONE"].includes(brand)) {
+  const brands = problemTitleBrands(value);
+  if (brands.length > 0) {
+    const named = brands.join(", ").toUpperCase();
     return {
       state: "branded",
       statusKey: "warning",
-      label: brand,
-      title: `${brand} TITLE${value.hasLien ? " + ACTIVE LIEN" : ""}`,
+      label: brands[0],
+      title: `${named} TITLE${value.hasLien ? " + ACTIVE LIEN" : ""}`,
       subtitle: value.hasLien
         ? `Branded title; ${lienSummary(value)}`
         : "Branded title — disclosure and review are required before sale.",

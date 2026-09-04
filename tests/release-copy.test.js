@@ -113,14 +113,42 @@ test("store screenshots stage only copy the app really uses", async () => {
   const { readFile } = await import("node:fs/promises");
   const root = new URL("../", import.meta.url);
   const capture = await readFile(new URL("tools/capture-store-shots.mjs", root), "utf8");
-  const quote = await readFile(new URL("src/sidepanel/sos-fee-quote.js", root), "utf8");
-  const panel = await readFile(new URL("sidepanel.js", root), "utf8");
-  const html = await readFile(new URL("sidepanel.html", root), "utf8");
-  const shipped = `${quote}\n${panel}\n${html}`;
+  // "Shipped" has to mean the whole runtime, not three hand-picked files — a
+  // result line lives in results.js and title-format.js, and a guard that
+  // cannot see them would report a true string as missing.
+  const { readdir } = await import("node:fs/promises");
+  const dirs = ["src/sidepanel", "src/worker", "lib"];
+  const parts = [
+    await readFile(new URL("sidepanel.js", root), "utf8"),
+    await readFile(new URL("sidepanel.html", root), "utf8"),
+  ];
+  for (const dir of dirs) {
+    for (const name of await readdir(new URL(`${dir}/`, root))) {
+      if (name.endsWith(".js") && !name.endsWith(".min.js")) {
+        parts.push(await readFile(new URL(`${dir}/${name}`, root), "utf8"));
+      }
+    }
+  }
+  const shipped = parts.join("\n");
+
+  // Every result line the staging writes, not a hand-kept subset — two of these
+  // had already drifted from the copy pass and were photographed for the
+  // listing showing wording the product no longer used.
+  const stagedResultLines = [...capture.matchAll(
+    /\["\w+ResultCard", "\w+ResultStatus", "((?:[^"\\]|\\.)*)"\]/g
+  )].map((m) =>
+    m[1]
+      // The staging writes some characters as escapes; compare the text the
+      // page would actually receive.
+      .replace(/\\\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/\\\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+  );
+  assert.ok(stagedResultLines.length >= 3, "expected the staged result lines");
 
   for (const staged of [
     "Calculated by SOS",
     "Official SOS calculation complete.",
+    ...stagedResultLines,
   ]) {
     assert.ok(
       capture.includes(staged),

@@ -105,8 +105,8 @@ const SCREENSHOTS = [
       };
       for (const [card, status, detail] of [
         ["ofacResultCard", "ofacResultStatus", "No matches in SDN list"],
-        ["repeatResultCard", "repeatResultStatus", "Eligible per MDOS repeat-offender response"],
-        ["titleResultCard", "titleResultStatus", "Clear paper title \\u00b7 no active lien"],
+        ["repeatResultCard", "repeatResultStatus", "No repeat-offender or ex parte record — eligible to purchase"],
+        ["titleResultCard", "titleResultStatus", "Michigan reported no title brands and no active liens."],
       ]) {
         const detailEl = document.querySelector("#" + card + " .result-detail");
         if (detailEl) detailEl.textContent = detail;

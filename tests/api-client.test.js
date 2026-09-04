@@ -95,7 +95,7 @@ test("a backend HTTP error surfaces the server's error message", async () => {
   );
 });
 
-test("a backend HTTP error with no JSON body falls back to the status code", async () => {
+test("a service error with no JSON body still produces a usable message", async () => {
   stubStorage("test-key");
   globalThis.fetch = async () => ({
     ok: false,
@@ -104,9 +104,17 @@ test("a backend HTTP error with no JSON body falls back to the status code", asy
       throw new Error("not json");
     },
   });
+  // It must still reject rather than resolving into a false clean result, and
+  // the message must be one a salesperson can act on — this reaches a toast
+  // verbatim, where it used to read "Backend error: HTTP 500".
   await assert.rejects(
     () => backendRepeatOffenderCheck({ firstName: "A", lastName: "B" }),
-    /HTTP 500/
+    (err) => {
+      assert.match(err.message, /could not complete this check/i);
+      assert.doesNotMatch(err.message, /HTTP \d/);
+      assert.doesNotMatch(err.message, /backend/i);
+      return true;
+    }
   );
 });
 
@@ -452,4 +460,42 @@ test("isBackendAvailable reflects the health endpoint result", async () => {
     throw new Error("network down");
   };
   assert.equal(await isBackendAvailable(), false);
+});
+
+// This message reaches a toast verbatim. It read "Backend error: HTTP 503" —
+// "backend" is our word for our own server, and a status code is not something
+// anyone at a desk can act on. It also passed the service's error text straight
+// through, so an internal stack trace would land on the dealer's screen.
+test("a failed service call says what happened and whether waiting helps", async () => {
+  const { httpFailureMessage } = await import("../lib/api-client.js");
+
+  // Waiting helps for these, and the message says so.
+  assert.match(httpFailureMessage(429), /busy right now.*try again/i);
+  assert.match(httpFailureMessage(503), /temporarily unavailable/i);
+  assert.match(httpFailureMessage(502), /temporarily unavailable/i);
+  assert.match(httpFailureMessage(500), /could not complete this check/i);
+  // A bad request is the dealer's to correct, so it points at the details.
+  assert.match(httpFailureMessage(400), /check the details/i);
+
+  // None of them may name our own plumbing or a raw status code.
+  for (const status of [400, 404, 429, 500, 502, 503, 504]) {
+    const msg = httpFailureMessage(status);
+    assert.doesNotMatch(msg, /backend/i, `status ${status} names the backend`);
+    assert.doesNotMatch(msg, /HTTP \d/, `status ${status} leaks a status code`);
+  }
+
+  // The service curates its own errors, so a sane one is preferred.
+  assert.equal(
+    httpFailureMessage(500, "MDOS did not return a result for that VIN."),
+    "MDOS did not return a result for that VIN."
+  );
+
+  // But a stack trace, a multi-line dump, or a runaway string is the service
+  // leaking internals onto the dealer's screen and must not pass through.
+  assert.match(
+    httpFailureMessage(500, "TypeError: undefined is not a function\n    at foo (/app/x.js:1:1)"),
+    /could not complete this check/i
+  );
+  assert.match(httpFailureMessage(500, "x".repeat(400)), /could not complete this check/i);
+  assert.match(httpFailureMessage(500, "   "), /could not complete this check/i);
 });

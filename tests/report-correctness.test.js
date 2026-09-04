@@ -477,3 +477,4 @@ test("a printed record formats the subject the way a record should read", async 
   assert.doesNotMatch(sentence, /T00:00:00/);
   assert.doesNotMatch(sentence, /\.000Z/);
 });
+

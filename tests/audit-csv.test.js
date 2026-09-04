@@ -153,3 +153,60 @@ test("the stored record and the CSV agree with the live decision", async () => {
     assert.ok(!/,Review,/.test(csv), `${disposition} must not export as Review`);
   }
 });
+
+// A saved row stores the verdict that was current when it was written, and
+// older releases wrote it under older rules. Reopening a row recomputes for the
+// panel and the printed report but never rewrites the stored value — so a
+// legacy APPROVED could sit in the History list and in the examiner's audit CSV
+// while both live surfaces said REVIEW for the very same record.
+test("the audit CSV reports the verdict the saved checks actually support", async () => {
+  const { buildAuditCsv } = await import("../src/sidepanel/audit-csv.js");
+  const now = Date.now();
+
+  // Stored APPROVED, but the screening never completed.
+  const stale = [
+    {
+      timestamp: new Date(now).toISOString(),
+      reference: "CC-1",
+      customerName: "Marcus Delaney",
+      runLabel: "Run all checks",
+      decision: "APPROVED",
+      checks: { ofac: { passed: true } },
+      savedResults: {
+        customer: { firstName: "Marcus", lastName: "Delaney" },
+        checks: { ofac: { passed: true, timestamp: now } },
+      },
+    },
+  ];
+  const csv = buildAuditCsv(stale);
+  assert.match(csv, /REVIEW/, "an incomplete record must not export as APPROVED");
+  assert.doesNotMatch(csv.split("\r\n")[1] || "", /APPROVED/);
+
+  // A genuinely complete, clean record still exports APPROVED.
+  const clean = [
+    {
+      ...stale[0],
+      reference: "CC-2",
+      savedResults: {
+        customer: { firstName: "Marcus", lastName: "Delaney" },
+        checks: {
+          ofac: { passed: true, timestamp: now },
+          repeatOffender: { passed: true, status: "eligible", timestamp: now },
+        },
+      },
+    },
+  ];
+  assert.match(buildAuditCsv(clean), /APPROVED/);
+
+  // A record saved before the app kept its checks has nothing to recompute
+  // from, so its stored decision stands — it is all there is.
+  const outcomeOnly = [
+    {
+      timestamp: new Date(now).toISOString(),
+      reference: "CC-3",
+      customerName: "Old Record",
+      decision: "APPROVED",
+    },
+  ];
+  assert.match(buildAuditCsv(outcomeOnly), /APPROVED/);
+});

@@ -12,7 +12,10 @@ import {
 } from "../../lib/history-retention.js";
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
-import { calculateFinalDecision } from "./checks.js";
+import {
+  calculateFinalDecision,
+  historyRowDecision,
+} from "./checks.js";
 
 const MAX_ENTRIES = CONFIG.limits.maxHistoryEntries;
 const RESCREEN_DAYS = CONFIG.reminders?.rescreenDays ?? 7;
@@ -321,7 +324,7 @@ export async function populateHistoryModal(historyListEl) {
           // at a different customer than the row the salesperson clicked.
           const auditId = sanitizeHTML(item.auditId || "");
 
-          const dm = decisionMeta(item.decision);
+          const dm = decisionMeta(historyRowDecision(item));
           const decisionItemCls = `decision-${dm.cls.replace("dec-", "")}`;
 
           const checks = item.checks || {};

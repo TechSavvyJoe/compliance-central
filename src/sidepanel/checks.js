@@ -422,6 +422,25 @@ export function calculateFinalDecision(checks) {
  * saved under earlier rules — which is exactly the case where a stale APPROVED
  * is most misleading.
  */
+/**
+ * The decision to show for a saved history row.
+ *
+ * A row stores the verdict that was current when it was written, and older
+ * releases wrote it under older rules. Reopening a row recomputes for the panel
+ * and the printed report but never rewrites the stored value, so a legacy
+ * APPROVED could sit in the History list and in the examiner's audit CSV while
+ * both live surfaces said REVIEW for the very same record.
+ *
+ * Recomputing from the saved checks keeps every surface telling one story. A
+ * record saved before the app kept its checks has nothing to recompute from, so
+ * its stored decision stands — it is all there is.
+ */
+export function historyRowDecision(item) {
+  const saved = item?.savedResults;
+  if (!saved?.checks) return item?.decision || "";
+  return finalDecisionForResults(saved).level || item?.decision || "";
+}
+
 export function finalDecisionForResults(results) {
   const checks = results?.checks || {};
   const customer = results?.customer || {};

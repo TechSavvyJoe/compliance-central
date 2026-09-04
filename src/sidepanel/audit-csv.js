@@ -5,6 +5,8 @@
  * download. Client-side only — history already lives in chrome.storage.local.
  */
 
+import { historyRowDecision } from "./checks.js";
+
 const HEADERS = [
   "Timestamp",
   "Audit Reference",
@@ -91,7 +93,7 @@ export function buildAuditCsv(history) {
         ? stateLabel("repeat", checks.coBuyerRepeatOffender)
         : "N/A",
       stateLabel("title", checks.title),
-      item.decision || "",
+      historyRowDecision(item),
     ]);
   }
   return rows.map((r) => r.map(csvCell).join(",")).join("\r\n");

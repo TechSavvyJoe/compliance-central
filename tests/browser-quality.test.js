@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const sidepanelHtml = readFileSync(new URL("../sidepanel.html", import.meta.url), "utf8");
+const sidepanelCss = readFileSync(new URL("../sidepanel.css", import.meta.url), "utf8");
 const datePickerSource = readFileSync(
   new URL("../src/sidepanel/date-picker.js", import.meta.url),
   "utf8"
@@ -92,4 +93,24 @@ test("bulk exports expose accessible per-document selection and all three action
   assert.match(sidepanelHtml, /id="downloadPdfBtn"/);
   assert.match(sidepanelHtml, /id="downloadAllPdfsBtn"/);
   assert.match(sidepanelHtml, /Download all PDFs/);
+});
+
+test("the floated export legend is cleared by the row beneath it", () => {
+  // "Documents to export" is a <legend>, floated so it does not notch the card
+  // border. A full-width float leaves no room beside it, and the "Select all"
+  // row is a flex container, so it keeps its own formatting context, refuses
+  // to overlap the float, shrinks to a sliver and wraps its label one word per
+  // line — a 420px column of empty white between the verdict and the print
+  // buttons, on every completed deal. The clear is what keeps the panel 152px
+  // instead of 509px. Float and clear ship together or neither ships.
+  const floated = /\.report-selection legend\s*\{[^}]*float:\s*left/.test(
+    sidepanelCss
+  );
+  if (floated) {
+    assert.match(
+      sidepanelCss,
+      /\.report-selection \.report-select-all\s*\{[^}]*clear:\s*both/,
+      "a floated export legend needs .report-select-all to clear it"
+    );
+  }
 });

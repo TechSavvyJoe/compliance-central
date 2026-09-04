@@ -5334,9 +5334,17 @@ button, input, select, textarea { font-family: inherit; }
 /* The kicker is 60px wide but was given a 160px flex basis, forcing a wrap. */
 .evidence-heading > div:first-child { flex: 1 1 60px; min-width: 0; }
 
-/* A fieldset legend notches the card border; float it into the flow instead. */
+/* A fieldset legend notches the card border, so it is floated into the flow
+   instead. The row under it has to be told to clear that float. Without the
+   clear, "Select all available documents" — a flex container, so it keeps its
+   own formatting context and refuses to overlap the float — shrank to the
+   sliver of line box a full-width float leaves and wrapped its label one word
+   per line down a 420px column of empty white. That box sat between the
+   verdict and the print buttons on every completed deal, adding 358px of
+   scroll to reach the export controls. Keep the clear with the float. */
 .report-selection { padding-top: 12px; }
 .report-selection legend { float: left; width: 100%; padding: 0; margin: 0 0 8px; }
+.report-selection .report-select-all { clear: both; }
 
 /* Both disclosures in the action card use the same chevron affordance. */
 .individual-check-menu > summary { list-style: none; position: relative; padding-right: 22px; cursor: pointer; }

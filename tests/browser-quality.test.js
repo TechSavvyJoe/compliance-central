@@ -114,3 +114,29 @@ test("the floated export legend is cleared by the row beneath it", () => {
     );
   }
 });
+
+test("the sticky tab strip parks at the sticky header's own height", () => {
+  // The offset used to be a hand-tuned 99px. Anything that changed the header
+  // left the tab strip floating over or under the content beneath it, and the
+  // 380px breakpoint carried a second copy of the number that drifted to 98px.
+  assert.match(sidepanelCss, /--hub-header-h:\s*\d+px/);
+  assert.match(
+    sidepanelCss,
+    /\.workspace-tabs\s*\{[^}]*top:\s*var\(--hub-header-h\)/,
+    "the tab strip should stick at var(--hub-header-h), not a literal"
+  );
+  assert.doesNotMatch(sidepanelCss, /\.workspace-tabs\s*\{[^}]*top:\s*\d+px/);
+});
+
+test("the header carries no second route to the three workspace tabs", () => {
+  // A search-shaped header button searched nothing: it opened a menu of
+  // Screening / Plate calculator / History, the same three tabs 8px below it,
+  // for 50px of a sticky header on every screen.
+  assert.doesNotMatch(sidepanelHtml, /id="commandBarBtn"/);
+  assert.doesNotMatch(sidepanelHtml, /id="commandMenu"/);
+  assert.match(sidepanelHtml, /id="screeningTabBtn"/);
+  assert.match(sidepanelHtml, /id="sosTabBtn"/);
+  assert.match(sidepanelHtml, /id="viewHistoryBtn"/);
+  // Searching saved deals is the History box's job, and it stays.
+  assert.match(sidepanelHtml, /id="historySearchInput"/);
+});

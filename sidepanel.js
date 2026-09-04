@@ -345,8 +345,6 @@ const elements = {
   // Claude Design workspace navigation
   screeningTabBtn: $("screeningTabBtn"),
   sosTabBtn: $("sosTabBtn"),
-  commandBarBtn: $("commandBarBtn"),
-  commandMenu: $("commandMenu"),
   historySearchInput: $("historySearchInput"),
   historyAgingOnly: $("historyAgingOnly"),
 };
@@ -515,20 +513,6 @@ function hideLoading() {
 
 const WORKSPACES = new Set(["screening", "sos", "history"]);
 
-function closeCommandMenu({ restoreFocus = false } = {}) {
-  if (!elements.commandMenu || !elements.commandBarBtn) return;
-  elements.commandMenu.classList.add("hidden");
-  elements.commandBarBtn.setAttribute("aria-expanded", "false");
-  if (restoreFocus) elements.commandBarBtn.focus();
-}
-
-function openCommandMenu() {
-  if (!elements.commandMenu || !elements.commandBarBtn) return;
-  elements.commandMenu.classList.remove("hidden");
-  elements.commandBarBtn.setAttribute("aria-expanded", "true");
-  elements.commandMenu.querySelector('[role="menuitem"]')?.focus();
-}
-
 function activateWorkspace(name, { focusTab = false } = {}) {
   if (!WORKSPACES.has(name)) return;
 
@@ -543,7 +527,6 @@ function activateWorkspace(name, { focusTab = false } = {}) {
     if (active && focusTab) tab.focus();
   });
 
-  closeCommandMenu();
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 }
@@ -635,44 +618,6 @@ function initWorkspaceNavigation() {
     activateWorkspace("screening")
   );
   elements.sosTabBtn?.addEventListener("click", () => activateWorkspace("sos"));
-
-  elements.commandBarBtn?.addEventListener("click", () => {
-    const open = elements.commandBarBtn.getAttribute("aria-expanded") === "true";
-    if (open) closeCommandMenu({ restoreFocus: true });
-    else openCommandMenu();
-  });
-  elements.commandMenu?.addEventListener("click", async (event) => {
-    const item = event.target.closest("[data-workspace-target]");
-    if (!item) return;
-    const target = item.dataset.workspaceTarget;
-    if (target === "history") await openHistory();
-    else activateWorkspace(target);
-    if (target === "screening") elements.firstName?.focus();
-    if (target === "sos") elements.sosVinLookupInput?.focus();
-    // The other two branches move focus out of the closing menu; without this
-    // one, choosing Saved customers left focus on a menu item that had just
-    // been hidden, dropping it to <body>.
-    if (target === "history") elements.historySearchInput?.focus();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-      event.preventDefault();
-      if (elements.commandBarBtn?.getAttribute("aria-expanded") === "true") {
-        closeCommandMenu({ restoreFocus: true });
-      } else {
-        openCommandMenu();
-      }
-      return;
-    }
-    if (event.key === "Escape" && elements.commandBarBtn?.getAttribute("aria-expanded") === "true") {
-      event.preventDefault();
-      closeCommandMenu({ restoreFocus: true });
-    }
-  });
-  document.addEventListener("pointerdown", (event) => {
-    if (!event.target.closest(".command-shell")) closeCommandMenu();
-  });
 
   elements.historySearchInput?.addEventListener("input", (event) =>
     filterHistoryWorkspace(event.target.value)

@@ -23,25 +23,13 @@
             <span class="icon icon-settings" aria-hidden="true"></span>
           </button>
         </div>
-        <div class="command-shell">
-          <button
-            type="button"
-            id="commandBarBtn"
-            class="command-bar"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            aria-controls="commandMenu"
-          >
-            <span class="command-search" aria-hidden="true"></span>
-            <span>Find a deal, run a check, decode a VIN</span>
-            <kbd>&#8984;K</kbd>
-          </button>
-          <div id="commandMenu" class="command-menu hidden" role="menu" aria-label="Quick actions">
-            <button type="button" role="menuitem" data-workspace-target="screening">New screening <span>Buyer and trade</span></button>
-            <button type="button" role="menuitem" data-workspace-target="sos">Plate calculator <span>VIN, design and official fee</span></button>
-            <button type="button" role="menuitem" data-workspace-target="history">Saved customers <span>Reopen, re-screen and print</span></button>
-          </div>
-        </div>
+        <!-- A search-shaped button reading "Find a deal, run a check, decode a
+             VIN" used to sit here. It searched nothing: it opened a three-item
+             menu whose items were Screening, Plate calculator and History —
+             the same three tabs rendered 8px below it. It cost 50px of a
+             sticky header on every screen of a panel whose scarcest resource
+             is height, and 112px at 320px where its label wrapped. Searching
+             saved deals is what the History search box does. -->
       </header>
 
       <nav class="workspace-tabs" role="tablist" aria-label="Compliance workspace">

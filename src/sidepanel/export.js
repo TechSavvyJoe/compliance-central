@@ -549,6 +549,19 @@ export function ofacResultArgs(ofac) {
       subtitle: "OFAC screening has not been completed.",
     };
   }
+  // A run that never attempted the screening. Without its own branch this fell
+  // through to the clean default, and a record for a buyer nobody screened
+  // printed a green NO MATCH FOUND.
+  if (classification.state === "not_run") {
+    return {
+      state: classification.state,
+      variant: "neutral",
+      title: "NOT RUN",
+      subtitle:
+        ofac?.message ||
+        "This run did not screen the subject above. Screen them before proceeding.",
+    };
+  }
   if (classification.state === "review") {
     return {
       state: classification.state,
@@ -588,7 +601,9 @@ export function ofacResultArgs(ofac) {
       state: classification.state,
       variant: "pass",
       title: "FALSE POSITIVE REVIEWED",
-      subtitle: "The dealership reviewed the potential match and marked it as a false positive.",
+      subtitle: classification.stale
+        ? "The dealership reviewed the potential match and marked it as a false positive. The SDN list could not be refreshed for this screening — re-run it when back online."
+        : "The dealership reviewed the potential match and marked it as a false positive.",
     };
   }
   return {
@@ -1032,13 +1047,21 @@ function ofacReportRow(label, result) {
     stale: "REVIEW REQUIRED",
     unavailable: "UNAVAILABLE",
     missing: "NOT RUN",
+    not_run: "NOT RUN",
     review: "REVIEW REQUIRED",
   };
+  // A screening run against a list that could not be refreshed has to be
+  // re-run whatever it found, so staleness lands the row in the incomplete
+  // list even when the dealership has already dispositioned the match.
+  const incomplete =
+    ["missing", "not_run", "unavailable", "review", "stale", "potential_match"].includes(
+      outcome.state
+    ) || Boolean(result?.stale);
   return reportRow(
     label,
     labels[outcome.state] || "REVIEW REQUIRED",
     outcome.subtitle,
-    ["missing", "unavailable", "review", "stale", "potential_match"].includes(outcome.state)
+    incomplete
   );
 }
 

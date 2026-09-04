@@ -478,3 +478,77 @@ test("a printed record formats the subject the way a record should read", async 
   assert.doesNotMatch(sentence, /\.000Z/);
 });
 
+
+// "Run all checks" with a trade-in VIN and no buyer runs the title check and
+// records the buyer screenings as never attempted. The verdict handles that,
+// but the OFAC state it introduced was never taught to the report builder, so
+// every OFAC-shaped surface fell through to its clean default: a printable,
+// downloadable "OFAC Screening Record" with a green NO MATCH FOUND for a
+// person who was never screened, and a decision page whose incomplete-checks
+// list said none.
+test("an OFAC screening that never ran never prints as a clean screening", () => {
+  const notRun = {
+    passed: null,
+    status: "skipped",
+    message: "Not run — no buyer details were entered for this check.",
+  };
+  const outcome = ofacResultArgs(notRun);
+  assert.notEqual(outcome.variant, "pass");
+  assert.doesNotMatch(outcome.title, /no match/i);
+  assert.doesNotMatch(outcome.subtitle, /no potential name match was found/i);
+
+  const results = {
+    timestamp: "2026-09-03T12:00:00.000Z",
+    runType: "full",
+    customer: { tradeVin: "1FTFW1E84PFA10397" },
+    checks: {
+      ofac: notRun,
+      repeatOffender: notRun,
+      title: {
+        passed: true,
+        titleStatus: "Clear",
+        titleBrand: "CLEAN",
+        hasLien: false,
+        vehicleBrands: [],
+      },
+    },
+  };
+
+  const summary = reportDecisionSummary(results);
+  assert.equal(summary.decision.level, "REVIEW");
+  const row = summary.rows.find((item) => item.label === "Buyer OFAC");
+  assert.equal(row.incomplete, true);
+  assert.doesNotMatch(row.detail, /no potential name match was found/i);
+  assert.ok(
+    summary.incomplete.some((item) => item.label === "Buyer OFAC"),
+    "a screening that never ran belongs in the incomplete list"
+  );
+
+  const html = combinedAllReportHTML(results);
+  assert.doesNotMatch(html, /NO MATCH FOUND/);
+  assert.doesNotMatch(html, /Every required check returned a recognized result/);
+});
+
+// A match cleared as a false positive against an SDN list that could not be
+// refreshed is a screening to re-run, so the report has to list it rather than
+// close with "every required check returned a recognized result".
+test("a false positive cleared on a stale list is listed as incomplete", () => {
+  const results = {
+    timestamp: "2026-09-03T12:00:00.000Z",
+    customer: { firstName: "A", lastName: "B" },
+    checks: {
+      ofac: {
+        passed: false,
+        matches: [{ name: "Cleared candidate" }],
+        matchCount: 1,
+        disposition: "false_positive",
+        stale: true,
+        dataAgeHours: 40,
+      },
+      repeatOffender: { status: "eligible", passed: true },
+    },
+  };
+  const summary = reportDecisionSummary(results);
+  assert.equal(summary.decision.level, "REVIEW");
+  assert.ok(summary.incomplete.some((item) => item.label === "Buyer OFAC"));
+});

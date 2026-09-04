@@ -140,3 +140,31 @@ test("the header carries no second route to the three workspace tabs", () => {
   // Searching saved deals is the History box's job, and it stays.
   assert.match(sidepanelHtml, /id="historySearchInput"/);
 });
+
+test("results-view exports are real targets and the icon-only ones say what they do", () => {
+  // The row a finished deal opens with had one filled navy chip and two pieces
+  // of blue text, and the chip was "New customer" — the control that clears
+  // the screen rather than the ones that put the record in the deal jacket.
+  // The exports are the chips now, and they clear a 30px target; they used to
+  // be 46x24 with 2px of horizontal padding.
+  assert.match(
+    sidepanelCss,
+    /\.evidence-download-btn\s*\{[^}]*min-height:\s*30px/,
+    "PDF all / Print all should keep a 30px minimum target"
+  );
+  // Inside the evidence panel the per-check save collapses to a 30px icon with
+  // its label switched off, so the only thing left to explain it is the title.
+  for (const id of [
+    "downloadOfacBtn",
+    "downloadRepeatBtn",
+    "downloadTitleBtn",
+    "downloadCbOfacBtn",
+    "downloadCbRepeatBtn",
+  ]) {
+    assert.match(
+      sidepanelHtml,
+      new RegExp(`id="${id}" title="Download [^"]+"`),
+      `${id} should name itself on hover`
+    );
+  }
+});

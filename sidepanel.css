@@ -4068,20 +4068,6 @@ body {
   font-weight: 750;
 }
 
-/* Starting the next customer is an action, not another export, so it reads
-   distinctly from PDF all / Print all sitting beside it. */
-.evidence-new-customer {
-  border-color: var(--design-navy);
-  background: var(--design-navy);
-  color: #fff;
-}
-
-.evidence-new-customer:hover,
-.evidence-new-customer:focus-visible {
-  background: var(--navy-deep);
-  border-color: var(--navy-deep);
-}
-
 .evidence-kicker,
 .sos-eyebrow {
   color: var(--design-muted);
@@ -4924,19 +4910,28 @@ body {
   padding-right: 42px;
 }
 
-/* "New customer" was meant to read as an action next to the two text links
-   beside it, but it inherited their zero horizontal padding and square
-   corners, so the navy landed as a highlighter stripe behind the words. Give
-   it the chip it was asking for, and clear the 24px minimum target size while
-   we are here — all three sat at 22px. */
+/* This row is the first thing a finished deal offers, and it had the emphasis
+   backwards: one filled navy chip and two pieces of blue text, and the chip
+   was "New customer" — the control that clears the screen. The record goes in
+   the deal jacket before it goes away, so the two exports are the buttons and
+   New customer is the quiet "done with this one" beside them. The exports also
+   pick up a real target: at 46x24 with 2px of horizontal padding they were the
+   smallest thing anyone taps on every deal. */
 .evidence-download-btn {
-  min-height: 24px;
-  padding: 5px 2px;
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--design-navy);
 }
 
 .evidence-new-customer {
-  padding: 5px 10px;
-  border-radius: 999px;
+  min-height: 30px;
+  padding: 6px 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--design-muted);
 }
 
 /* Two targets in History were smaller than they looked. The search field is
@@ -5472,8 +5467,16 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--hover-surface);
 }
 
-/* Evidence exports are text actions, so they answer like text actions. */
+/* The exports are chips now, so they answer like chips; New customer is the
+   text action in this row and keeps the underline. */
 .evidence-download-btn:not(.evidence-new-customer):hover {
+  border-color: #7294b5;
+  background: var(--hover-surface);
+}
+
+.evidence-new-customer:hover,
+.evidence-new-customer:focus-visible {
+  background: transparent;
   color: var(--design-navy);
   text-decoration: underline;
   text-underline-offset: 3px;

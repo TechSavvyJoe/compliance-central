@@ -15,6 +15,7 @@ import {
 } from "./lib/storage-keys.js";
 import { MISSING_API_KEY } from "./lib/api-client.js";
 import {
+  acceptsRunStatusUpdate,
   createRunId,
   isCurrentRunState,
   createOperationFence,
@@ -3431,11 +3432,7 @@ async function handleSessionStorageChanges(changes) {
   if (changes[STORAGE_KEYS.searchStatus]) {
     try {
       const status = changes[STORAGE_KEYS.searchStatus].newValue;
-      if (
-        status === SEARCH_STATUS.idle ||
-        acceptsActiveRun ||
-        (status === SEARCH_STATUS.error && acceptsActiveRun)
-      ) {
+      if (acceptsRunStatusUpdate(runState, activeUiRunId, status)) {
         handleSearchStatusChange(changes);
       }
     } catch (e) {

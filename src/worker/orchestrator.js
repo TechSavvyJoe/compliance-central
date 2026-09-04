@@ -365,10 +365,13 @@ async function runAllChecks(data, runId, signal, onInitialized) {
 
     // MDOS checks (sequential).
     const mdosPromise = (async () => {
-      const totalMdosChecks = Math.max(
-        1,
-        (plan.buyer ? 1 : 0) + (hasCoBuyer ? 1 : 0) + (hasTrade ? 1 : 0)
-      );
+      // Count the slots this sequence actually steps through, not the ones
+      // that do portal work. The buyer slot always advances `completedMdos` —
+      // when it is skipped for a missing buyer, and when it is not applicable
+      // for an out-of-state ID — so leaving it out of the total made a
+      // VIN-only run spend its whole title check reporting 110%, 155%, 170%.
+      // The panel clamps to 100, which reads as "Complete" with no results.
+      const totalMdosChecks = 1 + (hasCoBuyer ? 1 : 0) + (hasTrade ? 1 : 0);
       let completedMdos = 0;
 
       const mdosStart = 20;

@@ -19,6 +19,10 @@ function mockChromeSession(handlers = {}) {
       getURL(path = "") {
         return `chrome-extension://test-ext-id/${path}`;
       },
+      // api-client keeps the worker alive across a backend call with this.
+      getPlatformInfo(callback) {
+        callback?.({});
+      },
     },
     action: {
       async setBadgeText() {},
@@ -371,4 +375,82 @@ test("atomic state updates report failed storage publication", async () => {
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test("a VIN-only run never claims more progress than it has made", async () => {
+  const { writes } = mockChromeSession();
+  const originalFetch = globalThis.fetch;
+  let titleCheckStarted;
+  const titleCheckRunning = new Promise((resolve) => {
+    titleCheckStarted = resolve;
+  });
+  let releaseTitleCheck;
+  const titleCheckHeld = new Promise((resolve) => {
+    releaseTitleCheck = resolve;
+  });
+  globalThis.fetch = async () => {
+    titleCheckStarted();
+    await titleCheckHeld;
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      async json() {
+        return {
+          success: true,
+          passed: true,
+          details: {
+            titleStatus: "clear",
+            titleBrand: "CLEAN",
+            hasLien: false,
+            lienStatus: "NONE",
+          },
+          timestamp: new Date().toISOString(),
+        };
+      },
+    };
+  };
+
+  const progressWrites = () =>
+    writes
+      .filter((write) => write.searchProgress !== undefined)
+      .map((write) => write.searchProgress);
+
+  // "Run all checks" with only a trade-in VIN entered: no buyer to screen, so
+  // the plan skips OFAC and Repeat Offender and runs the title check alone.
+  const run = handleRunAllChecks({
+    customer: { tradeVin: "1HGBH41JXMN109186", hasCoBuyer: false },
+    hasTrade: true,
+    runId: "run-vin-only",
+    plan: { buyer: false, coBuyer: false, title: true },
+  });
+
+  let duringTitleCheck;
+  try {
+    await titleCheckRunning;
+    duringTitleCheck = progressWrites();
+  } finally {
+    releaseTitleCheck();
+    const outcome = await run;
+    globalThis.fetch = originalFetch;
+    assert.equal(outcome.success, true);
+  }
+
+  assert.ok(
+    duringTitleCheck.every((value) => value < 100),
+    `progress read as finished while the title check was still running: ${duringTitleCheck.join(", ")}`
+  );
+  const published = progressWrites();
+  assert.ok(
+    published.every((value) => value >= 0 && value <= 100),
+    `progress left the 0-100 range: ${published.join(", ")}`
+  );
+  // 100% belongs to the write that also publishes the results, and nothing
+  // earlier.
+  const completedAt = writes.findIndex(
+    (write) => write.searchStatus === "complete"
+  );
+  const firstFull = writes.findIndex((write) => write.searchProgress === 100);
+  assert.ok(completedAt >= 0);
+  assert.equal(firstFull, completedAt);
 });

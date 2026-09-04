@@ -1,0 +1,65 @@
+# Publish a downloadable test build.
+#
+# Loading the extension on another machine used to mean asking someone to build
+# the zip locally and hand it over. Pushing a version tag now runs the same
+# checks CI runs and, only if they pass, attaches the packaged zip to a release
+# — so every machine can pull a build from a stable URL without a toolchain.
+#
+#   git tag v1.6.1 && git push origin v1.6.1
+#
+# The newest build is always at:
+#   https://github.com/TechSavvyJoe/compliance-central/releases/latest/download/
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A tag that disagrees with manifest.json would publish a zip whose
+      # in-browser version does not match the release it came from, which is
+      # exactly the confusion a downloadable build is meant to remove.
+      - name: Tag must match manifest version
+        run: |
+          manifest=$(node -p "require('./manifest.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$manifest" != "$tag" ]; then
+            echo "::error::tag v$tag does not match manifest.json version $manifest"
+            exit 1
+          fi
+          echo "version=$manifest" >> "$GITHUB_ENV"
+
+      # Never publish a build that would not have passed on main.
+      - name: Lint
+        run: npm run lint
+      - name: Syntax check
+        run: npm run check
+      - name: Tests
+        run: npm test
+
+      - name: Build and verify package
+        run: npm run package
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "compliance-central-${{ env.version }}.zip" \
+            --title "v${{ env.version }} — test build" \
+            --generate-notes

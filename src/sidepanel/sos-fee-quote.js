@@ -247,26 +247,6 @@ function passportSummary(value) {
  * Accepts a packaged extension asset or an inlined data image, and nothing
  * remote — a printed worksheet should never depend on a third-party fetch.
  */
-/**
- * Michigan's motor-vehicle trade-in sales-tax credit is not a fixed number.
- * Under PA 159/160 of 2018 the cap rises by $1,000 every year and is scheduled
- * to be removed entirely from 2029, so "$12,000 for 2026" — which was correct
- * when it was written — becomes wrong on the first of January and stays wrong.
- * This is a reference figure on a worksheet a dealer may hand a customer, so it
- * follows the schedule instead of freezing one year into the page.
- *
- * Past the scheduled removal it stops asserting a number at all: tax law can
- * change, and a worksheet should not invent a cap it cannot know.
- */
-export function tradeInCreditPhrase(now = new Date()) {
-  const year = now.getFullYear();
-  if (year >= 2029) {
-    return "the Michigan trade-in credit (the cap was scheduled to end in 2029 — confirm the current limit)";
-  }
-  const cap = 12000 + (year - 2026) * 1000;
-  return `the Michigan trade-in credit (up to $${cap.toLocaleString("en-US")} for ${year})`;
-}
-
 export function sanitizeDealerLogo(value) {
   const url = String(value ?? "").trim();
   if (/^data:image\/(?:png|jpe?g|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(url)) {
@@ -394,7 +374,6 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
         <tr><th>Michigan lien recording fee</th><td></td><td class="amount">$1.00</td></tr>
         <tr class="total"><th>Total title fee</th><td></td><td class="amount">$16.00</td></tr>
         <tr><th>Instant title (if requested)</th><td colspan="2">$5.00 &mdash; expedited same-day title</td></tr>
-        <tr><th>Sales tax</th><td colspan="2">6% of the taxable price &mdash; purchase price less ${sanitizeHTML(tradeInCreditPhrase())}; confirm final transaction amount</td></tr>
         <tr><th>Optional Recreation Passport</th><td colspan="2">${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
         <tr><th>Quote time</th><td colspan="2">${sanitizeHTML(calculatedAt)}</td></tr>
       </table>

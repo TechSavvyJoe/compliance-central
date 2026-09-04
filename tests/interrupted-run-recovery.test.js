@@ -179,3 +179,61 @@ test("the side panel routes published run status through the shared fence", () =
     "the searchStatus branch must ask the shared fence"
   );
 });
+
+// A side panel is per-window but the storage namespace is shared. Saving one
+// panel's individual-check result used to publish searchStatus: idle
+// unconditionally, which stood down another window's live run: that panel hid
+// its progress, re-enabled its buttons and forgot which run it was watching, so
+// when the run finished no panel accepted the result — it was never shown and
+// never saved to History. A completed compliance run vanishing is the worst
+// way for this to fail.
+test("saving an individual result does not stand down another window's run", async () => {
+  const store = {};
+  const priorChrome = globalThis.chrome;
+  globalThis.chrome = {
+    storage: {
+      session: {
+        get: async (keys) =>
+          Object.fromEntries(
+            (Array.isArray(keys) ? keys : [keys]).map((k) => [k, store[k]])
+          ),
+        set: async (obj) => Object.assign(store, obj),
+        remove: async () => {},
+      },
+      local: { get: async () => ({}), set: async () => {} },
+    },
+    runtime: { sendMessage: async () => ({}), getURL: (p) => p },
+  };
+
+  try {
+    const { STORAGE_KEYS, SEARCH_STATUS } = await import("../lib/storage-keys.js");
+    const state = await import("../src/sidepanel/state.js");
+
+    // Window 1 is mid-run.
+    store[STORAGE_KEYS.searchStatus] = SEARCH_STATUS.running;
+    store[STORAGE_KEYS.activeRunId] = "run-A";
+
+    // Window 2 saves a local OFAC-only result.
+    state.setCurrentResults({
+      customer: { firstName: "B" },
+      checks: { ofac: { passed: true } },
+    });
+    await state.persistCurrentResults();
+
+    assert.equal(
+      store[STORAGE_KEYS.searchStatus],
+      SEARCH_STATUS.running,
+      "the other window's run must still read as running"
+    );
+    assert.equal(store[STORAGE_KEYS.activeRunId], "run-A");
+
+    // With nothing in flight it must still return the panel to rest, which is
+    // what the reopen path depends on.
+    store[STORAGE_KEYS.searchStatus] = SEARCH_STATUS.complete;
+    store[STORAGE_KEYS.activeRunId] = null;
+    await state.persistCurrentResults();
+    assert.equal(store[STORAGE_KEYS.searchStatus], SEARCH_STATUS.idle);
+  } finally {
+    globalThis.chrome = priorChrome;
+  }
+});

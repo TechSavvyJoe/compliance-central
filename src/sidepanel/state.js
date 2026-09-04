@@ -54,9 +54,28 @@ export function mergeIntoCurrentResults(customer, checkKey, result, options = {}
 export async function persistCurrentResults() {
   if (!currentResults) return;
   try {
+    // Saving one panel's individual-check result must not announce that no run
+    // is in progress anywhere. A side panel is per-window, but the storage
+    // namespace is shared: with two windows open, an OFAC-only check in one
+    // published `idle` and stood the other one down mid-run — that panel hid
+    // its progress, re-enabled its buttons and forgot which run it was
+    // watching, so when the run finished no panel accepted the result and it
+    // was never shown and never saved to History. A completed compliance run
+    // disappearing is the worst way for this to fail.
+    //
+    // Individual checks are gated behind disabled buttons within a window, so
+    // in the single-window case this condition never fires and the reopen path
+    // behaves exactly as before.
+    const stored = await chrome.storage.session.get([
+      STORAGE_KEYS.searchStatus,
+      STORAGE_KEYS.activeRunId,
+    ]);
+    const runInProgress =
+      stored[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.running &&
+      Boolean(stored[STORAGE_KEYS.activeRunId]);
     await chrome.storage.session.set({
       [STORAGE_KEYS.currentResults]: currentResults,
-      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
+      ...(runInProgress ? {} : { [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle }),
     });
   } catch (error) {
     console.error("Error persisting results:", error);

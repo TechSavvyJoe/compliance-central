@@ -88,5 +88,28 @@ Keyboard/modal behavior was checked against the [WAI-ARIA dialog pattern](https:
   require a separate architecture and product decision before introducing cloud
   storage for dealership/customer information.
 
-Final command results, artifact identity and actual deployment status are
-recorded in the review handoff; none should be inferred from this checklist alone.
+## Verified handoff
+
+- Extension runtime/source commit: `5a686c57ee4fe59b4e8ef373b237a7a10534fdda`.
+  **431 tests passed**, zero failures/skips; lint, syntax, package checks and all
+  three browser suites passed. Dependency audit: zero reported vulnerabilities.
+  One initial scanner navigation timeout was resolved by separating browser/font
+  startup allowance from the unchanged short interaction deadlines.
+- Package: `compliance-central-1.6.1.zip`, 60 runtime files; all 60 compared
+  byte-for-byte with reviewed source. SHA-256:
+  `e58c684bd9ae20ff507a24c2a237d21153caf14584fe3bfb5ea7748ea13432fd`.
+- Backend commit `373e4c45558af225dcc577413f5381b3476d8b2c` was pushed to the
+  verified **private** API repository and deployed. **209 tests passed**, lint
+  and syntax passed, zero reported dependency vulnerabilities. `/health` and
+  `/ready` report this exact release; the browser is connected and Fly reports
+  one started Machine with a passing health check.
+- Post-deployment live canary passed: **$157.00 over 7 months**, expiry
+  **2027-03-14**, `new_plate`, with 698 KB of evidence. This is the repository's
+  synthetic fixture, not a customer quote or a claim that every plate path was
+  live-tested.
+- **Extension/source/site publication is blocked pending user approval.** Safety
+  review rejected the push because the extension repository is public and the
+  user had previously requested private access. No public push, repository
+  visibility change, release replacement or Chrome Web Store submission occurred.
+  CI artifact distribution and updated website images are prepared locally;
+  they are not yet online for this commit.

@@ -107,9 +107,18 @@ Keyboard/modal behavior was checked against the [WAI-ARIA dialog pattern](https:
   **2027-03-14**, `new_plate`, with 698 KB of evidence. This is the repository's
   synthetic fixture, not a customer quote or a claim that every plate path was
   live-tested.
-- **Extension/source/site publication is blocked pending user approval.** Safety
-  review rejected the push because the extension repository is public and the
-  user had previously requested private access. No public push, repository
-  visibility change, release replacement or Chrome Web Store submission occurred.
-  CI artifact distribution and updated website images are prepared locally;
-  they are not yet online for this commit.
+- **Extension source and website are published.** After the public-repository
+  boundary was explained, the user requested proceeding; the normal push was
+  approved and completed. Repository visibility and version are unchanged; no
+  release tag was replaced and no Chrome Web Store submission occurred.
+- GitHub [CI run 34376405896](https://github.com/TechSavvyJoe/compliance-central/actions/runs/34376405896)
+  passed on `4f014a2e5259b83d435bea7029aeef26003aa989`, including dependency
+  audit, lint, syntax, unit tests, all browser suites and package verification.
+  Its downloadable artifact was independently retrieved: all **60 runtime
+  files match the reviewed source**, with `manifest.json` at the root and
+  version **1.6.1**. This artifact expires after 14 days; later successful main
+  builds generate their own tested downloads.
+- [Pages deployment 34376404548](https://github.com/TechSavvyJoe/compliance-central/actions/runs/34376404548)
+  succeeded on the same commit. Live `index.html`, `scan.html`, `scan.js`,
+  `scan.css` and the calculator gallery image were fetched and compared
+  byte-for-byte with reviewed source; every comparison matched.

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
+import { handleFormCacheMessage } from "../src/worker/form-cache.js";
 import {
   cacheFormData,
   extractScanJurisdiction,
@@ -40,6 +41,9 @@ function makeElements(values = {}) {
 function installSessionStore() {
   const store = {};
   globalThis.chrome = {
+    runtime: {
+      sendMessage: (message) => handleFormCacheMessage(message.type, message.data),
+    },
     storage: {
       session: {
         async set(update) {

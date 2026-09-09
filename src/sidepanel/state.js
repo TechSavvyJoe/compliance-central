@@ -4,10 +4,18 @@
 
 import { CONFIG } from "../../lib/config.js";
 import { STORAGE_KEYS, SEARCH_STATUS } from "../../lib/storage-keys.js";
-import { isCurrentRunState } from "../../lib/run-fence.js";
+import {
+  CANCELLED_CHECK_IDS_KEY,
+  RESULT_STATE_MESSAGES,
+  createRunId,
+  isCheckCancelled,
+  isCurrentRunState,
+  resultIdentity,
+} from "../../lib/run-fence.js";
 
 let currentResults = null;
 let isRunning = false;
+let expectedResultId = null;
 
 export function getCurrentResults() {
   return currentResults;
@@ -15,6 +23,7 @@ export function getCurrentResults() {
 
 export function setCurrentResults(next) {
   currentResults = next;
+  expectedResultId = resultIdentity(next);
 }
 
 export function getIsRunning() {
@@ -51,35 +60,38 @@ export function mergeIntoCurrentResults(customer, checkKey, result, options = {}
   return cur;
 }
 
-export async function persistCurrentResults() {
-  if (!currentResults) return;
+export async function persistCurrentResults({ restore = false } = {}) {
+  if (!currentResults) return false;
+  // A restored history entry is a new working copy, with a fresh cancellation
+  // identity. Its audit/history metadata is otherwise retained.
+  const results = structuredClone(currentResults);
+  if (restore) {
+    if (results.runType === "individual") results.operationId = createRunId();
+    else results.runId = createRunId();
+  }
   try {
-    // Saving one panel's individual-check result must not announce that no run
-    // is in progress anywhere. A side panel is per-window, but the storage
-    // namespace is shared: with two windows open, an OFAC-only check in one
-    // published `idle` and stood the other one down mid-run — that panel hid
-    // its progress, re-enabled its buttons and forgot which run it was
-    // watching, so when the run finished no panel accepted the result and it
-    // was never shown and never saved to History. A completed compliance run
-    // disappearing is the worst way for this to fail.
-    //
-    // Individual checks are gated behind disabled buttons within a window, so
-    // in the single-window case this condition never fires and the reopen path
-    // behaves exactly as before.
-    const stored = await chrome.storage.session.get([
-      STORAGE_KEYS.searchStatus,
-      STORAGE_KEYS.activeRunId,
-    ]);
-    const runInProgress =
-      stored[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.running &&
-      Boolean(stored[STORAGE_KEYS.activeRunId]);
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.currentResults]: currentResults,
-      ...(runInProgress ? {} : { [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle }),
+    const response = await chrome.runtime.sendMessage({
+      type: RESULT_STATE_MESSAGES.persist,
+      data: { results, expectedResultId: restore ? null : expectedResultId },
     });
+    if (!response?.success) throw new Error(response?.error || "Could not save results.");
+    if (response.persisted && resultIdentity(currentResults) ===
+        (restore ? expectedResultId : resultIdentity(results))) {
+      expectedResultId = resultIdentity(results);
+      if (restore) currentResults = results;
+    }
+    return response.persisted === true;
   } catch (error) {
     console.error("Error persisting results:", error);
+    return false;
   }
+}
+
+export async function discardPersistedResult(resultId, timestamp) {
+  return chrome.runtime.sendMessage({
+    type: RESULT_STATE_MESSAGES.discard,
+    data: { resultId, ...(timestamp === undefined ? {} : { timestamp }) },
+  });
 }
 
 /**
@@ -100,6 +112,8 @@ export async function loadPersistedResults() {
       STORAGE_KEYS.activeRunId,
       STORAGE_KEYS.stateRunId,
       STORAGE_KEYS.cancelledRunId,
+      STORAGE_KEYS.cancelledIndividualOperationId,
+      CANCELLED_CHECK_IDS_KEY,
     ]);
 
     if (storage[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.running) {
@@ -108,7 +122,7 @@ export async function loadPersistedResults() {
         stateRunId: storage[STORAGE_KEYS.stateRunId],
         cancelledRunId: storage[STORAGE_KEYS.cancelledRunId],
       };
-      if (!isCurrentRunState(runState)) {
+      if (!isCurrentRunState(runState) || isCheckCancelled(storage, `run:${runState.activeRunId}`)) {
         return { state: "idle" };
       }
       const startTime = storage[STORAGE_KEYS.currentResults]?.timestamp;
@@ -118,38 +132,21 @@ export async function loadPersistedResults() {
           const elapsed = Date.now() - parsedTime;
           if (elapsed > CONFIG.timeouts.stuckSearchTimeout) {
             const runId = runState.activeRunId;
-            // Persist the tombstone before messaging the worker. Even if the
-            // worker is restarting, delayed state for this run is now rejected.
-            await chrome.storage.session.set({
-              [STORAGE_KEYS.cancelledRunId]: runId,
-              [STORAGE_KEYS.activeRunId]: null,
-              [STORAGE_KEYS.stateRunId]: runId,
-              [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
-              [STORAGE_KEYS.searchProgress]: 0,
-              [STORAGE_KEYS.inFlightCheck]: null,
+            const response = await chrome.runtime.sendMessage({
+              type: "CANCEL_CURRENT_RUN",
+              runId,
             });
-            try {
-              await chrome.runtime.sendMessage({
-                type: "CANCEL_CURRENT_RUN",
-                runId,
-              });
-            } catch {
-              // SW may be unavailable; still clear local session state.
-            }
-            await chrome.storage.session.remove([
-              STORAGE_KEYS.currentResults,
-              STORAGE_KEYS.repeatOffenderScreenshot,
-              STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-              STORAGE_KEYS.titleScreenshot,
-              STORAGE_KEYS.lastResult,
-            ]);
-            await chrome.action.setBadgeText({ text: "" });
+            if (!response?.success) throw new Error(response?.error || "Could not cancel the stale check.");
+            setCurrentResults(null);
+            isRunning = false;
             return { state: "idle" };
           }
         }
       }
 
-      currentResults = storage[STORAGE_KEYS.currentResults] || null;
+      const results = storage[STORAGE_KEYS.currentResults];
+      if (resultIdentity(results) !== `run:${runState.activeRunId}`) return { state: "idle" };
+      setCurrentResults(results);
       isRunning = true;
       return {
         state: "running",
@@ -166,15 +163,21 @@ export async function loadPersistedResults() {
     };
     if (
       storage[STORAGE_KEYS.currentResults] &&
-      (storage[STORAGE_KEYS.currentResults].runType === "individual" ||
-        isCurrentRunState(completedRunState))
+      !isCheckCancelled(storage, resultIdentity(storage[STORAGE_KEYS.currentResults])) &&
+      ((storage[STORAGE_KEYS.currentResults].runType === "individual" &&
+          !completedRunState.activeRunId &&
+          storage[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.idle) ||
+        (storage[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.complete &&
+          isCurrentRunState(completedRunState) &&
+          resultIdentity(storage[STORAGE_KEYS.currentResults]) === `run:${completedRunState.activeRunId}`))
     ) {
       const resultTime = new Date(storage[STORAGE_KEYS.currentResults].timestamp);
       const parsedTime = resultTime.getTime();
       if (!Number.isNaN(parsedTime)) {
         const hoursDiff = (Date.now() - parsedTime) / 3600000;
         if (hoursDiff < 8) {
-          currentResults = storage[STORAGE_KEYS.currentResults];
+          setCurrentResults(storage[STORAGE_KEYS.currentResults]);
+          isRunning = false;
           if (currentResults.runType === "individual") {
             return { state: "individual", results: currentResults };
           }
@@ -185,12 +188,12 @@ export async function loadPersistedResults() {
           };
         }
       }
-      currentResults = null;
-      await chrome.storage.session.remove([
-        STORAGE_KEYS.currentResults,
-        STORAGE_KEYS.searchStatus,
-        STORAGE_KEYS.searchProgress,
-      ]);
+      setCurrentResults(null);
+      isRunning = false;
+      await discardPersistedResult(
+        resultIdentity(storage[STORAGE_KEYS.currentResults]),
+        storage[STORAGE_KEYS.currentResults].timestamp
+      );
       return { state: "stale" };
     }
 

@@ -33,7 +33,7 @@ import {
 } from "./lib/scanner-provider.js?v=20260717-10";
 
 const RELAY_BASE = "https://compliance-central-api.fly.dev";
-const SCANNER_BUILD = "scanner-2026-07-22.23";
+const SCANNER_BUILD = "scanner-2026-09-09.29";
 
 // Pairing capabilities stay entirely in the fragment, which is never sent in
 // the HTTP request. This keeps both the mailbox id and AES key out of logs.
@@ -193,7 +193,7 @@ function show(name) {
     if (heading) {
       heading.tabIndex = -1;
       requestAnimationFrame(() => {
-        if (visibleScreenName === name) heading.focus({ preventScroll: true });
+        if (visibleScreenName === name) heading.focus();
       });
     }
   }
@@ -1008,18 +1008,15 @@ function renderReview(person) {
 }
 
 /**
- * True when the camera can be opened without raising a prompt.
+ * Best-effort hint that the camera was already granted access. The browser
+ * still controls permission and may prompt again when getUserMedia runs.
  *
  * Two independent signals, because no single one covers every phone a
  * salesperson might hold:
  *
- *  - `navigator.permissions.query({name:"camera"})` is answered by Chromium —
- *    Chrome, Edge and Samsung Internet on Android — and is definitive there.
- *  - Everywhere else, a granted camera is the only reason `enumerateDevices()`
- *    returns a videoinput whose `label` is non-empty; browsers blank those
- *    labels until permission exists. That covers Firefox Android, and iOS
- *    (Safari, and Chrome/Edge/Firefox for iOS, which are all WebKit) within a
- *    session where access was already granted.
+ *  - Use the camera permission state when the browser supports querying it.
+ *  - Otherwise, a labelled video input indicates prior access or an active
+ *    stream. This is a hint, not a guarantee of a persisted camera grant.
  *
  * Both are read-only checks — neither opens the camera or raises a prompt — and
  * anything unknown falls back to showing the button, which is the safe answer.
@@ -1415,14 +1412,13 @@ function relayFailure(status) {
 }
 
 async function deliverPayload(payload, generation) {
-  const delivery = el("deliveryStatus");
   const retry = el("retrySendBtn");
   clearError();
   if (retry) {
     retry.disabled = true;
     retry.classList.add("hidden");
   }
-  if (delivery) delivery.textContent = "Encrypting and sending to your computer…";
+  setDeliveryState("sending");
 
   if (activeDeliveryController) activeDeliveryController.abort();
   const controller = new AbortController();
@@ -1439,6 +1435,8 @@ async function deliverPayload(payload, generation) {
         false
       );
     }
+    if (generation !== deliveryGeneration) return;
+    if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
 
     const res = await fetch(
       `${RELAY_BASE}/pair/${encodeURIComponent(sessionId)}/submit`,
@@ -1451,7 +1449,7 @@ async function deliverPayload(payload, generation) {
     );
     if (!res.ok) throw relayFailure(res.status);
     if (generation !== deliveryGeneration) return;
-    if (delivery) delivery.textContent = "Sent securely — return to your computer.";
+    setDeliveryState("sent");
   } catch (error) {
     if (generation !== deliveryGeneration) return;
     const message = controller.signal.aborted
@@ -1459,7 +1457,7 @@ async function deliverPayload(payload, generation) {
       : error && error.message
         ? error.message
         : "The network request failed. Check the connection and retry.";
-    if (delivery) delivery.textContent = "Not sent yet.";
+    setDeliveryState("unconfirmed");
     showError(message);
     const canRetry = controller.signal.aborted || error?.retryable !== false;
     if (retry && canRetry) {
@@ -1470,6 +1468,19 @@ async function deliverPayload(payload, generation) {
     clearTimeout(timeout);
     if (activeDeliveryController === controller) activeDeliveryController = null;
   }
+}
+
+function setDeliveryState(state) {
+  const copy = {
+    sending: ["Sending details", "Keep this page open while sending.", "Encrypting and sending to your computer…"],
+    sent: ["Details sent", "Return to your computer to check the filled form.", "Sent securely — return to your computer."],
+    unconfirmed: ["Check delivery", "Check the computer before retrying.", "Delivery not confirmed."],
+    standalone: ["Scan complete", "Open a scanner QR code on your computer to send details.", "Not sent — this page has no computer pairing."],
+  }[state];
+  el("doneHeading").textContent = copy[0];
+  screens.done.querySelector(".hint").textContent = copy[1];
+  el("deliveryStatus").textContent = copy[2];
+  screens.done.querySelector(".done-check").classList.toggle("hidden", state !== "sent" && state !== "standalone");
 }
 
 async function finish() {
@@ -1492,13 +1503,7 @@ async function finish() {
   }
   const cs = el("captureSummary");
   if (cs) cs.innerHTML = rows;
-  const delivery = el("deliveryStatus");
-  if (delivery) {
-    delivery.textContent =
-      sessionId && keyB64
-        ? "Preparing secure delivery…"
-        : "Scan complete. This page was opened without a computer pairing.";
-  }
+  setDeliveryState(sessionId && keyB64 ? "sending" : "standalone");
   el("startOverBtn").classList.toggle("hidden", Boolean(sessionId && keyB64));
   el("retrySendBtn").classList.add("hidden");
   show("done");
@@ -1538,6 +1543,8 @@ el("noCoBuyerBtn").addEventListener("click", finish);
 el("startOverBtn").addEventListener("click", resetAll);
 el("retrySendBtn").addEventListener("click", () => {
   if (!lastPayload || !sessionId || !keyB64) return;
+  // The retry button is hidden during sending; keep focus on visible context.
+  el("doneHeading").focus();
   const generation = ++deliveryGeneration;
   deliverPayload(lastPayload, generation);
 });
@@ -1605,9 +1612,25 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   captureGen++;
   stopCamera();
+  resumeAfterVisibility = false;
+  choosingPhoto = false;
   deliveryGeneration++;
-  if (activeDeliveryController) activeDeliveryController.abort();
+  if (activeDeliveryController) {
+    activeDeliveryController.abort();
+    // A frozen page keeps its DOM. Leave a usable recovery state for Back /
+    // Forward restoration; the cancelled request's stale callback is ignored.
+    setDeliveryState("unconfirmed");
+    showError("Sending was interrupted. Check the computer; if the fields did not fill, retry sending.");
+    el("retrySendBtn").disabled = false;
+    el("retrySendBtn").classList.remove("hidden");
+  }
   activeDeliveryController = null;
+});
+
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && visibleScreenName === "camera" && !activeRun) {
+    beginCapture(capturing, { waitForGesture: true });
+  }
 });
 
 // Prefer a full top-level page so the phone camera permission prompt can appear.

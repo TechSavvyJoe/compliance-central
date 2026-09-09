@@ -76,20 +76,30 @@ The backend that drives the MDOS and SOS sites lives in a separate repository,
 ## Development
 
 ```bash
-npm install
-npm test            # 351 tests
+npm ci
+npm test            # unit and regression checks
 npm run lint
+npm run test:browser # isolated Chrome flows, with synthetic customer/state replies
 npm run package     # build the Web Store zip
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the details, including which scripts need
 extra dependencies.
 
-Pushing a `v*` tag runs the same checks and publishes a downloadable build:
+Browser checks require Google Chrome; use `CHROME_PATH` for a nonstandard
+installation. They do not query Michigan or prove physical-phone camera support.
 
-```bash
-git tag v1.6.1 && git push origin v1.6.1
-```
+Pushing a new `v*` tag publishes a downloadable release after its checks pass.
+Do not recreate an existing release tag to distribute revised test builds.
+For unreleased testing, build the package from the current source and keep its
+commit and checksum with the ZIP. Extract it, then use Chrome's **Load unpacked**
+on the folder that directly contains `manifest.json`.
+
+Without local build tools: sign in to GitHub on the other computer, open the
+repository's **Actions → CI**, choose the newest successful run, and download
+its `compliance-central-test-<commit>` artifact. Extract that download and load
+the folder containing `manifest.json`. These tested artifacts are kept for 14
+days and do not change the existing release or auto-update installed test copies.
 
 ## Privacy
 

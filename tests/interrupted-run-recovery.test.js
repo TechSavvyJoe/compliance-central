@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { acceptsRunStatusUpdate, isCurrentRunState } from "../lib/run-fence.js";
 import { SEARCH_STATUS, STORAGE_KEYS } from "../lib/storage-keys.js";
+import { handleMessage } from "../src/worker/message-router.js";
 
 const sidepanelSource = readFileSync(
   new URL("../sidepanel.js", import.meta.url),
@@ -128,8 +129,11 @@ test("run status updates are accepted only for the run the panel is watching", (
     false
   );
 
-  // Idle is the Clear tombstone: every panel returns to rest on it.
-  assert.equal(acceptsRunStatusUpdate({}, null, SEARCH_STATUS.idle), true);
+  // Idle may come from another window's individual check. Only the matching
+  // full-run tombstone can stand down a panel watching a run.
+  assert.equal(acceptsRunStatusUpdate({}, null, SEARCH_STATUS.idle), false);
+  assert.equal(acceptsRunStatusUpdate(current, "run-a", SEARCH_STATUS.idle), false);
+  assert.equal(acceptsRunStatusUpdate({ activeRunId: null, stateRunId: "run-a", cancelledRunId: "run-a" }, "run-a", SEARCH_STATUS.idle), true);
 
   // A failure whose tombstone names another run is not this panel's business.
   const otherRunFailed = {
@@ -202,7 +206,7 @@ test("saving an individual result does not stand down another window's run", asy
       },
       local: { get: async () => ({}), set: async () => {} },
     },
-    runtime: { sendMessage: async () => ({}), getURL: (p) => p },
+    runtime: { sendMessage: (message) => handleMessage(message, {}), getURL: (p) => p },
   };
 
   try {
@@ -212,13 +216,22 @@ test("saving an individual result does not stand down another window's run", asy
     // Window 1 is mid-run.
     store[STORAGE_KEYS.searchStatus] = SEARCH_STATUS.running;
     store[STORAGE_KEYS.activeRunId] = "run-A";
+    store[STORAGE_KEYS.stateRunId] = "run-A";
+    const fullResults = { runId: "run-A", runType: "full", checks: {}, customer: { firstName: "A" } };
+    store[STORAGE_KEYS.currentResults] = fullResults;
 
     // Window 2 saves a local OFAC-only result.
-    state.setCurrentResults({
+    const individual = {
       customer: { firstName: "B" },
       checks: { ofac: { passed: true } },
+      runType: "individual",
+      operationId: "operation-B",
+    };
+    state.setCurrentResults(null);
+    state.mergeIntoCurrentResults(individual.customer, "ofac", individual.checks.ofac, {
+      replace: true, operationId: individual.operationId,
     });
-    await state.persistCurrentResults();
+    assert.equal(await state.persistCurrentResults(), false);
 
     assert.equal(
       store[STORAGE_KEYS.searchStatus],
@@ -226,11 +239,15 @@ test("saving an individual result does not stand down another window's run", asy
       "the other window's run must still read as running"
     );
     assert.equal(store[STORAGE_KEYS.activeRunId], "run-A");
+    assert.deepEqual(store[STORAGE_KEYS.currentResults], fullResults);
 
     // With nothing in flight it must still return the panel to rest, which is
     // what the reopen path depends on.
     store[STORAGE_KEYS.searchStatus] = SEARCH_STATUS.complete;
+    assert.equal(await state.persistCurrentResults(), false);
+    assert.deepEqual(store[STORAGE_KEYS.currentResults], fullResults);
     store[STORAGE_KEYS.activeRunId] = null;
+    store[STORAGE_KEYS.currentResults] = null;
     await state.persistCurrentResults();
     assert.equal(store[STORAGE_KEYS.searchStatus], SEARCH_STATUS.idle);
   } finally {

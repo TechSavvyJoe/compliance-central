@@ -12,8 +12,9 @@ import {
 } from "../../lib/history-retention.js";
 import { sanitizeHTML } from "./dom-utils.js";
 import { ICONS } from "./icons.js";
+import { showToast } from "./toast.js";
 import {
-  calculateFinalDecision,
+  finalDecisionForResults,
   historyRowDecision,
 } from "./checks.js";
 
@@ -217,8 +218,7 @@ function historyDecision(results) {
     };
   }
 
-  if (results.finalDecision) return results.finalDecision;
-  return calculateFinalDecision(results.checks || {});
+  return finalDecisionForResults(results);
 }
 
 /**
@@ -279,7 +279,9 @@ export async function updateHistoryCount(historyCountEl) {
 export async function populateHistoryModal(historyListEl) {
   try {
     const storage = await chrome.storage.local.get(STORAGE_KEYS.complianceHistory);
-    const history = storage[STORAGE_KEYS.complianceHistory] || [];
+    const history = (storage[STORAGE_KEYS.complianceHistory] || [])
+      .map(minimizeHistoryEntry)
+      .filter(Boolean);
 
     // Where the records live used to be stated in a paragraph above the search
     // box that also spent two lines naming the buttons printed on every card.
@@ -430,7 +432,10 @@ export async function clearAllHistory(historyListEl, historyCountEl) {
 
   try {
     const result = await chrome.runtime.sendMessage({ type: "CLEAR_HISTORY" });
-    if (!result?.success) return false;
+    if (!result?.success) {
+      showToast(result?.error || "History could not be cleared. Try again.", "warning");
+      return false;
+    }
   } catch (error) {
     console.error("Error clearing history:", error);
     return false;

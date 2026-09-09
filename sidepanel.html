@@ -307,7 +307,7 @@
               </h2>
               <p class="sos-heading-copy">Registration and plate cost from the official Michigan SOS calculator.</p>
             </div>
-            <span id="sosQuoteSource" class="sos-quote-source">Ready locally</span>
+            <span id="sosQuoteSource" class="sos-quote-source">Not calculated yet</span>
           </div>
 
           <fieldset class="sos-quote-mode" aria-label="Registration choice">
@@ -324,7 +324,7 @@
               <button type="button" id="useTradeVinBtn" class="sos-use-trade-vin hidden">Use trade-in VIN <span id="useTradeVinValue"></span></button>
               <button type="button" id="lookupSosVinBtn" class="btn-secondary btn-sm">Decode VIN</button>
             </div>
-            <p class="sos-vin-note">For the vehicle being registered. Fills type, body, fuel, and year when NHTSA identifies them. Trade Title/Lien stays in the Trade-In section above.</p>
+            <p class="sos-vin-note">Use the VIN of the vehicle being registered. Review the filled details before calculating.</p>
             <p id="sosVinLookupStatus" class="sos-vin-status" role="status" aria-live="polite"></p>
           </details>
 
@@ -422,8 +422,8 @@
               </div>
             </button>
             <div id="sosPlatePreviewUnavailable" class="sos-plate-preview-unavailable" hidden>
-              <strong>No preview for this combination</strong>
-              <span>Michigan does not publish a sample image for this plate type and design together. Calculate the fee and the state's own image will appear here if it has one.</span>
+                <strong>Preview unavailable</strong>
+                <span>You can still calculate the fee for this plate.</span>
             </div>
 
             <div class="sos-timing-row">
@@ -474,6 +474,14 @@
             </div>
           </div>
           <p id="sosQuoteStatus" class="sos-quote-status" role="status" aria-live="polite">No fee calculated yet.</p>
+          <details id="sosFeeBreakdown" class="sos-fee-breakdown" hidden>
+            <summary>Fee breakdown</summary>
+            <table>
+              <caption class="visually-hidden">Costs included in the official SOS total</caption>
+              <thead><tr><th scope="col">Fee</th><th scope="col">Amount</th></tr></thead>
+              <tbody id="sosFeeBreakdownRows"></tbody>
+            </table>
+          </details>
 
           <p id="sosReadiness" class="sos-readiness" aria-live="polite"></p>
           <div id="sosProgress" class="sos-progress hidden" role="status" aria-live="polite">
@@ -483,10 +491,12 @@
 
           <div class="sos-primary-actions" role="group" aria-label="Michigan SOS fee quote actions">
             <button type="button" id="calculateSosFeeBtn" class="btn-primary btn-sm">Calculate SOS fee</button>
+            <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm" aria-label="Clear SOS quote">Clear</button>
+          </div>
+          <div id="sosExportActions" class="sos-export-actions" role="group" aria-label="Print or save the calculated fee" hidden>
             <button type="button" id="printSosQuoteBtn" class="btn-secondary btn-sm" disabled>Customer print</button>
             <button type="button" id="printSosCalculationBtn" class="btn-secondary btn-sm" disabled>Print SOS</button>
             <button type="button" id="downloadSosCalculationPdfBtn" class="btn-secondary btn-sm" disabled>SOS PDF</button>
-            <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm" aria-label="Clear SOS quote">Clear</button>
           </div>
 
           <details class="sos-fee-reference">
@@ -862,7 +872,7 @@
           <div class="modal-body">
             <div class="settings-group">
               <h3 class="settings-heading"><span class="icon icon-check" aria-hidden="true"></span>Service</h3>
-              <p id="serviceStatus" class="settings-status connected">All checks are ready — no setup needed.</p>
+              <p id="serviceStatus" class="settings-status connected">Service access is included — no setup needed.</p>
               <p class="settings-help">OFAC, Repeat Offender, Title/Lien, and phone scanning are included. There is no account or key to configure.</p>
             </div>
 

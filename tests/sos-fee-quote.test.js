@@ -126,7 +126,11 @@ function runnerHarness(respond) {
       return respond(payload, options);
     },
   });
-  return { requests, runner };
+  return { requests, runner: {
+    ...runner,
+    calculate: (mode, fields, requestId = "quote-test") => runner.calculate(mode, fields, requestId),
+    cancel: (requestId = "quote-test") => runner.cancel(requestId),
+  } };
 }
 
 test("local dealer form defaults to Gas and includes modern fuels and commercial plates", () => {
@@ -436,7 +440,7 @@ test("cancelling aborts the in-flight quote and reports it as cancelled", async 
   await started;
   assert.equal(harness.runner.isInFlight(), true);
 
-  assert.deepEqual(harness.runner.cancel(), { success: true });
+  assert.deepEqual(harness.runner.cancel(), { success: true, cancelled: true, requestId: "quote-test" });
   const response = await pending;
   assert.equal(response.success, false);
   assert.equal(response.cancelled, true);
@@ -446,7 +450,7 @@ test("cancelling aborts the in-flight quote and reports it as cancelled", async 
 
 // A late answer for superseded choices is how a customer ends up reading a fee
 // for a vehicle configuration that is no longer on screen.
-test("a superseded quote resolves as cancelled instead of repainting a stale fee", async () => {
+test("an owner cancels its previous quote before replacing its choices", async () => {
   const pendingResolvers = [];
   const harness = runnerHarness(
     () => new Promise((resolve) => pendingResolvers.push(resolve))
@@ -457,9 +461,11 @@ test("a superseded quote resolves as cancelled instead of repainting a stale fee
     buildSosSubmission(newPlateValues())
   );
   await Promise.resolve();
+  harness.runner.cancel();
   const second = harness.runner.calculate(
     SOS_QUOTE_MODE.newPlate,
-    buildSosSubmission(newPlateValues({ msrp: "51000" }))
+    buildSosSubmission(newPlateValues({ msrp: "51000" })),
+    "quote-replacement"
   );
   await Promise.resolve();
 
@@ -727,7 +733,8 @@ test("UI, manifest, and package drop every local-tab affordance", () => {
   assert.match(sidepanelScript, /fields:\s*buildSosSubmission\(values\)/);
   assert.match(sidepanelScript, /applyPendingVinSuggestions\(\)/);
   assert.match(sidepanelHtml, /Auto-fill by vehicle VIN/);
-  assert.match(sidepanelHtml, /Trade Title\/Lien stays in the Trade-In section above/);
+  // The trade check is on another tab, not "above" the calculator.
+  assert.doesNotMatch(sidepanelHtml, /Trade Title\/Lien stays in the Trade-In section above/);
   assert.doesNotMatch(sidepanelHtml, /Use trade VIN|VIN assist \+ lien check/);
   // Print/PDF still gate on the optional official-page capture.
   assert.match(sidepanelScript, /printSosCalculationBtn\.disabled = !quote\?\.officialPageImage/);
@@ -1546,7 +1553,10 @@ test("the loading overlay reports how long it has been waiting", () => {
   // Elapsed seconds, held back until a wait is worth remarking on.
   assert.match(show, /secs >= 3/);
   assert.match(show, /secs >= 10/);
-  assert.match(show, /the state site is slow right now/);
+  // The same overlay also serves local OFAC: elapsed time cannot diagnose a
+  // state-site outage. Give an honest progress cue without blaming Michigan.
+  assert.match(show, /still working/);
+  assert.doesNotMatch(show, /the state site is slow/);
   // No invented percentage — the count must come from real elapsed time.
   assert.match(show, /Math\.round\(\(Date\.now\(\) - started\) \/ 1000\)/);
   assert.doesNotMatch(show, /Math\.random|fakeProgress|\bpercent\b/);

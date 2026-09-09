@@ -32,6 +32,16 @@ import {
   isSosLienCheckInFlight,
 } from "./sos-lien-check.js";
 import { CONFIG } from "../../lib/config.js";
+import { RESULT_STATE_MESSAGES, resultIdentity } from "../../lib/run-fence.js";
+import { persistResults, discardPersistedResults } from "./state.js";
+// These exports are pure: use the form's actual validation rules at the
+// worker boundary too, without invoking its DOM feedback helpers.
+import { collectCustomerValidationErrors, planChecksForData } from "../sidepanel/form.js";
+import {
+  FORM_CACHE_MESSAGES,
+  validateFormCacheMessage,
+  handleFormCacheMessage,
+} from "./form-cache.js";
 
 const SOS_QUOTE_MODES = new Set(["new_plate", "plate_transfer"]);
 
@@ -96,18 +106,61 @@ function isValidSosMode(value) {
   return typeof value === "string" && SOS_QUOTE_MODES.has(value);
 }
 
+function normalizeRunAllPayload(data) {
+  if (!isRecord(data) || !isRecord(data.customer) || !isValidRunId(data.runId)) return null;
+  const source = data.customer;
+  const validShape = (person) => isRecord(person) &&
+    ["firstName", "middleName", "lastName"].every((key) =>
+      isBoundedString(person[key], CONFIG.validation.nameMaxLength)) &&
+    isBoundedString(person.suffix, 16) &&
+    isBoundedString(person.dob, 32) &&
+    isBoundedString(person.dlnPid ?? person.dln, 32);
+  if (!validShape(source) ||
+      !isBoundedString(source.tradeVin, CONFIG.validation.vinLength) ||
+      !isOptionalBoolean(source.buyerIsMichigan) ||
+      !isOptionalBoolean(source.coBuyerIsMichigan) ||
+      (source.hasCoBuyer !== undefined && typeof source.hasCoBuyer !== "boolean") ||
+      (source.coBuyer !== undefined && !validShape(source.coBuyer)) ||
+      (source.hasCoBuyer && !source.coBuyer)) return null;
+
+  const coBuyer = source.coBuyer && { ...source.coBuyer, dlnPid: source.coBuyer.dlnPid ?? source.coBuyer.dln };
+  const hasCoBuyer = Boolean(coBuyer &&
+    ["firstName", "middleName", "lastName", "suffix", "dob", "dlnPid"].some((key) => coBuyer[key]?.trim()));
+  const customer = {
+    ...source,
+    dlnPid: source.dlnPid ?? source.dln,
+    tradeVin: source.tradeVin?.trim().toUpperCase() || "",
+    hasCoBuyer,
+    ...(coBuyer ? { coBuyer } : {}),
+  };
+  // A supplied plan or hasTrade flag cannot suppress a filled person/VIN or
+  // invent work for an empty one. Partial supplied identities fail validation.
+  const plan = planChecksForData(customer);
+  if (!(plan.buyer || plan.coBuyer || plan.title) ||
+      collectCustomerValidationErrors(customer, plan).length) return null;
+  return { customer, runId: data.runId, hasTrade: plan.title, plan };
+}
+
 function validatePayload(type, data) {
   switch (type) {
+    case FORM_CACHE_MESSAGES.save:
+    case FORM_CACHE_MESSAGES.load:
+    case FORM_CACHE_MESSAGES.clear:
+      return validateFormCacheMessage(type, data);
+    case RESULT_STATE_MESSAGES.persist:
+      return isRecord(data) && isRecord(data.results) &&
+        isRecord(data.results.checks) &&
+        isValidRequiredOperationId(data.results.runType === "individual"
+          ? data.results.operationId : data.results.runId) &&
+        Boolean(resultIdentity(data.results)) &&
+        (data.expectedResultId === null ||
+          /^(run|operation):[A-Za-z0-9._:-]{1,128}$/.test(data.expectedResultId));
+    case RESULT_STATE_MESSAGES.discard:
+      return isRecord(data) && typeof data.resultId === "string" &&
+        /^(run|operation):[A-Za-z0-9._:-]{1,128}$/.test(data.resultId) &&
+        isBoundedString(data.timestamp, 64);
     case "RUN_ALL_CHECKS":
-      return (
-        isRecord(data) &&
-        typeof data.hasTrade === "boolean" &&
-        isValidRunId(data.runId) &&
-        isValidPerson(data.customer, true) &&
-        (!data.customer.hasCoBuyer || isValidPerson(data.customer.coBuyer, true)) &&
-        (!data.hasTrade ||
-          isBoundedString(data.customer.tradeVin, CONFIG.validation.vinLength, true))
-      );
+      return Boolean(normalizeRunAllPayload(data));
     case "RUN_OFAC_CHECK":
       return isValidPerson(data, false);
     case "RUN_REPEAT_OFFENDER":
@@ -131,11 +184,12 @@ function validatePayload(type, data) {
     case SOS_FEE_MESSAGES.calculate:
       return (
         isRecord(data) &&
+        isValidRequiredOperationId(data.requestId) &&
         isValidSosMode(data.mode) &&
         validSosSubmissionFields(data.fields)
       );
     case SOS_FEE_MESSAGES.cancel:
-      return data === undefined || data === null || isRecord(data);
+      return isRecord(data) && isValidRequiredOperationId(data.requestId);
     case HISTORY_MESSAGES.append:
     case HISTORY_MESSAGES.remove:
     case HISTORY_MESSAGES.purge:
@@ -170,7 +224,7 @@ export async function handleMessage(message, sender) {
     }
 
     const invalidCancelId =
-      message.type === "CANCEL_CURRENT_RUN" && !isValidRunId(message.runId);
+      message.type === "CANCEL_CURRENT_RUN" && !isValidRequiredOperationId(message.runId);
     const operationId = message.data?.operationId || message.operationId;
     const invalidOperationCancelId =
       message.type === "CANCEL_INDIVIDUAL_OPERATION" &&
@@ -184,6 +238,17 @@ export async function handleMessage(message, sender) {
     }
 
     switch (message.type) {
+      case FORM_CACHE_MESSAGES.save:
+      case FORM_CACHE_MESSAGES.load:
+      case FORM_CACHE_MESSAGES.clear:
+        return handleFormCacheMessage(message.type, message.data);
+
+      case RESULT_STATE_MESSAGES.persist:
+        return persistResults(message.data);
+
+      case RESULT_STATE_MESSAGES.discard:
+        return discardPersistedResults(message.data);
+
       case "RUN_ALL_CHECKS":
         // Reject busy before starting so the sidepanel learns the truth.
         if (
@@ -198,7 +263,7 @@ export async function handleMessage(message, sender) {
         }
         // Acknowledge only after the initial session state is durable. The rest
         // of the run continues in the background and storage events drive UI.
-        return startRunAllChecks(message.data);
+        return startRunAllChecks(normalizeRunAllPayload(message.data));
 
       case "CANCEL_CURRENT_RUN":
         return cancelCurrentRun(message.runId);
@@ -242,10 +307,10 @@ export async function handleMessage(message, sender) {
         return handleSosLienCheck(message.data);
 
       case SOS_FEE_MESSAGES.calculate:
-        return getSosFeeRunner().calculate(message.data.mode, message.data.fields);
+        return getSosFeeRunner().calculate(message.data.mode, message.data.fields, message.data.requestId);
 
       case SOS_FEE_MESSAGES.cancel:
-        return getSosFeeRunner().cancel();
+        return getSosFeeRunner().cancel(message.data.requestId);
 
       case "getDataStatus":
         return handleGetDataStatus();

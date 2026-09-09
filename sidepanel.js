@@ -26,6 +26,7 @@ import {
   validateCustomerFields,
   planChecksForData,
   cacheFormData,
+  clearCachedFormData,
   loadCachedFormData,
   extractScanJurisdiction,
 } from "./src/sidepanel/form.js";
@@ -39,7 +40,6 @@ import {
   runOfacCheck,
   runRepeatOffenderCheck,
   runTitleCheck,
-  clearTransientScreenshots,
 } from "./src/sidepanel/checks.js";
 import {
   resetProgress,
@@ -93,6 +93,7 @@ import {
   loadPersistedResults,
   mergeIntoCurrentResults,
   persistCurrentResults,
+  discardPersistedResult,
   getIsRunning,
   setIsRunning,
 } from "./src/sidepanel/state.js";
@@ -407,7 +408,8 @@ function syncReportSelection(currentResults) {
 }
 
 async function resolveOfacTriage(checkKey, disposition) {
-  const results = getCurrentResults();
+  const originalResults = getCurrentResults();
+  const results = structuredClone(originalResults);
   const ofac = results?.checks?.[checkKey];
   if (!ofac || ofac.passed !== false) return;
 
@@ -419,7 +421,11 @@ async function resolveOfacTriage(checkKey, disposition) {
   // REVIEW for the same record.
   results.finalDecision = finalDecisionForResults(results);
   setCurrentResults(results);
-  await persistCurrentResults();
+  if (!await persistCurrentResults()) {
+    setCurrentResults(originalResults);
+    showToast("The review could not be saved because the active record changed. Reopen it from History before reviewing the match.", "warning");
+    return;
+  }
   displayResults(elements, results);
   syncReportSelection(results);
   await saveToHistory(results);
@@ -493,7 +499,7 @@ function showLoading(text = "Processing...") {
     const secs = Math.round((Date.now() - started) / 1000);
     if (!elements.loadingDetail) return;
     if (secs >= 10) {
-      elements.loadingDetail.textContent = `${secs}s \u00b7 the state site is slow right now, still working`;
+      elements.loadingDetail.textContent = `${secs}s \u00b7 still working`;
     } else if (secs >= 3) {
       elements.loadingDetail.textContent = `${secs}s`;
     }
@@ -611,7 +617,8 @@ function initWorkspaceNavigation() {
 
     event.preventDefault();
     const target = tabs[next]?.dataset.workspaceTarget;
-    if (target) activateWorkspace(target, { focusTab: true });
+    if (target === "history") void openHistory({ focusTab: true });
+    else if (target) activateWorkspace(target, { focusTab: true });
   });
 
   elements.screeningTabBtn?.addEventListener("click", () =>
@@ -639,8 +646,7 @@ document.addEventListener("DOMContentLoaded", () => {
   syncFirstRunPresentation();
 
   initSettings(elements, {
-    onClearHistory: () =>
-      clearAllHistory(elements.historyList, elements.historyCount),
+    onClearHistory: clearHistoryFromPanel,
   });
 
   // Independent async tasks — run in parallel, don't block paint.
@@ -763,6 +769,19 @@ let currentSosFeeQuote = null;
 let pendingVinDecode = null;
 let sosWorkspaceBusy = false;
 let sosLienCheckBusy = false;
+const sosQuoteFence = createOperationFence();
+const sosVinFence = createOperationFence();
+let sosQuoteWrites = Promise.resolve();
+let sosCancellation = Promise.resolve();
+let activeSosRequestId = null;
+
+// Keep a late save ahead of the clear that supersedes it, including when the
+// salesperson edits again while Chrome is still writing the previous quote.
+function writeSosQuote(operation) {
+  const write = sosQuoteWrites.then(operation);
+  sosQuoteWrites = write.catch(() => {});
+  return write;
+}
 
 function selectedSosQuoteMode() {
   return (
@@ -797,9 +816,9 @@ function selectedRadioValue(name) {
   return document.querySelector(`input[name="${name}"]:checked`)?.value || "";
 }
 
-function replaceSosOptions(select, options, preferredValue = "") {
+function replaceSosOptions(select, options, preferredValue) {
   if (!select) return;
-  const current = preferredValue || select.value;
+  const current = preferredValue ?? select.value;
   select.replaceChildren(
     ...options.map(([value, label]) => {
       const option = document.createElement("option");
@@ -838,7 +857,14 @@ function clearSosValidation() {
   document
     .querySelectorAll("#sosNewPlateFields [aria-invalid], #sosTransferFields [aria-invalid]")
     .forEach((control) => control.removeAttribute("aria-invalid"));
-  document.querySelectorAll(".sos-field-error").forEach((n) => n.remove());
+  document.querySelectorAll(".sos-field-error").forEach((note) => {
+    document.querySelectorAll('[aria-describedby]').forEach((control) => {
+      const ids = control.getAttribute("aria-describedby").split(/\s+/).filter((id) => id && id !== note.id);
+      if (ids.length) control.setAttribute("aria-describedby", ids.join(" "));
+      else control.removeAttribute("aria-describedby");
+    });
+    note.remove();
+  });
 }
 
 function showSosValidation(errors, { focusFirst = true } = {}) {
@@ -862,7 +888,12 @@ function showSosValidation(errors, { focusFirst = true } = {}) {
       .split(/\s+/).filter(Boolean).filter((x) => x !== note.id);
     control.setAttribute("aria-describedby", [...described, note.id].join(" "));
   }
-  if (focusFirst) document.getElementById(errors[0]?.id)?.focus?.();
+  if (focusFirst) {
+    const control = document.getElementById(errors[0]?.id);
+    const focusTarget = control?.matches("fieldset") ? control.querySelector("input") : control;
+    focusTarget?.focus({ preventScroll: true });
+    focusTarget?.scrollIntoView({ block: "center" });
+  }
 }
 
 // True once Calculate has been pressed: before that, an untouched form should
@@ -878,7 +909,9 @@ function renderSosReadiness() {
   try {
     errors = validateSosLocalValues(localSosValues()) || [];
   } catch {
-    errors = [];
+    el.textContent = "Check the vehicle details before calculating.";
+    el.classList.remove("is-ready");
+    return;
   }
   const n = errors.length;
   // Once a fee has been calculated there is nothing left to be ready for, and
@@ -923,6 +956,8 @@ function syncSosLienCheckButton() {
 }
 
 function handleSosVinInput() {
+  sosVinFence.cancel();
+  if (elements.lookupSosVinBtn) elements.lookupSosVinBtn.disabled = sosWorkspaceBusy;
   // A decoded response belongs only to the exact text that was looked up.
   // Never apply stale suggestions after the salesperson edits the VIN.
   pendingVinDecode = null;
@@ -1060,6 +1095,11 @@ function renderSosPlatePreview() {
   }
   if (elements.sosPlatePreviewImage) {
     if (shouldShow) {
+      elements.sosPlatePreviewImage.onerror = () => {
+        if (loadToken !== sosPlatePreviewLoadToken) return;
+        elements.sosPlatePreview.hidden = true;
+        elements.sosPlatePreviewUnavailable.hidden = false;
+      };
       elements.sosPlatePreviewImage.alt = `${localDesign?.label || "Michigan"} official plate design artwork`;
       if (new URL(previewUrl).hostname === SOS_CALCULATOR_IMAGE_HOST) {
         const abortController = new AbortController();
@@ -1292,7 +1332,28 @@ function endSosPlatePan(event) {
 
 function renderSosFeeQuote() {
   const quote = currentSosFeeQuote;
-  if (elements.sosQuoteStatus) elements.sosQuoteStatus.textContent = quoteStatusText(quote);
+  if (elements.sosQuoteStatus) {
+    elements.sosQuoteStatus.textContent = quoteStatusText(quote);
+    elements.sosQuoteStatus.hidden = !quote;
+  }
+  const exports = document.getElementById("sosExportActions");
+  if (exports) exports.hidden = !quote;
+  const breakdown = document.getElementById("sosFeeBreakdown");
+  const rows = document.getElementById("sosFeeBreakdownRows");
+  if (breakdown && rows) {
+    breakdown.hidden = !quote?.feeBreakdown?.length;
+    if (!quote) breakdown.open = false;
+    rows.replaceChildren(...(quote?.feeBreakdown || []).map((fee) => {
+      const row = document.createElement("tr");
+      const label = document.createElement("th");
+      label.scope = "row";
+      label.textContent = fee.label;
+      const amount = document.createElement("td");
+      amount.textContent = formatMoney(fee.feeCents);
+      row.append(label, amount);
+      return row;
+    }));
+  }
   // The total and what it buys lead; the itemised add-ons stay below as
   // reference rather than competing with the number a customer is quoted.
   if (elements.sosQuoteHeadline) {
@@ -1335,8 +1396,11 @@ function renderSosFeeQuote() {
 }
 
 async function restoreSosFeeQuote() {
+  const token = sosQuoteFence.start();
   try {
-    currentSosFeeQuote = await loadSosFeeQuote();
+    const quote = await loadSosFeeQuote();
+    if (!sosQuoteFence.isCurrent(token)) return;
+    currentSosFeeQuote = quote;
     renderSosFeeQuote();
   } catch (error) {
     console.error("Could not restore SOS fee quote:", error);
@@ -1344,6 +1408,7 @@ async function restoreSosFeeQuote() {
 }
 
 function renderSosWorkspace() {
+  if (elements.lookupSosVinBtn && sosWorkspaceBusy) elements.lookupSosVinBtn.disabled = true;
   if (elements.calculateSosFeeBtn) {
     elements.calculateSosFeeBtn.disabled = sosWorkspaceBusy;
     elements.calculateSosFeeBtn.textContent = sosWorkspaceBusy
@@ -1370,8 +1435,16 @@ function renderSosWorkspace() {
 // Abandoning an in-flight quote is what keeps a late backend response from
 // repainting a fee for choices the salesperson has already changed.
 async function cancelSosFeeRequest() {
+  const requestId = activeSosRequestId;
+  activeSosRequestId = null;
+  sosQuoteFence.cancel();
+  sosWorkspaceBusy = false;
+  if (elements.lookupSosVinBtn) elements.lookupSosVinBtn.disabled = false;
+  setSosProgress(false);
+  if (!requestId) return sosCancellation;
   try {
-    await chrome.runtime.sendMessage({ type: "SOS_FEE_CANCEL", data: {} });
+    sosCancellation = chrome.runtime.sendMessage({ type: "SOS_FEE_CANCEL", data: { requestId } }).catch(() => {});
+    await sosCancellation;
   } catch {
     // The worker may already have settled or dropped the request.
   }
@@ -1422,6 +1495,10 @@ function prefillSosPurchaseDate() {
  * Screening and Plate pages agree on what "cleared" means.
  */
 function resetSosLocalForm() {
+  sosSubmitAttempted = false;
+  sosVinFence.cancel();
+  setSosQuoteMode(SOS_QUOTE_MODE.newPlate);
+  clearSosValidation();
   for (const input of [
     elements.sosModelYear,
     elements.sosMsrp,
@@ -1450,6 +1527,7 @@ function resetSosLocalForm() {
   }
 
   if (elements.sosVehicleType) elements.sosVehicleType.value = "Passenger";
+  if (elements.sosFuelType) elements.sosFuelType.value = "GAS";
   // Rebuild the dependent option lists, then re-apply the defaults that depend
   // on them, so the workbench is usable immediately rather than half-empty.
   syncSosLocalDependencies({ resetDependentValues: true });
@@ -1647,7 +1725,7 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   replaceSosOptions(elements.sosVehicleUse, useOptionsForVehicle(vehicleType), previousUse);
 
   const vehicleUse = elements.sosVehicleUse?.value || "PASS";
-  const previousPlate = elements.sosPlateType?.value;
+  const previousPlate = resetDependentValues ? "" : elements.sosPlateType?.value;
   replaceSosOptions(elements.sosPlateType, plateOptionsForUse(vehicleUse), previousPlate);
 
   // "Registered to" is asked by every official calculator, not just the
@@ -1656,7 +1734,7 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
   // the birthdate, because the state expires those on a fixed schedule instead.
   syncSosOwnerBirthdateVisibility();
   const designOptions = plateDesignOptionsForType(elements.sosPlateType?.value);
-  const previousDesign = elements.sosPlateDesign?.value;
+  const previousDesign = resetDependentValues ? "" : elements.sosPlateDesign?.value;
   replaceSosOptions(elements.sosPlateDesign, designOptions, previousDesign);
   // Two places set `hidden` on this control: the mode switch, which hides every
   // [data-new-plate-only] node, and this function. This one used to decide
@@ -1676,13 +1754,16 @@ function syncSosLocalDependencies({ resetDependentValues = false } = {}) {
       !choosesPlate || !selectedDesign?.eligibilityNote;
     elements.sosPlateEligibility.textContent = selectedDesign?.eligibilityNote || "";
   }
-  clearSosValidation();
   renderSosPlatePreview();
+  renderSosReadiness();
 }
 
 async function applyPendingVinSuggestions() {
   if (!pendingVinDecode) return 0;
+  const decoded = pendingVinDecode;
+  const choices = JSON.stringify(localSosValues());
   await invalidateSosQuoteAfterEdit();
+  if (pendingVinDecode !== decoded || JSON.stringify(localSosValues()) !== choices) return 0;
   let applied = 0;
   const initialSuggestions = makeSosVinSuggestions(
     pendingVinDecode,
@@ -1714,26 +1795,30 @@ async function applyPendingVinSuggestions() {
 }
 
 async function invalidateSosQuoteAfterEdit() {
-  if (currentSosFeeQuote) {
-    currentSosFeeQuote = null;
-    renderSosFeeQuote();
+  const shouldClear = Boolean(currentSosFeeQuote) || sosWorkspaceBusy;
+  const cancellation = cancelSosFeeRequest();
+  currentSosFeeQuote = null;
+  renderSosWorkspace();
+  setSosWorkspaceStatus("Selections changed. Calculate again when complete.");
+  if (shouldClear) {
     try {
-      await clearSosFeeQuote();
+      await writeSosQuote(clearSosFeeQuote);
     } catch (error) {
       console.error("Could not remove the stale SOS fee quote:", error);
       showToast("The previous fee quote could not be cleared. Calculate again to replace it.", "error");
     }
   }
-  setSosWorkspaceStatus("Selections changed. Calculate again when complete.");
+  await cancellation;
 }
 
 async function handleSosOfficialFieldChange(event) {
-  await invalidateSosQuoteAfterEdit();
+  const invalidation = invalidateSosQuoteAfterEdit();
   if (event?.target === elements.sosVehicleType) {
     syncSosLocalDependencies({ resetDependentValues: true });
   } else {
     syncSosLocalDependencies();
   }
+  await invalidation;
 }
 
 async function handleSosCalculationInput() {
@@ -1744,6 +1829,7 @@ async function handleSosCalculationInput() {
 
 async function calculateSosFee() {
   if (sosWorkspaceBusy) return;
+  const requestedFromButton = document.activeElement === elements.calculateSosFeeBtn;
   const values = localSosValues();
   const errors = validateSosLocalValues(values);
   sosSubmitAttempted = true;
@@ -1759,18 +1845,26 @@ async function calculateSosFee() {
     return;
   }
   clearSosValidation();
+  const token = sosQuoteFence.start();
+  const requestId = createRunId();
+  activeSosRequestId = requestId;
+  const isCurrent = () => sosQuoteFence.isCurrent(token);
   sosWorkspaceBusy = true;
   setSosProgress(true);
   renderSosWorkspace();
   setSosWorkspaceStatus("Running the official Michigan SOS calculator…", "busy");
   try {
+    await sosCancellation;
+    if (!isCurrent()) return;
     const response = await chrome.runtime.sendMessage({
       type: "SOS_FEE_CALCULATE",
       data: {
+        requestId,
         mode: values.mode,
         fields: buildSosSubmission(values),
       },
     });
+    if (!isCurrent()) return;
     // A cancelled request was superseded on purpose; do not shout about it.
     if (response?.cancelled) {
       setSosWorkspaceStatus("Calculation cancelled. Calculate again when ready.");
@@ -1781,33 +1875,47 @@ async function calculateSosFee() {
     }
     // The MSRP lives only in the local form, so capture it with the quote
     // rather than reading the box later, when it may have moved on.
-    const msrpRaw = String(elements.sosMsrp?.value || "").replace(/[$,\s]/g, "");
+    const msrpRaw = String(values.msrp || "").replace(/[$,\s]/g, "");
     const msrpCents = /^\d{1,7}(?:\.\d{1,2})?$/.test(msrpRaw)
       ? Math.round(Number(msrpRaw) * 100)
       : null;
     const quote = createCalculatedQuote(
       response.quote,
-      selectedSosQuoteMode(),
+      values.mode,
       new Date(),
       { msrpCents }
     );
     if (!quote) {
       throw new Error("Michigan SOS returned an incomplete fee. Try calculating again.");
     }
-    currentSosFeeQuote = await saveSosFeeQuote(quote);
+    const savedQuote = await writeSosQuote(() => isCurrent() ? saveSosFeeQuote(quote) : null);
+    if (!isCurrent() || !savedQuote) return;
+    currentSosFeeQuote = savedQuote;
     pendingVinDecode = null;
     renderSosFeeQuote();
     setSosWorkspaceStatus("Official SOS calculation complete.", "ok");
+    // Disabling Calculate moves focus to the document in Chrome. Remember
+    // the click, but do not move the page if the user has since focused a
+    // different field or switched workspaces.
+    if (requestedFromButton && !document.getElementById("sosWorkspace")?.hidden &&
+        [document.body, elements.calculateSosFeeBtn].includes(document.activeElement)) {
+      elements.sosQuoteHeadline?.scrollIntoView({ block: "center", behavior: "auto" });
+    }
   } catch (error) {
+    if (!isCurrent()) return;
     setSosWorkspaceStatus(
       error?.message || "Michigan SOS could not calculate the fee.",
       "error"
     );
   } finally {
-    sosWorkspaceBusy = false;
-    setSosProgress(false);
-    renderSosWorkspace();
-    renderSosReadiness();
+    if (isCurrent()) {
+      activeSosRequestId = null;
+      sosWorkspaceBusy = false;
+      setSosProgress(false);
+      if (elements.lookupSosVinBtn) elements.lookupSosVinBtn.disabled = false;
+      renderSosWorkspace();
+      renderSosReadiness();
+    }
   }
 }
 
@@ -1815,6 +1923,9 @@ async function handleSosVinLookup() {
   if (sosWorkspaceBusy) return;
   const input = elements.sosVinLookupInput;
   const rawVin = input?.value || "";
+  const token = sosVinFence.start();
+  const initialChoices = JSON.stringify(localSosValues());
+  const isCurrent = () => sosVinFence.isCurrent(token) && input?.value === rawVin;
   if (!normalizeVinLookupInput(rawVin)) {
     if (elements.sosVinLookupStatus) {
       elements.sosVinLookupStatus.textContent = "Enter at least 8 valid VIN characters. A full 17-character VIN is most reliable.";
@@ -1827,6 +1938,11 @@ async function handleSosVinLookup() {
   }
   try {
     const decoded = await lookupVin(rawVin);
+    if (!isCurrent()) return;
+    if (sosWorkspaceBusy || JSON.stringify(localSosValues()) !== initialChoices) {
+      elements.sosVinLookupStatus.textContent = "Vehicle choices changed during lookup. Look up the VIN again to fill them.";
+      return;
+    }
     pendingVinDecode = decoded;
     const summary = vinLookupSummary(decoded) || "vehicle details";
     const applied = await applyPendingVinSuggestions();
@@ -1842,15 +1958,17 @@ async function handleSosVinLookup() {
       applied ? "" : "error"
     );
   } catch (error) {
+    if (!isCurrent()) return;
     pendingVinDecode = null;
     if (elements.sosVinLookupStatus) {
       elements.sosVinLookupStatus.textContent =
         error?.message || "NHTSA VIN lookup could not return vehicle details.";
     }
   } finally {
-    sosWorkspaceBusy = false;
-    if (elements.lookupSosVinBtn) elements.lookupSosVinBtn.disabled = false;
-    renderSosWorkspace();
+    if (isCurrent()) {
+      if (elements.lookupSosVinBtn) elements.lookupSosVinBtn.disabled = sosWorkspaceBusy;
+      renderSosWorkspace();
+    }
   }
 }
 
@@ -1898,18 +2016,19 @@ async function handleSosLienCheck() {
 }
 
 async function clearCurrentSosFeeQuote() {
+  const cancellation = cancelSosFeeRequest();
+  currentSosFeeQuote = null;
+  pendingVinDecode = null;
+  resetSosLocalForm();
+  renderSosWorkspace();
   try {
-    await cancelSosFeeRequest();
-    await clearSosFeeQuote();
-    currentSosFeeQuote = null;
-    pendingVinDecode = null;
+    await Promise.all([cancellation, writeSosQuote(clearSosFeeQuote)]);
     if (elements.sosVinLookupInput) elements.sosVinLookupInput.value = "";
     if (elements.sosVinLookupStatus) elements.sosVinLookupStatus.textContent = "";
     // The owner birthdate is personal data belonging to one deal. Leaving it
     // behind would carry a date of birth into the next customer's quote and
     // could price their registration off the wrong expiration. Dropping the
     // touched flag too lets the Screening DOB prefill again for that customer.
-    resetSosLocalForm();
     if (elements.sosLienStatus) {
       elements.sosLienStatus.textContent = "";
       elements.sosLienStatus.className = "sos-lien-status";
@@ -1927,15 +2046,13 @@ async function clearCurrentSosFeeQuote() {
 }
 
 async function handleSosQuoteModeChange() {
-  await cancelSosFeeRequest();
   pendingVinDecode = null;
-  if (currentSosFeeQuote && currentSosFeeQuote.mode !== selectedSosQuoteMode()) {
-    await clearSosFeeQuote();
-    currentSosFeeQuote = null;
-  }
-  renderSosFeeQuote();
+  sosSubmitAttempted = false;
+  clearSosValidation();
+  const invalidation = invalidateSosQuoteAfterEdit();
   renderSosWorkspace();
   setSosWorkspaceStatus("Registration choice changed. Complete the fields, then calculate.");
+  await invalidation;
 }
 
 async function printSosFeeQuote() {
@@ -2092,7 +2209,7 @@ function initEventListeners() {
     elements.sosPlateType,
     elements.sosPlateDesign,
   ].forEach((control) => control?.addEventListener("change", handleSosOfficialFieldChange));
-  ["sosFirstTitle", "sosBusinessRegistration", "sosRecreationPassport"].forEach(
+  ["sosFirstTitle", "sosBusinessRegistration", "sosRecreationPassport", "sosTransferChangePlate", "sosTransferAlreadyOwn"].forEach(
     (name) =>
       document
         .querySelectorAll(`input[name="${name}"]`)
@@ -2103,6 +2220,7 @@ function initEventListeners() {
     elements.sosMsrp,
     elements.sosPurchaseDate,
     elements.sosTransferPlateNumber,
+    elements.sosOwnerBirthdate,
   ].forEach((control) => control?.addEventListener("input", handleSosCalculationInput));
   syncSosLocalDependencies({ resetDependentValues: true });
   renderSosWorkspace();
@@ -2110,7 +2228,7 @@ function initEventListeners() {
   window.addEventListener("pagehide", () => {
     // Do not await during teardown. Nobody is left to read the answer, so
     // release the worker's in-flight quote instead of letting it finish.
-    chrome.runtime.sendMessage({ type: "SOS_FEE_CANCEL", data: {} }).catch(() => {});
+    void cancelSosFeeRequest();
   });
 
   elements.tradeVin.addEventListener("input", (e) => {
@@ -2123,10 +2241,7 @@ function initEventListeners() {
     hideModal(elements.historyModal)
   );
   elements.clearAllHistoryBtn.addEventListener("click", async () => {
-    const cleared = await clearAllHistory(
-      elements.historyList,
-      elements.historyCount
-    );
+    const cleared = await clearHistoryFromPanel();
     if (cleared) showToast("All history has been cleared.", "success");
   });
 
@@ -2339,6 +2454,7 @@ function initEventListeners() {
           showToast("That record could not be deleted. Try again.", "error");
           return;
         }
+        await populateHistoryModal(elements.historyList);
         filterHistoryWorkspace(elements.historySearchInput?.value || "");
         await refreshHistoryCountAndActions();
         showToast("Record deleted. Other records are unchanged.", "success");
@@ -2395,7 +2511,10 @@ function initEventListeners() {
           : null;
       updateJurisdictionTags();
       setCurrentResults(results);
-      await persistCurrentResults();
+      const restored = await persistCurrentResults({ restore: true });
+      if (!restored) {
+        showToast("The record is open here, but another panel owns the active checks. Close that check before reopening this record for review.", "warning");
+      }
       if (results.runType === "individual") {
         displayStoredIndividualResult(results);
       } else {
@@ -2406,7 +2525,7 @@ function initEventListeners() {
       elements.resultsSection.classList.remove("hidden");
       elements.progressSection.classList.add("hidden");
       activateWorkspace("screening");
-      showToast(
+      if (restored) showToast(
         "Saved customer and reports restored. You can print, download, or run fresh checks.",
         "success",
         6500
@@ -2800,20 +2919,28 @@ function isCurrentIndividualOperation(operation) {
 }
 
 async function discardCancelledIndividualResult(operationId) {
-  const stored = await chrome.storage.session.get(STORAGE_KEYS.currentResults);
-  if (stored[STORAGE_KEYS.currentResults]?.operationId === operationId) {
-    await chrome.storage.session.remove(STORAGE_KEYS.currentResults);
-  }
+  await discardPersistedResult(`operation:${operationId}`);
   if (getCurrentResults()?.operationId === operationId) {
     setCurrentResults(null);
   }
 }
 
-function cacheCurrentFormData() {
-  return cacheFormData(elements, {
-    buyerIsMichigan: scanJurisdiction.buyer,
-    coBuyerIsMichigan: scanJurisdiction.coBuyer,
-  });
+let draftSaveWarningShown = false;
+async function cacheCurrentFormData() {
+  try {
+    const saved = await cacheFormData(elements, {
+      buyerIsMichigan: scanJurisdiction.buyer,
+      coBuyerIsMichigan: scanJurisdiction.coBuyer,
+    });
+    if (saved) draftSaveWarningShown = false;
+    return saved;
+  } catch {
+    if (!draftSaveWarningShown) {
+      draftSaveWarningShown = true;
+      showToast("Your entries are still on screen, but the draft could not be saved. Keep this panel open until you finish.", "warning");
+    }
+    return false;
+  }
 }
 
 async function restoreCachedForm() {
@@ -2912,7 +3039,6 @@ async function handleRunAllChecks() {
   const isCurrentRun = () =>
     activeUiRunId === runId && getIsRunning();
   setButtonsDisabled(elements, true);
-  await clearTransientScreenshots();
   if (!isCurrentRun()) return;
 
   const hasTrade = !!customerData.tradeVin;
@@ -3030,7 +3156,6 @@ async function handleRunRepeatOffender() {
   const isCurrent = () => isCurrentIndividualOperation(operation);
   setButtonsDisabled(elements, true);
   showLoading("Checking Repeat Offender status...");
-  await clearTransientScreenshots();
   if (!isCurrent()) return;
   try {
     const result = await runRepeatOffenderCheck(
@@ -3080,7 +3205,6 @@ async function handleRunTitle() {
   const isCurrent = () => isCurrentIndividualOperation(operation);
   setButtonsDisabled(elements, true);
   showLoading("Checking Title & Lien status...");
-  await clearTransientScreenshots();
   if (!isCurrent()) return;
   try {
     const result = await runTitleCheck(customerData, operation.operationId);
@@ -3113,33 +3237,28 @@ async function handleRunTitle() {
 }
 
 async function handleClear() {
-  let cancelledIndividualOperationId = activeIndividualOperationId;
-  const persistedIndividualOperation = cancelledIndividualOperationId
-    ? Promise.resolve(null)
-    : chrome.storage.session
-        .get(STORAGE_KEYS.activeIndividualOperationId)
-        .catch(() => null);
+  // Capture/fence this form's saved identity before resetting its controls.
+  const cachedFormClear = clearCachedFormData().then(() => true, () => false);
+  void cancelSosFeeRequest();
+  sosVinFence.cancel();
+  const displayedResults = getCurrentResults();
+  const cancelledIndividualOperationId = activeIndividualOperationId || displayedResults?.operationId;
+  const cancelledRunId = activeUiRunId || displayedResults?.runId;
   individualOperationFence.cancel();
   activeIndividualOperationId = null;
   hideLoading();
-  const cancelledRunId = activeUiRunId;
   activeUiRunId = null;
-  // Write the cancellation tombstone immediately. A delayed worker write may
-  // still reach session storage, but it can no longer be accepted as current.
-  const fenceState = {
-    [STORAGE_KEYS.cancelledRunId]: cancelledRunId,
-    [STORAGE_KEYS.activeRunId]: null,
-    [STORAGE_KEYS.stateRunId]: cancelledRunId,
-    [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
-    [STORAGE_KEYS.searchProgress]: 0,
-    [STORAGE_KEYS.inFlightCheck]: null,
-  };
-  if (cancelledIndividualOperationId) {
-    fenceState[STORAGE_KEYS.cancelledIndividualOperationId] =
-      cancelledIndividualOperationId;
-    fenceState[STORAGE_KEYS.activeIndividualOperationId] = null;
-  }
-  const fenceWrite = chrome.storage.session.set(fenceState);
+  // Only cancel identities this panel is showing. The worker serializes the
+  // compare-and-clear with starts and writes from every other open panel.
+  const cancellationMessages = [];
+  if (cancelledRunId) cancellationMessages.push(chrome.runtime.sendMessage({
+    type: "CANCEL_CURRENT_RUN", runId: cancelledRunId,
+  }));
+  if (cancelledIndividualOperationId) cancellationMessages.push(chrome.runtime.sendMessage({
+    type: "CANCEL_INDIVIDUAL_OPERATION", operationId: cancelledIndividualOperationId,
+  }));
+  const cancellationResults = Promise.allSettled(cancellationMessages);
+  setCurrentResults(null);
   setIsRunning(false);
   setButtonsDisabled(elements, false);
   resetInputPanel();
@@ -3183,49 +3302,8 @@ async function handleClear() {
   // the wrong expiration date.
   resetSosLocalForm();
 
-  const persistedIndividual = await persistedIndividualOperation;
-  if (!cancelledIndividualOperationId) {
-    cancelledIndividualOperationId =
-      persistedIndividual?.[STORAGE_KEYS.activeIndividualOperationId] || null;
-    if (cancelledIndividualOperationId) {
-      await chrome.storage.session.set({
-        [STORAGE_KEYS.cancelledIndividualOperationId]:
-          cancelledIndividualOperationId,
-        [STORAGE_KEYS.activeIndividualOperationId]: null,
-      });
-    }
-  }
-  await fenceWrite;
-  const cancellationMessages = [
-    chrome.runtime.sendMessage({
-      type: "CANCEL_CURRENT_RUN",
-      runId: cancelledRunId,
-    }),
-  ];
-  if (cancelledIndividualOperationId) {
-    cancellationMessages.push(
-      chrome.runtime.sendMessage({
-        type: "CANCEL_INDIVIDUAL_OPERATION",
-        operationId: cancelledIndividualOperationId,
-      })
-    );
-  }
-  await Promise.allSettled(cancellationMessages);
-  await chrome.storage.session.remove([
-    STORAGE_KEYS.cachedFormData,
-    STORAGE_KEYS.cachedAt,
-    STORAGE_KEYS.currentResults,
-    STORAGE_KEYS.lastError,
-    STORAGE_KEYS.repeatOffenderScreenshot,
-    STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-    STORAGE_KEYS.titleScreenshot,
-    STORAGE_KEYS.lastResult,
-  ]);
-
-  setCurrentResults(null);
   document.body.classList.remove("has-screening-results");
   syncFirstRunPresentation();
-  await chrome.action.setBadgeText({ text: "" });
 
   elements.resultsSection.classList.add("hidden");
   elements.progressSection.classList.add("hidden");
@@ -3234,14 +3312,31 @@ async function handleClear() {
   resetProgress(elements);
   elements.runTitleBtn.disabled = true;
   elements.firstName.focus();
+  const cancelled = await cancellationResults;
+  if (!await cachedFormClear) {
+    showToast("The form is empty, but its saved draft could not be cleared. Press Clear again before closing this panel.", "error");
+  }
+  if (cancelled.some((result) => result.status !== "fulfilled" || !result.value?.success)) {
+    showToast("The form is clear, but the active check could not be cancelled. Reopen the panel before starting another customer.", "warning");
+  }
 }
 
 // ---------- History helpers ----------
 
-async function openHistory() {
-  await populateHistoryModal(elements.historyList);
-  activateWorkspace("history");
-  filterHistoryWorkspace(elements.historySearchInput?.value || "");
+async function clearHistoryFromPanel() {
+  const cleared = await clearAllHistory(elements.historyList, elements.historyCount);
+  if (cleared) await handleClear();
+  return cleared;
+}
+
+async function openHistory({ focusTab = false } = {}) {
+  activateWorkspace("history", { focusTab });
+  try {
+    await populateHistoryModal(elements.historyList);
+    filterHistoryWorkspace(elements.historySearchInput?.value || "");
+  } catch {
+    showToast("Saved records could not be loaded. Open History to try again.", "error");
+  }
 
   // If the re-screen reminder is on, flag any aging full-run deals.
   try {
@@ -3311,16 +3406,23 @@ async function handleSessionStorageChanges(changes) {
     STORAGE_KEYS.activeRunId,
     STORAGE_KEYS.stateRunId,
     STORAGE_KEYS.cancelledRunId,
+    STORAGE_KEYS.searchStatus,
+    STORAGE_KEYS.searchProgress,
+    STORAGE_KEYS.inFlightCheck,
+    STORAGE_KEYS.currentResults,
+    STORAGE_KEYS.lastError,
   ]);
   const runState = {
     activeRunId: storedRunState[STORAGE_KEYS.activeRunId],
     stateRunId: storedRunState[STORAGE_KEYS.stateRunId],
     cancelledRunId: storedRunState[STORAGE_KEYS.cancelledRunId],
+    searchStatus: storedRunState[STORAGE_KEYS.searchStatus],
   };
   const acceptsActiveRun =
     activeUiRunId != null &&
     isCurrentRunState(runState, activeUiRunId);
-  const nextResults = changes[STORAGE_KEYS.currentResults]?.newValue;
+  const nextResults = storedRunState[STORAGE_KEYS.currentResults];
+  const acceptsFullResult = acceptsActiveRun && nextResults?.runId === activeUiRunId;
   const acceptsIndividualResult =
     !activeUiRunId &&
     activeIndividualOperationId != null &&
@@ -3331,7 +3433,7 @@ async function handleSessionStorageChanges(changes) {
 
   if (acceptsActiveRun && changes[STORAGE_KEYS.searchProgress]) {
     try {
-      const pct = changes[STORAGE_KEYS.searchProgress].newValue || 0;
+      const pct = storedRunState[STORAGE_KEYS.searchProgress] || 0;
       // Forward progress means a check advanced — reset the stall clock so the
       // slow note only appears after ~30s with NO movement.
       if (pct > slowCheckLastProgress) {
@@ -3347,7 +3449,7 @@ async function handleSessionStorageChanges(changes) {
 
   if (acceptsActiveRun && changes[STORAGE_KEYS.inFlightCheck]) {
     try {
-      const key = changes[STORAGE_KEYS.inFlightCheck].newValue;
+      const key = storedRunState[STORAGE_KEYS.inFlightCheck];
       if (key) applyInFlight(key);
     } catch (e) {
       console.error("[Sidepanel] in-flight update failed:", e);
@@ -3356,10 +3458,10 @@ async function handleSessionStorageChanges(changes) {
 
   if (
     changes[STORAGE_KEYS.currentResults]?.newValue &&
-    (acceptsActiveRun || acceptsIndividualResult)
+    (acceptsFullResult || acceptsIndividualResult)
   ) {
     try {
-      const next = changes[STORAGE_KEYS.currentResults].newValue;
+      const next = nextResults;
       setCurrentResults(next);
       const checks = next.checks || {};
       if (checks.ofac) {
@@ -3384,9 +3486,12 @@ async function handleSessionStorageChanges(changes) {
 
   if (changes[STORAGE_KEYS.searchStatus]) {
     try {
-      const status = changes[STORAGE_KEYS.searchStatus].newValue;
+      const status = storedRunState[STORAGE_KEYS.searchStatus];
       if (acceptsRunStatusUpdate(runState, activeUiRunId, status)) {
-        handleSearchStatusChange(changes);
+        handleSearchStatusChange({
+          [STORAGE_KEYS.searchStatus]: { newValue: status },
+          [STORAGE_KEYS.lastError]: { newValue: storedRunState[STORAGE_KEYS.lastError] },
+        });
       }
     } catch (e) {
       console.error("[Sidepanel] status update failed:", e);

@@ -201,6 +201,7 @@ h2 {
   text-wrap: balance;
 }
 .hint { color: var(--text-secondary); font-size: var(--fs-base); line-height: 1.45; }
+.screen > h2:focus { outline: 2px solid var(--gold); outline-offset: 4px; }
 
 .scan-steps {
   list-style: none;

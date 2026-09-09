@@ -18,15 +18,22 @@ npm run check      # node --check on every .js (skips vendored libs)
 npm run lint       # eslint . (no-var, prefer-const errors; unused-vars warns)
 npm run lint:fix   # eslint . --fix
 npm test           # node --test (unit suites under tests/)
+npm run test:browser # isolated Chrome: panel interactions and scanner recovery
 npm run package    # build compliance-central-<version>.zip
-npm run assets     # regenerate store screenshots/tiles + icons — SEE BELOW, needs sharp
+npm run assets     # capture current UI for the listing screenshots and promo tiles
 ```
 
-`npm run assets` runs `tools/build-store-assets.mjs`, which drives headless Chrome and
-imports `sharp`. **`sharp` is not declared in `package.json` and is not installed**, so the
-script fails on its first raster step until you run `npm i -D sharp`. Treat the script as
-unavailable out of the box; the checked-in images under `store-assets/` are whatever the
-last person to install sharp produced.
+`npm run assets` runs `tools/capture-store-shots.mjs`, which captures the actual panel
+HTML/CSS with staged sample results. It writes the listing's `screenshot-1.png` through
+`screenshot-5.png` and promo tiles under `store-assets/chrome-web-store/`. It needs Google
+Chrome; set `CHROME_PATH` when it is not at the standard macOS path. The old
+`build-store-assets.mjs` is a legacy mockup/icon tool requiring `sharp`; do not use its
+superseded screenshots for the current listing.
+
+Browser regression tests use pinned `puppeteer-core`, the installed Chrome browser,
+and synthetic data. They cover changed/cancelled quotes, partial runs, short-screen
+layouts, keyboard recovery, and scanner permission/delivery failures. They do not
+replace physical iPhone/Android testing or a live state-site acceptance check.
 
 Backend (`../compliance-central-api`): `npm run lint`, `npm test` (same conventions).
 

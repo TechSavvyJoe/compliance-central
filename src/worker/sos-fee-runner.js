@@ -56,26 +56,35 @@ export function validSosSubmissionFields(fields) {
 }
 
 export function createSosFeeRunner({ requestQuote = backendSosFeeQuote } = {}) {
-  // One quote at a time. A second Calculate — or a workspace edit, mode change,
-  // or side-panel teardown — abandons the earlier request so a late response can
-  // never repaint the panel with a fee for choices the salesperson has moved on
-  // from.
+  // The slot is shared by all windows. Only its request owner can cancel it.
   let inFlight = null;
+  const cancelledIds = new Set();
+  const validRequestId = (id) => typeof id === "string" && /^[A-Za-z0-9._:-]{1,128}$/.test(id);
 
-  function cancel() {
-    inFlight?.controller.abort();
-    inFlight = null;
-    return { success: true };
+  function cancel(requestId) {
+    if (!validRequestId(requestId)) return safeError("A fee request ID is required.");
+    cancelledIds.add(requestId);
+    const cancelled = inFlight?.requestId === requestId;
+    if (cancelled) {
+      inFlight.controller.abort();
+      inFlight = null;
+    }
+    return { success: true, cancelled, requestId };
   }
 
-  async function calculate(mode, fields) {
+  async function calculate(mode, fields, requestId) {
+    if (!validRequestId(requestId)) return safeError("A fee request ID is required.");
+    const cancelledResult = () => ({ success: false, cancelled: true, requestId, error: "Request cancelled." });
     if (!VALID_MODES.has(mode) || !validSosSubmissionFields(fields)) {
-      return safeError("Complete the required SOS fee fields before calculating.");
+      return { ...safeError("Complete the required SOS fee fields before calculating."), requestId };
     }
 
-    cancel();
+    if (cancelledIds.has(requestId)) return cancelledResult();
+    if (inFlight) {
+      return { ...safeError("An SOS fee request is already in progress."), busy: true, requestId };
+    }
     const controller = new AbortController();
-    const request = { controller };
+    const request = { controller, requestId };
     inFlight = request;
 
     try {
@@ -87,20 +96,20 @@ export function createSosFeeRunner({ requestQuote = backendSosFeeQuote } = {}) {
       // A superseded or cancelled request must resolve quietly rather than
       // surface a stale success or a scary error for work nobody is waiting on.
       if (inFlight !== request) {
-        return { success: false, cancelled: true, error: "Request cancelled." };
+        return cancelledResult();
       }
       if (!response?.success || !response.quote) {
-        return safeError(response?.error);
+        return { ...safeError(response?.error), requestId };
       }
-      return { success: true, quote: response.quote };
+      return { success: true, quote: response.quote, requestId };
     } catch (error) {
       if (controller.signal.aborted || error?.name === "AbortError") {
-        return { success: false, cancelled: true, error: "Request cancelled." };
+        return cancelledResult();
       }
       // Never echo the transport error: backend messages can carry request
       // context, and the salesperson needs an action, not a stack.
       console.error("[SOS fee] backend fee quote failed");
-      return safeError();
+      return { ...safeError(), requestId };
     } finally {
       if (inFlight === request) inFlight = null;
     }

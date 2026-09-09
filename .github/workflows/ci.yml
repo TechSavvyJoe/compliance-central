@@ -25,5 +25,18 @@ jobs:
         run: npm run check
       - name: Tests
         run: npm test
+      - name: Browser flow checks
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: npm run test:browser
       - name: Build and verify Web Store package
         run: npm run package
+      - name: Prepare an unpacked test build
+        run: unzip -q compliance-central-*.zip -d test-build
+      - name: Save tested build for other computers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compliance-central-test-${{ github.sha }}
+          path: test-build/
+          if-no-files-found: error
+          retention-days: 14

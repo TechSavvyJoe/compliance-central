@@ -21,7 +21,7 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import http from "node:http";
@@ -31,8 +31,17 @@ const ROOT = join(__dirname, "..");
 const BUILD = join(ROOT, "store-assets", ".build");
 const OUT = join(ROOT, "store-assets", "chrome-web-store");
 const SHOTS = join(OUT, "screenshots");
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 8790;
+
+function syncGalleryImage(file) {
+  // Publish the very same pixels on the website; no separate stale gallery.
+  copyFileSync(join(SHOTS, file), join(ROOT, "docs", "images", file.replace("screenshot-", "screen-")));
+}
+if (process.argv.includes("--sync-gallery-only")) {
+  for (let index = 1; index <= 5; index++) syncGalleryImage(`screenshot-${index}.png`);
+  process.exit(0);
+}
 
 mkdirSync(BUILD, { recursive: true });
 mkdirSync(SHOTS, { recursive: true });
@@ -84,7 +93,7 @@ const SCREENSHOTS = [
     headline: "Clear to deliver,\nor exactly why not",
     bullets: [
       "Pass, review, or do-not-sell — with the statute",
-      "Evidence saved with every decision",
+      "Results and available state-site evidence",
       "Print or PDF the full deal jacket",
     ],
     stage: `
@@ -136,6 +145,9 @@ const SCREENSHOTS = [
       h.classList.remove("hidden");
       document.getElementById("sosQuoteTotal").textContent = "$179.00";
       document.getElementById("sosQuoteTerm").textContent = "12 months \\u00b7 expires Apr 15, 2027";
+      // Keep the example's purchase date consistent with its 12-month term;
+      // this is sample listing data, not a live fee from today's calendar.
+      document.getElementById("sosPurchaseDate").value = "04/15/2026";
       const src = document.getElementById("sosQuoteSource");
       // Must match sosSourceLabel() in src/sidepanel/sos-fee-quote.js — a
       // listing image showing copy the product does not ship is a
@@ -147,7 +159,13 @@ const SCREENSHOTS = [
       document.getElementById("sosWorkspaceStatusText").textContent =
         "Official SOS calculation complete.";
       document.getElementById("sosQuoteStatus").textContent =
-        "Calculated by the Michigan SOS for a purchase today.";
+        "New plate · 2026 sample vehicle · calculated Apr 15, 2026";
+      document.getElementById("sosQuoteStatus").hidden = false;
+      document.getElementById("sosReadiness").hidden = true;
+      document.getElementById("sosExportActions").hidden = false;
+      document.getElementById("sosFeeBreakdown").hidden = false;
+      document.getElementById("sosFeeBreakdownRows").innerHTML =
+        '<tr><td>MSRP Based Reg Fee</td><td>$179.00</td></tr>';
       // A calculated quote enables the customer print and PDF actions.
       for (const id of ["printSosQuoteBtn", "printSosCalculationBtn", "downloadSosCalculationPdfBtn"]) {
         const b = document.getElementById(id);
@@ -390,6 +408,7 @@ if (needServer) {
 
 for (const shot of SCREENSHOTS) {
   await render(screenshotHtml(shot), join(SHOTS, shot.file), 1280, 800, 9000);
+  syncGalleryImage(shot.file);
   console.log("wrote", shot.file);
 }
 await render(promoHtml({ width: 440, height: 280 }), join(OUT, "promo-small-440x280.png"), 440, 280, 3000);

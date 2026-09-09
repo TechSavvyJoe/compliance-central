@@ -10,11 +10,18 @@ import {
   backendRepeatOffenderCheck,
   backendTitleCheck,
 } from "../../lib/api-client.js";
-import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { STORAGE_KEYS, SEARCH_STATUS } from "../../lib/storage-keys.js";
+import { CANCELLED_CHECK_IDS_KEY, isCheckCancelled, resultIdentity } from "../../lib/run-fence.js";
+import {
+  atomicStateUpdate,
+  cancellationState,
+  clearedResultArtifacts,
+  clearBadge,
+  withSessionStateLock,
+} from "./state.js";
 import { setBadgeForStatus } from "./badge.js";
 
 const individualControllers = new Map();
-let individualSideEffectLock = Promise.resolve();
 
 export function isIndividualMdosInFlight() {
   return individualControllers.size > 0;
@@ -26,12 +33,6 @@ function busyResult() {
     busy: true,
     error: "A Michigan state-site check is already in progress.",
   };
-}
-
-function withIndividualSideEffectLock(callback) {
-  const task = individualSideEffectLock.then(callback, callback);
-  individualSideEffectLock = task.catch(() => {});
-  return task;
 }
 
 function cancelledResult() {
@@ -47,22 +48,37 @@ async function beginIndividualOperation(operationId) {
 
   const controller = new AbortController();
   individualControllers.set(operationId, controller);
-  const allowed = await withIndividualSideEffectLock(async () => {
+  const allowed = await withSessionStateLock(async () => {
     if (controller.signal.aborted) return false;
     const stored = await chrome.storage.session.get([
       STORAGE_KEYS.activeIndividualOperationId,
       STORAGE_KEYS.cancelledIndividualOperationId,
+      STORAGE_KEYS.searchStatus,
+      CANCELLED_CHECK_IDS_KEY,
     ]);
     if (
       controller.signal.aborted ||
-      stored[STORAGE_KEYS.cancelledIndividualOperationId] === operationId
+      isCheckCancelled(stored, `operation:${operationId}`) ||
+      stored[STORAGE_KEYS.searchStatus] === SEARCH_STATUS.running
     ) {
       return false;
     }
     await chrome.storage.session.set({
+      ...clearedResultArtifacts(),
+      [STORAGE_KEYS.activeRunId]: null,
+      [STORAGE_KEYS.stateRunId]: null,
+      [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
+      [STORAGE_KEYS.searchProgress]: 0,
+      [STORAGE_KEYS.inFlightCheck]: null,
       [STORAGE_KEYS.activeIndividualOperationId]: operationId,
     });
+    await clearBadge();
     return !controller.signal.aborted;
+  }).catch((error) => {
+    if (individualControllers.get(operationId) === controller) {
+      individualControllers.delete(operationId);
+    }
+    throw error;
   });
 
   if (!allowed && individualControllers.get(operationId) === controller) {
@@ -81,18 +97,20 @@ function finishIndividualOperation(operation) {
 }
 
 async function publishIndividualSideEffects(operation, updates, badgeStatus) {
-  return withIndividualSideEffectLock(async () => {
+  return withSessionStateLock(async () => {
     if (!operation?.allowed || operation.controller.signal.aborted) return false;
     const stored = await chrome.storage.session.get([
       STORAGE_KEYS.activeIndividualOperationId,
       STORAGE_KEYS.cancelledIndividualOperationId,
+      STORAGE_KEYS.activeRunId,
+      CANCELLED_CHECK_IDS_KEY,
     ]);
     if (
       operation.controller.signal.aborted ||
       stored[STORAGE_KEYS.activeIndividualOperationId] !==
         operation.operationId ||
-      stored[STORAGE_KEYS.cancelledIndividualOperationId] ===
-        operation.operationId
+      isCheckCancelled(stored, `operation:${operation.operationId}`) ||
+      stored[STORAGE_KEYS.activeRunId]
     ) {
       return false;
     }
@@ -107,34 +125,32 @@ async function publishIndividualSideEffects(operation, updates, badgeStatus) {
 
 /** Abort one individual MDOS request and fence/clean all of its late writes. */
 export async function cancelIndividualOperation(operationId) {
+  if (!operationId) return { success: false, error: "A check operation ID is required." };
   const controller = individualControllers.get(operationId);
   controller?.abort();
-  individualControllers.delete(operationId);
-
-  return withIndividualSideEffectLock(async () => {
-    const stored = await chrome.storage.session.get(
-      STORAGE_KEYS.activeIndividualOperationId
-    );
-    const activeId = stored[STORAGE_KEYS.activeIndividualOperationId];
-    // A delayed cancellation for an older operation must not clear a newer one,
-    // nor should it wipe state if the operation is already finished (activeId is null).
-    if (activeId !== operationId) {
-      return { success: true, cancelled: false };
+  let cleaned = false;
+  try {
+    const publication = await atomicStateUpdate((stored) => {
+      const tombstone = cancellationState(stored, `operation:${operationId}`);
+      const activeId = stored[STORAGE_KEYS.activeIndividualOperationId];
+      const ownsResult = resultIdentity(stored[STORAGE_KEYS.currentResults]) === `operation:${operationId}`;
+      if (stored[STORAGE_KEYS.activeRunId] ||
+          (activeId !== operationId && (activeId || !ownsResult))) return tombstone;
+      cleaned = true;
+      return {
+        ...tombstone,
+        ...clearedResultArtifacts(),
+        [STORAGE_KEYS.cancelledIndividualOperationId]: operationId,
+        [STORAGE_KEYS.activeIndividualOperationId]: null,
+      };
+    }, async () => { if (cleaned) await clearBadge(); });
+    if (publication.error) throw publication.error;
+    return { success: true, cancelled: !!controller || cleaned };
+  } finally {
+    if (individualControllers.get(operationId) === controller) {
+      individualControllers.delete(operationId);
     }
-
-    await chrome.storage.session.set({
-      [STORAGE_KEYS.cancelledIndividualOperationId]: operationId,
-      [STORAGE_KEYS.activeIndividualOperationId]: null,
-    });
-    await chrome.storage.session.remove([
-      STORAGE_KEYS.repeatOffenderScreenshot,
-      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-      STORAGE_KEYS.titleScreenshot,
-      STORAGE_KEYS.lastResult,
-    ]);
-    await chrome.action.setBadgeText({ text: "" });
-    return { success: true, cancelled: !!controller || activeId === operationId };
-  });
+  }
 }
 
 export async function handleRepeatOffenderCheck(searchData) {

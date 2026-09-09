@@ -13,6 +13,9 @@ import {
 } from "../../lib/history-retention.js";
 import { PRINT_STORAGE_PREFIX } from "../../lib/print-html.js";
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
+import { CANCELLED_CHECK_IDS_KEY, isCheckCancelled } from "../../lib/run-fence.js";
+import { withSessionStateLock } from "./state.js";
+import { FORM_CACHE_STATE_KEY } from "./form-cache.js";
 
 // Session keys that hold the last customer's data. Clearing history clears
 // these — and ONLY these. A blanket chrome.storage.session.clear() also erased
@@ -165,19 +168,13 @@ async function writeHistoryIfChanged(original, next) {
 async function isCancelledAudit(auditId) {
   if (!chrome.storage.session?.get) return false;
 
-  if (auditId.startsWith("run:")) {
-    const runId = auditId.slice("run:".length);
-    const state = await chrome.storage.session.get(STORAGE_KEYS.cancelledRunId);
-    return state[STORAGE_KEYS.cancelledRunId] === runId;
-  }
-  if (auditId.startsWith("operation:")) {
-    const operationId = auditId.slice("operation:".length);
-    const state = await chrome.storage.session.get(
-      STORAGE_KEYS.cancelledIndividualOperationId
-    );
-    return (
-      state[STORAGE_KEYS.cancelledIndividualOperationId] === operationId
-    );
+  if (auditId.startsWith("run:") || auditId.startsWith("operation:")) {
+    const state = await chrome.storage.session.get([
+      STORAGE_KEYS.cancelledRunId,
+      STORAGE_KEYS.cancelledIndividualOperationId,
+      CANCELLED_CHECK_IDS_KEY,
+    ]);
+    return isCheckCancelled(state, auditId);
   }
   return false;
 }
@@ -282,7 +279,12 @@ export function purgeHistory(now = Date.now()) {
 }
 
 export function clearHistory() {
-  return enqueueHistoryMutation(async () => {
+  return enqueueHistoryMutation(() => withSessionStateLock(async () => {
+    const sessionBag = await chrome.storage.session.get(null);
+    if (sessionBag?.[STORAGE_KEYS.searchStatus] === "running" ||
+        sessionBag?.[STORAGE_KEYS.activeIndividualOperationId]) {
+      return { success: false, error: "Finish or cancel the active check before clearing History." };
+    }
     await chrome.storage.local.remove([
       STORAGE_KEYS.complianceHistory,
       STORAGE_KEYS.searchHistory,
@@ -296,7 +298,6 @@ export function clearHistory() {
     // go as well. The clear is scoped: run-fence and status bookkeeping hold
     // no customer data and erasing them mid-run orphaned the active check.
     try {
-      const sessionBag = await chrome.storage.session.get(null);
       const printPayloadKeys = Object.keys(sessionBag || {}).filter((key) =>
         key.startsWith(PRINT_STORAGE_PREFIX)
       );
@@ -304,12 +305,18 @@ export function clearHistory() {
         ...CUSTOMER_SESSION_KEYS,
         ...printPayloadKeys,
       ]);
+      const draftState = sessionBag?.[FORM_CACHE_STATE_KEY];
+      if (draftState) await chrome.storage.session.set({
+        [FORM_CACHE_STATE_KEY]: {
+          cacheId: null, epochId: null,
+          epochs: Object.fromEntries(Object.keys(draftState.epochs || {}).map((epoch) => [epoch, null])),
+        },
+      });
     } catch {
-      // A blocked session clear must not fail the history clear itself; the
-      // persistent records are already gone by this point.
+      return { success: false, error: "History was cleared, but the working copy could not be removed. Try Clear again before closing this panel." };
     }
     return { success: true, cleared: true };
-  });
+  }));
 }
 
 export function handleHistoryMessage(type, data) {

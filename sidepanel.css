@@ -311,9 +311,9 @@ body.modal-open {
 .sos-quote-plate-preview strong { margin-top: 1px; color: #fff; font-size: var(--fs-small); line-height: 1.2; }
 .sos-quote-plate-preview small { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.3; }
 .sos-preview-kicker { color: var(--gold); font-size: var(--fs-micro); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.sos-plate-preview-unavailable { display: grid; gap: 2px; margin-top: 7px; padding: 8px 9px; border: 1px dashed rgba(125,211,252,.3); border-radius: var(--r-sm); background: rgba(14,165,233,.045); }
+.sos-plate-preview-unavailable { display: grid; gap: 2px; margin-top: 7px; padding: 8px 9px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); background: var(--design-canvas); }
 .sos-plate-preview-unavailable[hidden] { display: none; }
-.sos-plate-preview-unavailable strong { color: #bae6fd; font-size: var(--fs-caption); }
+.sos-plate-preview-unavailable strong { color: var(--design-navy); font-size: var(--fs-caption); }
 .sos-plate-preview-unavailable span { color: var(--text-muted); font-size: var(--fs-micro); line-height: 1.35; }
 .sos-plate-viewer { padding: 0; background: rgba(1, 9, 18, .94); backdrop-filter: blur(14px); }
 .sos-plate-viewer-shell { display: grid; grid-template-rows: auto auto auto; width: calc(100% - 14px); max-width: 760px; height: auto; max-height: calc(100% - 14px); min-height: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.12); border-radius: var(--r-lg); background: radial-gradient(circle at 50% 35%, rgba(23, 70, 108, .62), rgba(3, 15, 27, .98) 68%); box-shadow: var(--elev-4); animation: sosPlateViewerIn .2s cubic-bezier(.2,.8,.2,1); }
@@ -4299,14 +4299,62 @@ body {
 
 .sos-primary-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 7px;
 }
 
-#calculateSosFeeBtn {
-  grid-column: 1 / -1;
+#sosWorkspace #calculateSosFeeBtn {
+  grid-column: auto;
   min-height: 42px;
   font-size: var(--fs-body);
+}
+
+.sos-export-actions {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.sos-export-actions button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px;
+  justify-content: center;
+  font-size: var(--fs-caption);
+}
+
+.sos-export-actions[hidden], .sos-fee-breakdown[hidden], .sos-readiness:empty {
+  display: none;
+}
+
+.sos-fee-breakdown {
+  margin: 8px 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--design-card);
+  color: var(--design-ink);
+  font-size: var(--fs-caption);
+}
+
+.sos-fee-breakdown summary {
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sos-fee-breakdown table { width: 100%; border-collapse: collapse; }
+.sos-fee-breakdown th, .sos-fee-breakdown td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-soft);
+  text-align: left;
+  font-weight: 400;
+}
+.sos-fee-breakdown thead th { color: var(--design-muted); font-weight: 600; }
+.sos-fee-breakdown td, .sos-fee-breakdown th:last-child {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* History is a workspace, not a popup. */

@@ -17,8 +17,13 @@
 import { handleOfacCheck } from "./ofac-check.js";
 import { handleRepeatOffenderCheck, handleTitleCheck } from "./mdos-check.js";
 import { setBadgeForStatus } from "./badge.js";
-import { atomicStateUpdate } from "./state.js";
-import { createRunId, isCurrentRunState } from "../../lib/run-fence.js";
+import {
+  atomicStateUpdate,
+  cancellationState,
+  clearedResultArtifacts,
+  clearBadge,
+} from "./state.js";
+import { createRunId, isCheckCancelled, isCurrentRunState } from "../../lib/run-fence.js";
 import {
   STORAGE_KEYS,
   SEARCH_STATUS,
@@ -73,46 +78,38 @@ export async function waitForSettledOrAbort(promises, signal) {
 
 /** Request abort and persist a tombstone that fences all delayed writes. */
 export async function cancelCurrentRun(requestedRunId) {
-  const runId = requestedRunId || currentRunId;
-  const wasRunning =
-    runInFlight && (!requestedRunId || requestedRunId === currentRunId);
+  if (!requestedRunId) {
+    return { success: false, error: "A run ID is required to cancel a check." };
+  }
+  const runId = requestedRunId;
+  const wasRunning = runInFlight && runId === currentRunId;
   if (wasRunning) {
     abortedRunId = currentRunId;
     currentAbortController?.abort();
   }
-  let shouldCleanRunArtifacts = !runId;
-
-  if (runId) {
-    const stored = await chrome.storage.session.get(STORAGE_KEYS.activeRunId);
+  let cleaned = false;
+  const publication = await atomicStateUpdate((stored) => {
+    const tombstone = cancellationState(stored, `run:${runId}`);
     const storedRunId = stored[STORAGE_KEYS.activeRunId];
-    // Never let a delayed cancel for an older run invalidate a newer run.
-    const targetsCurrentMemoryRun = !currentRunId || currentRunId === runId;
-    if (storedRunId === runId || (!storedRunId && targetsCurrentMemoryRun)) {
-      shouldCleanRunArtifacts = true;
-      await chrome.storage.session.set({
+    const ownsState = storedRunId === runId || (
+      !storedRunId && !stored[STORAGE_KEYS.activeIndividualOperationId] &&
+      (stored[STORAGE_KEYS.stateRunId] === runId ||
+        (wasRunning && !stored[STORAGE_KEYS.currentResults]))
+    );
+    if (!ownsState) return tombstone;
+    cleaned = true;
+    return {
+        ...tombstone,
+        ...clearedResultArtifacts(),
         [STORAGE_KEYS.cancelledRunId]: runId,
         [STORAGE_KEYS.activeRunId]: null,
         [STORAGE_KEYS.stateRunId]: runId,
         [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.idle,
         [STORAGE_KEYS.searchProgress]: 0,
         [STORAGE_KEYS.inFlightCheck]: null,
-      });
-    }
-  }
-
-  if (shouldCleanRunArtifacts) {
-    await chrome.storage.session.remove([
-      STORAGE_KEYS.repeatOffenderScreenshot,
-      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-      STORAGE_KEYS.titleScreenshot,
-      STORAGE_KEYS.lastResult,
-    ]);
-    try {
-      await chrome.action.setBadgeText({ text: "" });
-    } catch (error) {
-      console.error("Could not clear the toolbar badge:", error);
-    }
-  }
+    };
+  }, async () => { if (cleaned) await clearBadge(); });
+  if (publication.error) throw publication.error;
   return { success: true, cancelled: wasRunning };
 }
 
@@ -209,19 +206,21 @@ async function runAllChecks(data, runId, signal, onInitialized) {
       // Honor its persisted tombstone before ever republishing RUNNING.
       if (
         isAborted() ||
-        current[STORAGE_KEYS.cancelledRunId] === runId
+        isCheckCancelled(current, `run:${runId}`)
       ) {
         return {};
       }
       return {
+        ...clearedResultArtifacts(),
         [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.running,
         [STORAGE_KEYS.searchProgress]: 0,
         [STORAGE_KEYS.currentResults]: results,
         [STORAGE_KEYS.inFlightCheck]: IN_FLIGHT.ofac,
         [STORAGE_KEYS.activeRunId]: runId,
         [STORAGE_KEYS.stateRunId]: runId,
+        [STORAGE_KEYS.activeIndividualOperationId]: null,
       };
-    });
+    }, clearBadge);
     if (initialPublication.error) throw initialPublication.error;
     if (!initialPublication.applied) {
       onInitialized?.({
@@ -231,25 +230,6 @@ async function runAllChecks(data, runId, signal, onInitialized) {
         runId,
       });
       return { success: false, cancelled: true, runId };
-    }
-
-    // Never carry prior individual-check evidence into a new full run. Besides
-    // being stale, those duplicate image blobs can consume enough session
-    // storage to make a later Print All payload fail.
-    await chrome.storage.session.remove([
-      STORAGE_KEYS.repeatOffenderScreenshot,
-      STORAGE_KEYS.coBuyerRepeatOffenderScreenshot,
-      STORAGE_KEYS.titleScreenshot,
-      STORAGE_KEYS.lastResult,
-    ]);
-
-    // Never leave a prior customer's Repeat Offender result on the toolbar
-    // while a new full run is in progress. A badge API failure must not abort
-    // the compliance checks themselves.
-    try {
-      await chrome.action.setBadgeText({ text: "" });
-    } catch (error) {
-      console.error("Could not clear the toolbar badge:", error);
     }
 
     // A side-panel tombstone can land while the storage write is pending.
@@ -305,7 +285,7 @@ async function runAllChecks(data, runId, signal, onInitialized) {
   const setInFlight = async (key) => {
     if (isAborted()) return;
     await atomicStateUpdate((current) => {
-      if (!hasActiveRunState(current, runId)) return {};
+      if (isAborted() || !hasActiveRunState(current, runId)) return {};
       return {
         [STORAGE_KEYS.inFlightCheck]: key,
         [STORAGE_KEYS.stateRunId]: runId,
@@ -576,7 +556,7 @@ async function runAllChecks(data, runId, signal, onInitialized) {
     }
 
     const publication = await atomicStateUpdate((current) => {
-      if (!hasActiveRunState(current, runId)) return {};
+      if (isAborted() || !hasActiveRunState(current, runId)) return {};
       return {
         [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.complete,
         [STORAGE_KEYS.searchProgress]: 100,
@@ -584,9 +564,8 @@ async function runAllChecks(data, runId, signal, onInitialized) {
         [STORAGE_KEYS.inFlightCheck]: null,
         [STORAGE_KEYS.stateRunId]: runId,
       };
-    });
-    if (publication.error) throw publication.error;
-    if (publication.applied) {
+    }, async () => {
+      if (isAborted()) return;
       try {
         const repeatStatus = results.checks.repeatOffender?.status;
         if (["eligible", "ineligible"].includes(repeatStatus)) {
@@ -597,7 +576,8 @@ async function runAllChecks(data, runId, signal, onInitialized) {
       } catch (error) {
         console.error("Could not update the toolbar badge:", error);
       }
-    }
+    });
+    if (publication.error) throw publication.error;
     return publication.applied
       ? { success: true, runId }
       : { success: false, cancelled: true, runId };
@@ -607,7 +587,7 @@ async function runAllChecks(data, runId, signal, onInitialized) {
     }
     console.error("Run-all error:", err);
     await atomicStateUpdate((current) => {
-      if (!hasActiveRunState(current, runId)) return {};
+      if (isAborted() || !hasActiveRunState(current, runId)) return {};
       return {
         [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
         [STORAGE_KEYS.lastError]: err.message,

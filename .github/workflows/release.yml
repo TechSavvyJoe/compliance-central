@@ -51,6 +51,12 @@ jobs:
         run: npm run check
       - name: Tests
         run: npm test
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: Browser flow checks
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: npm run test:browser
 
       - name: Build and verify package
         run: npm run package

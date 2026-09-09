@@ -7,7 +7,7 @@
 
 import { handleMessage } from "./src/worker/message-router.js";
 import { registerAlarmListeners } from "./src/worker/alarms.js";
-import { STORAGE_KEYS, SEARCH_STATUS } from "./lib/storage-keys.js";
+import { reconcileInterruptedRun } from "./src/worker/state.js";
 
 // Keep API-key/history storage private to trusted extension pages. Chrome's
 // local storage area is otherwise readable by any future content script.
@@ -17,28 +17,12 @@ const storageAccessReady = Promise.all(
   )
 ).catch((err) => console.error("[SW] storage access restriction failed:", err));
 
-async function reconcileInterruptedRun() {
-  const state = await chrome.storage.session.get([
-    STORAGE_KEYS.searchStatus,
-    STORAGE_KEYS.activeRunId,
-  ]);
-  if (state[STORAGE_KEYS.searchStatus] !== SEARCH_STATUS.running) return;
-  const interruptedRunId = state[STORAGE_KEYS.activeRunId] || null;
-  await chrome.storage.session.set({
-    [STORAGE_KEYS.searchStatus]: SEARCH_STATUS.error,
-    [STORAGE_KEYS.lastError]:
-      "The previous check was interrupted when the extension restarted. Run the checks again.",
-    [STORAGE_KEYS.cancelledRunId]: interruptedRunId,
-    [STORAGE_KEYS.activeRunId]: null,
-    [STORAGE_KEYS.stateRunId]: interruptedRunId,
-    [STORAGE_KEYS.inFlightCheck]: null,
-  });
-  await chrome.action.setBadgeText({ text: "" });
-}
-
 const startupReady = storageAccessReady
   .then(reconcileInterruptedRun)
-  .catch((err) => console.error("[SW] startup reconciliation failed:", err));
+  .then(() => ({ ready: true }), (err) => {
+    console.error("[SW] startup reconciliation failed:", err);
+    return { ready: false };
+  });
 
 // ---------- Side panel opening ----------
 //
@@ -55,7 +39,9 @@ chrome.sidePanel
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   startupReady
-    .then(() => handleMessage(message, sender))
+    .then((startup) => startup.ready
+      ? handleMessage(message, sender)
+      : { success: false, error: "Could not recover the previous check state. Reload the extension and try again." })
     .then((response) => sendResponse(response))
     .catch((error) =>
       sendResponse({

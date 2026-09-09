@@ -107,8 +107,8 @@ test("Clear aborts and fences a late individual Repeat Offender result", async (
   const result = await check;
 
   assert.equal(result.cancelled, true);
-  assert.equal(state[STORAGE_KEYS.repeatOffenderScreenshot], undefined);
-  assert.equal(state[STORAGE_KEYS.lastResult], undefined);
+  assert.equal(state[STORAGE_KEYS.repeatOffenderScreenshot], null);
+  assert.equal(state[STORAGE_KEYS.lastResult], null);
   assert.equal(state[STORAGE_KEYS.activeIndividualOperationId], null);
   assert.equal(
     state[STORAGE_KEYS.cancelledIndividualOperationId],
@@ -143,8 +143,8 @@ test("Clear fences a late individual Title screenshot", async () => {
   const result = await check;
 
   assert.equal(result.cancelled, true);
-  assert.equal(state[STORAGE_KEYS.titleScreenshot], undefined);
-  assert.equal(state[STORAGE_KEYS.lastResult], undefined);
+  assert.equal(state[STORAGE_KEYS.titleScreenshot], null);
+  assert.equal(state[STORAGE_KEYS.lastResult], null);
 });
 
 test("a persisted operation tombstone prevents a delayed worker request", async () => {

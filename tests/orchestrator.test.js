@@ -105,8 +105,9 @@ test("a second concurrent Run all checks is rejected while one is in flight", as
   assert.equal(second.success, false);
   assert.match(second.error, /already in progress/i);
   await startEntered;
-  await cancelCurrentRun("run-busy");
+  const cancelling = cancelCurrentRun("run-busy");
   releaseStart();
+  await cancelling;
   assert.equal((await first).cancelled, true);
 });
 
@@ -134,6 +135,7 @@ test("message router returns busy before starting a second RUN_ALL_CHECKS", asyn
   const customer = {
     firstName: "Jane",
     lastName: "Doe",
+    dob: "1985-03-14",
     dlnPid: "S123456789012",
     hasCoBuyer: false,
   };
@@ -150,8 +152,9 @@ test("message router returns busy before starting a second RUN_ALL_CHECKS", asyn
   assert.equal(response.success, false);
   assert.match(response.error, /already in progress/i);
   await startEntered;
-  await cancelCurrentRun("run-router-busy");
+  const cancelling = cancelCurrentRun("run-router-busy");
   releaseStart();
+  await cancelling;
   await first;
 });
 
@@ -164,6 +167,7 @@ test("message router reports an initial storage failure instead of false started
   const customer = {
     firstName: "Jane",
     lastName: "Doe",
+    dob: "1985-03-14",
     dlnPid: "S123456789012",
     hasCoBuyer: false,
   };
@@ -226,10 +230,6 @@ test("a delayed cancel for an older run cannot fence a newer starting run", asyn
       }
       return Promise.resolve();
     },
-    // Model a storage read racing ahead of the new run's pending initial write.
-    async get() {
-      return {};
-    },
   });
 
   const run = handleRunAllChecks({
@@ -239,13 +239,15 @@ test("a delayed cancel for an older run cannot fence a newer starting run", asyn
   });
 
   await startEntered;
-  const staleCancel = await cancelCurrentRun("run-old");
+  const cancellingOld = cancelCurrentRun("run-old");
+  const cancellingNew = cancelCurrentRun("run-new");
+  releaseStart();
+  const staleCancel = await cancellingOld;
   assert.equal(staleCancel.cancelled, false);
   assert.equal(state.activeRunId, "run-new");
   assert.notEqual(state.cancelledRunId, "run-old");
 
-  await cancelCurrentRun("run-new");
-  releaseStart();
+  await cancellingNew;
   await run;
 });
 
@@ -280,20 +282,21 @@ test("cancelled run cannot publish completion or leave transient residue", async
   assert.equal(isRunInFlight(), true);
 
   await startEntered;
-  const response = await handleMessage(
+  const cancelling = handleMessage(
     { type: "CANCEL_CURRENT_RUN", runId: "run-cancelled" },
     { id: "test-ext-id" }
   );
+  releaseStart();
+  const response = await cancelling;
   assert.equal(response.success, true);
   assert.equal(response.cancelled, true);
 
-  releaseStart();
   const outcome = await run;
   assert.equal(outcome.cancelled, true);
   assert.equal(state.activeRunId, null);
   assert.equal(state.cancelledRunId, "run-cancelled");
-  assert.equal(state.repeatOffenderScreenshot, undefined);
-  assert.equal(state.lastResult, undefined);
+  assert.equal(state.repeatOffenderScreenshot, null);
+  assert.equal(state.lastResult, null);
   assert.equal(
     writes.some((write) => write.searchStatus === "complete"),
     false

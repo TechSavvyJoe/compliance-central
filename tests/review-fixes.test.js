@@ -340,6 +340,15 @@ test("clearing history removes customer session data but not the run fence", asy
     },
   };
 
+  const before = structuredClone(session);
+  const blocked = await clearHistory();
+  assert.equal(blocked.success, false, "do not erase evidence underneath an active check");
+  assert.deepEqual(session, before);
+  assert.equal(local.complianceHistory.length, 1);
+  // Once the check has ended, remove customer artifacts while retaining its
+  // anonymous ownership/tombstone bookkeeping.
+  session.searchStatus = "complete";
+  session.activeIndividualOperationId = null;
   const result = await clearHistory();
   assert.equal(result.success, true);
   assert.equal(local.complianceHistory, undefined);

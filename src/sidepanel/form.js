@@ -3,7 +3,6 @@
  */
 
 import { CONFIG } from "../../lib/config.js";
-import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { getDateInputValue, setDateInputValue } from "./date-picker.js";
 import { showToast } from "./toast.js";
 
@@ -308,18 +307,16 @@ export function collectCustomerValidationErrors(data, plan = null) {
   // individual-check buttons still want. "Run all checks" passes a plan so an
   // empty buyer or an absent trade is a skip rather than an error.
   const runPlan = plan || { buyer: true, coBuyer: Boolean(data?.hasCoBuyer), title: true };
-  if (!runPlan.buyer) {
-    return collectTradeOnlyValidationErrors(data);
-  }
-
-  const buyer = [
+  const buyer = runPlan.buyer ? [
     { id: "firstName", name: "firstName", value: data.firstName, label: "First Name", required: true },
     { id: "middleName", name: "middleName", value: data.middleName, label: "Middle Name", required: false },
     { id: "lastName", name: "lastName", value: data.lastName, label: "Last Name", required: true },
     { id: "dob", name: "dob", value: data.dob, label: "Date of Birth", required: true },
     { id: "dlnPid", name: "dlnPid", value: data.dlnPid, label: "DLN/PID", required: true, isMichigan: data.buyerIsMichigan },
-    { id: "tradeVin", name: "tradeVin", value: data.tradeVin, label: "Trade-In VIN", required: false },
-  ];
+  ] : [];
+  if (runPlan.title || data.tradeVin) {
+    buyer.push({ id: "tradeVin", name: "tradeVin", value: data.tradeVin, label: "Trade-In VIN", required: Boolean(plan?.title) });
+  }
 
   for (const f of buyer) {
     const r = validateField(f.name, f.value, f.label, f.required, {
@@ -365,17 +362,6 @@ export function collectCustomerValidationErrors(data, plan = null) {
  * already refuses to approve a record whose required checks did not complete,
  * so a partial run lands on REVIEW rather than reading as a clean result.
  */
-/**
- * A run with no buyer still has to validate what it was given: a malformed VIN
- * is a typo to fix, not a check to skip.
- */
-function collectTradeOnlyValidationErrors(data) {
-  const issues = [];
-  const result = validateField("tradeVin", data?.tradeVin, "Trade-In VIN", true);
-  if (!result.valid) issues.push({ fieldId: "tradeVin", error: result.error });
-  return issues;
-}
-
 export function planChecksForData(data) {
   const filled = (value) => String(value ?? "").trim().length > 0;
   const buyerFields = [data?.firstName, data?.lastName, data?.dob, data?.dlnPid];
@@ -388,11 +374,11 @@ export function planChecksForData(data) {
   return {
     // Partly-filled means the person meant to enter it and did not finish, so
     // it is validated rather than skipped.
-    buyer: buyerFilled > 0,
-    buyerPartial: buyerFilled > 0 && buyerFilled < buyerFields.length,
-    coBuyer: Boolean(data?.hasCoBuyer) && coFilled > 0,
+    buyer: buyerFilled > 0 || filled(data?.middleName) || filled(data?.suffix),
+    buyerPartial: (buyerFilled > 0 || filled(data?.middleName) || filled(data?.suffix)) && buyerFilled < buyerFields.length,
+    coBuyer: Boolean(data?.hasCoBuyer) && (coFilled > 0 || filled(co.middleName) || filled(co.suffix)),
     coBuyerPartial:
-      Boolean(data?.hasCoBuyer) && coFilled > 0 && coFilled < coFields.length,
+      Boolean(data?.hasCoBuyer) && (coFilled > 0 || filled(co.middleName) || filled(co.suffix)) && coFilled < coFields.length,
     title: filled(data?.tradeVin),
   };
 }
@@ -419,31 +405,71 @@ export function validateCustomerFields(data, plan = null) {
   return true;
 }
 
+let cacheEpochId = null;
+let cacheRevision = 0;
+let cacheGeneration = 0;
+let restoredCacheId = null;
+const pendingCacheClears = new Set();
+
+function currentCacheEpoch() {
+  cacheEpochId ||= crypto.randomUUID();
+  return cacheEpochId;
+}
+
 export async function cacheFormData(elements, scanContext = {}) {
   const data = getFormData(elements);
   const jurisdiction = extractScanJurisdiction(scanContext);
   data.buyerIsMichigan = jurisdiction.buyer;
   data.coBuyerIsMichigan = jurisdiction.coBuyer;
-  await chrome.storage.session.set({
-    [STORAGE_KEYS.cachedFormData]: data,
-    [STORAGE_KEYS.cachedAt]: Date.now(),
+  cacheGeneration += 1;
+  const response = await chrome.runtime.sendMessage({
+    type: "SAVE_FORM_CACHE",
+    data: {
+      cacheId: crypto.randomUUID(),
+      epochId: currentCacheEpoch(),
+      revision: ++cacheRevision,
+      data,
+    },
   });
+  if (!response?.success) throw new Error(response?.error || "Could not cache form data.");
+  return response.saved === true;
+}
+
+/** Fence every outstanding save synchronously, then clear only our cached record. */
+export async function clearCachedFormData() {
+  const target = {
+    epochId: currentCacheEpoch(),
+    cacheId: restoredCacheId,
+  };
+  pendingCacheClears.add(target);
+  cacheEpochId = null;
+  cacheRevision = 0;
+  restoredCacheId = null;
+  cacheGeneration += 1;
+
+  for (const pending of [...pendingCacheClears]) {
+    const response = await chrome.runtime.sendMessage({
+      type: "CLEAR_FORM_CACHE",
+      data: { epochId: pending.epochId, cacheId: pending.cacheId },
+    });
+    if (!response?.success) throw new Error(response?.error || "Could not clear cached form data.");
+    pendingCacheClears.delete(pending);
+  }
+  return true;
 }
 
 export async function loadCachedFormData(elements) {
+  const generation = ++cacheGeneration;
   try {
-    const result = await chrome.storage.session.get([
-      STORAGE_KEYS.cachedFormData,
-      STORAGE_KEYS.cachedAt,
-    ]);
-    const cached = result[STORAGE_KEYS.cachedFormData];
-    const cachedAt = result[STORAGE_KEYS.cachedAt];
-    if (!cached || !cachedAt) return;
-
-    const cacheAge = Date.now() - cachedAt;
-    if (cacheAge >= CONFIG.timeouts.formCacheExpiry) return;
-
-    const data = cached;
+    const result = await chrome.runtime.sendMessage({
+      type: "LOAD_FORM_CACHE",
+      data: { epochId: currentCacheEpoch(), revision: cacheRevision },
+    });
+    if (!result?.success) throw new Error(result?.error || "Could not load cached form data.");
+    if (generation !== cacheGeneration) return null;
+    const data = result.data;
+    if (!data) return null;
+    restoredCacheId = result.cacheId;
     elements.firstName.value = data.firstName || "";
     if (elements.middleName) elements.middleName.value = data.middleName || "";
     elements.lastName.value = data.lastName || "";

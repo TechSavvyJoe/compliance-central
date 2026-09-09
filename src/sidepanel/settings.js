@@ -69,7 +69,7 @@ export async function openSettings() {
   const ready = await hasBackendApiKey();
   if (els.serviceStatus) {
     els.serviceStatus.textContent = ready
-      ? "All checks are ready — no setup needed."
+      ? "Service access is included — no setup needed."
       : "Service setup is unavailable. Contact support.";
     els.serviceStatus.className = ready
       ? "settings-status connected"

@@ -5,7 +5,7 @@
 
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { problemTitleBrands } from "../../lib/title-brands.js";
-import { lienSummary } from "./title-format.js";
+import { lienSummary, titlePresentation } from "./title-format.js";
 
 /**
  * Remove any leftover MDOS screenshots from a prior run in this session.
@@ -231,6 +231,9 @@ export function classifyRepeatOffenderResult(result) {
   if (result.error || result.status === "error") {
     return { state: "unavailable", blocker: false, complete: false };
   }
+  if (result.status === "skipped" && result.passed === null) {
+    return { state: "not_run", blocker: false, complete: false };
+  }
   if (result.status === "eligible" && result.passed === true) {
     return { state: "eligible", blocker: false, complete: true };
   }
@@ -325,7 +328,7 @@ export function calculateFinalDecision(checks) {
     };
   }
 
-  if (buyerRepeat.state === "missing") {
+  if (["missing", "not_run"].includes(buyerRepeat.state) || coBuyerRepeat?.state === "not_run") {
     return {
       approved: false,
       level: "REVIEW",
@@ -370,7 +373,7 @@ export function calculateFinalDecision(checks) {
   }
 
   if (checks.title) {
-    if (checks.title.error || checks.title.passed !== true) {
+    if (titlePresentation(checks.title).state === "review") {
       return {
         approved: false,
         level: "REVIEW",
@@ -441,17 +444,28 @@ export function historyRowDecision(item) {
   return finalDecisionForResults(saved).level || item?.decision || "";
 }
 
+/** Saved records may retain the co-buyer flag or checks without the nested person. */
+export function requiresCoBuyerChecks(results) {
+  return Boolean(
+    results?.customer?.hasCoBuyer ||
+    results?.customer?.coBuyer ||
+    results?.checks?.coBuyerOfac ||
+    results?.checks?.coBuyerRepeatOffender
+  );
+}
+
 export function finalDecisionForResults(results) {
   const checks = results?.checks || {};
   const customer = results?.customer || {};
   const base = calculateFinalDecision(checks);
   if (base.level !== "APPROVED") return base;
+  const hasCoBuyer = requiresCoBuyerChecks(results);
 
   const incomplete = [
     !classifyOfacResult(checks.ofac).complete,
     !classifyRepeatOffenderResult(checks.repeatOffender).complete,
-    Boolean(customer.coBuyer) && !classifyOfacResult(checks.coBuyerOfac).complete,
-    Boolean(customer.coBuyer) &&
+    hasCoBuyer && !classifyOfacResult(checks.coBuyerOfac).complete,
+    hasCoBuyer &&
       !classifyRepeatOffenderResult(checks.coBuyerRepeatOffender).complete,
     // A trade VIN with no title result, or an errored one, is a missing check.
     Boolean(customer.tradeVin) &&

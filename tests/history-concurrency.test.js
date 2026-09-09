@@ -4,6 +4,8 @@ import test from "node:test";
 import { CONFIG } from "../lib/config.js";
 import { minimizeHistoryEntry } from "../lib/history-retention.js";
 import { STORAGE_KEYS } from "../lib/storage-keys.js";
+import { CANCELLED_CHECK_IDS_KEY } from "../lib/run-fence.js";
+import { FORM_CACHE_STATE_KEY, handleFormCacheMessage } from "../src/worker/form-cache.js";
 import {
   appendHistoryEntry,
   clearHistory,
@@ -58,9 +60,12 @@ function installStorage(initialHistory = [], { delayedReads = false } = {}) {
         },
       },
       session: {
-        async get(key) {
-          return { [key]: cancelled[key] };
+        async get(keys) {
+          if (keys == null) return structuredClone(cancelled);
+          return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).map((key) => [key, cancelled[key]]));
         },
+        async set(values) { Object.assign(cancelled, structuredClone(values)); },
+        async remove(keys) { for (const key of keys) delete cancelled[key]; },
       },
     },
   };
@@ -129,6 +134,16 @@ test("a cancellation tombstone prevents a late history write", async () => {
   assert.deepEqual(storage.stored[STORAGE_KEYS.complianceHistory], []);
 });
 
+test("a second Clear cannot revive a previously cancelled history write", async () => {
+  const storage = installStorage();
+  storage.cancelled[STORAGE_KEYS.cancelledRunId] = "newer-cancellation";
+  storage.cancelled[CANCELLED_CHECK_IDS_KEY] = ["run:older-cancellation"];
+  const result = await appendHistoryEntry(anonymousEntry("run:older-cancellation"));
+  assert.equal(result.saved, false);
+  assert.equal(result.cancelled, true);
+  assert.deepEqual(storage.stored[STORAGE_KEYS.complianceHistory], []);
+});
+
 test("queued cancellation cleanup removes only its stable audit ID", async () => {
   const storage = installStorage();
   const keep = anonymousEntry("run:keep", -1);
@@ -177,4 +192,28 @@ test("clear is ordered after already-queued appends", async () => {
     storage.stored[STORAGE_KEYS.complianceHistory],
     undefined
   );
+});
+
+test("History clear refuses to remove an in-flight customer's working state", async () => {
+  const entry = anonymousEntry("run:active");
+  const storage = installStorage([entry]);
+  storage.cancelled.searchStatus = "running";
+  storage.cancelled.currentResults = { runId: "active" };
+  const response = await clearHistory();
+  assert.equal(response.success, false);
+  assert.match(response.error, /Finish or cancel/);
+  assert.equal(storage.stored.complianceHistory.length, 1);
+  assert.equal(storage.cancelled.currentResults.runId, "active");
+});
+
+test("History clear fences cached drafts so delayed saves cannot restore personal data", async () => {
+  const storage = installStorage();
+  const epochId = crypto.randomUUID();
+  const data = { epochId, cacheId: crypto.randomUUID(), revision: 1, data: { firstName: "Synthetic" } };
+  assert.equal((await handleFormCacheMessage("SAVE_FORM_CACHE", data)).saved, true);
+  assert.equal((await clearHistory()).success, true);
+  assert.equal(storage.cancelled.cachedFormData, undefined);
+  assert.equal(storage.cancelled[FORM_CACHE_STATE_KEY].epochs[epochId], null);
+  assert.equal((await handleFormCacheMessage("SAVE_FORM_CACHE", { ...data, revision: 2 })).saved, false);
+  assert.equal(storage.cancelled.cachedFormData, undefined);
 });

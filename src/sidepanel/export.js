@@ -23,6 +23,7 @@ import {
   finalDecisionForResults,
   classifyOfacResult,
   classifyRepeatOffenderResult,
+  requiresCoBuyerChecks,
 } from "./checks.js";
 import { ensureDataUrl, imageDataUrlExtension } from "../../lib/data-url.js";
 import {
@@ -165,7 +166,7 @@ function optionalReportValue(value) {
  * record: it names the record type, the running head, and the footer.
  * ------------------------------------------------------------------ */
 
-/** The longest dealership name a masthead can hold on one line. */
+/** Match the Settings name limit; PDF mastheads wrap within their available width. */
 const MAX_DEALER_NAME = 80;
 
 /**
@@ -1074,18 +1075,19 @@ function repeatReportRow(label, result) {
     not_applicable: "NOT APPLICABLE",
     unavailable: "UNAVAILABLE",
     missing: "NOT RUN",
+    not_run: "NOT RUN",
     review: "REVIEW REQUIRED",
   };
   return reportRow(
     label,
     labels[classification.state] || "REVIEW REQUIRED",
     outcome.subtitle,
-    ["missing", "unavailable", "review"].includes(classification.state)
+    !classification.complete
   );
 }
 
 function titleReportRow(result, hasTrade) {
-  if (!hasTrade) {
+  if (!hasTrade && !result) {
     return reportRow(
       "Title / Lien",
       "NOT APPLICABLE",
@@ -1114,7 +1116,7 @@ function titleReportRow(result, hasTrade) {
     "Title / Lien",
     outcome.statusKey === "pass" ? "CLEAR" : "REVIEW REQUIRED",
     outcome.subtitle,
-    false
+    outcome.state === "review"
   );
 }
 
@@ -1129,7 +1131,7 @@ export function reportDecisionSummary(currentResults) {
     repeatReportRow("Buyer Repeat Offender", checks.repeatOffender),
   ];
 
-  if (customer.coBuyer) {
+  if (requiresCoBuyerChecks(currentResults)) {
     rows.push(
       ofacReportRow("Co-buyer OFAC", checks.coBuyerOfac),
       repeatReportRow(
@@ -1700,20 +1702,20 @@ function pdfLogoDataUrl(logoUrl) {
     : "";
 }
 
-/** The logo box: 0.5in tall and 2in wide at most, same as `.brand-logo`. */
-function drawBrandLogo(doc, logo, x, bottom) {
+/** Measure the logo before reserving space for the adjacent name and title. */
+function brandLogoSize(doc, logo) {
   const maxHeight = 36;
   const maxWidth = 144;
   try {
     const props = doc.getImageProperties(logo);
+    if (!Number.isFinite(props.width) || !Number.isFinite(props.height) ||
+        props.width <= 0 || props.height <= 0) return null;
     const scale = Math.min(maxWidth / props.width, maxHeight / props.height);
     const width = props.width * scale;
     const height = props.height * scale;
-    doc.addImage(logo, x, bottom - height, width, height);
-    return width;
+    return { width, height };
   } catch {
-    // An unreadable upload must never cost the record its masthead.
-    return 0;
+    return null;
   }
 }
 
@@ -1727,23 +1729,37 @@ function drawMasthead(ctx, title, branding = {}) {
   const { dealerName, logoUrl } = normalizeReportBranding(branding);
   const logo = pdfLogoDataUrl(logoUrl);
   const right = pageWidth - margin;
-  const nameHeight = dealerName ? TYPE.lead * 1.2 + SPACE.s1 : 0;
-  const titleHeight = TYPE.masthead * LEADING.display;
-  const blockHeight = Math.max(nameHeight + titleHeight, logo ? 36 : 0);
+  const logoSize = logo ? brandLogoSize(doc, logo) : null;
+  const textLeft = margin + (logoSize ? logoSize.width + SPACE.s4 : 0);
+  const textWidth = right - textLeft;
+  doc.setFont(PDF_FACE.display, "bold");
+  doc.setFontSize(TYPE.lead);
+  const nameLines = dealerName ? doc.splitTextToSize(dealerName, textWidth) : [];
+  const nameLeading = TYPE.lead * 1.2;
+  const nameHeight = nameLines.length ? nameLines.length * nameLeading + SPACE.s1 : 0;
+  doc.setFontSize(TYPE.masthead);
+  const titleLines = doc.splitTextToSize(String(title), textWidth);
+  const titleLeading = TYPE.masthead * LEADING.display;
+  const titleHeight = titleLines.length * titleLeading;
+  const blockHeight = Math.max(nameHeight + titleHeight, logoSize?.height || 0);
   ensureSpace(ctx, blockHeight + SPACE.s2 + RULE.heavy + RULE.accent + SPACE.s4);
 
   const bottom = ctx.y + blockHeight;
-  let textLeft = margin;
-  if (logo) {
-    const width = drawBrandLogo(doc, logo, margin, bottom);
-    if (width > 0) textLeft = margin + width + SPACE.s4;
+  if (logoSize) {
+    try {
+      doc.addImage(logo, margin, bottom - logoSize.height, logoSize.width, logoSize.height);
+    } catch {
+      // A damaged logo must not prevent exporting the screening record.
+    }
   }
 
   if (dealerName) {
     doc.setFont(PDF_FACE.display, "bold");
     doc.setFontSize(TYPE.lead);
     setText(doc, PALETTE.navy);
-    doc.text(dealerName, textLeft, bottom - titleHeight - SPACE.s1);
+    nameLines.forEach((line, index) => {
+      doc.text(line, textLeft, bottom - titleHeight - SPACE.s1 - (nameLines.length - 1 - index) * nameLeading);
+    });
   }
 
   doc.setFont(PDF_FACE.display, "bold");
@@ -1751,7 +1767,9 @@ function drawMasthead(ctx, title, branding = {}) {
   // Branded, the store's name is the navy line and the record title steps back
   // to ink; unbranded, the title is the only line and keeps the navy.
   setText(doc, dealerName ? PALETTE.ink : PALETTE.navy);
-  doc.text(String(title), textLeft, bottom - titleHeight + TYPE.masthead);
+  titleLines.forEach((line, index) => {
+    doc.text(line, textLeft, bottom - titleHeight + TYPE.masthead + index * titleLeading);
+  });
 
   // The rule is stroked on its centre line, so half of it sits below `ruleY`;
   // the gold accent starts there, leaving no paper gap between the two.
@@ -2505,13 +2523,19 @@ function drawPortalCapture(ctx, opts) {
     doc.setFont(PDF_FACE.display, "bold");
     doc.setFontSize(TYPE.lead);
     setText(doc, PALETTE.navy);
-    doc.text(dealerName, evidenceMargin, ctx.y + TYPE.lead);
-    ctx.y += TYPE.lead * 1.2 + SPACE.s1;
+    for (const line of doc.splitTextToSize(dealerName, right - evidenceMargin)) {
+      doc.text(line, evidenceMargin, ctx.y + TYPE.lead);
+      ctx.y += TYPE.lead * 1.2;
+    }
+    ctx.y += SPACE.s1;
   }
   doc.setFont(PDF_FACE.display, "bold");
   doc.setFontSize(TYPE.masthead);
   setText(doc, dealerName ? PALETTE.ink : PALETTE.navy);
-  doc.text(`${title} — State-Site Capture`, evidenceMargin, ctx.y + TYPE.masthead);
+  for (const line of doc.splitTextToSize(`${title} — State-Site Capture`, right - evidenceMargin)) {
+    doc.text(line, evidenceMargin, ctx.y + TYPE.masthead);
+    ctx.y += TYPE.masthead * LEADING.display;
+  }
 
   doc.setFont(PDF_FACE.body, "normal");
   doc.setFontSize(TYPE.caption);
@@ -2519,10 +2543,10 @@ function drawPortalCapture(ctx, opts) {
   doc.text(
     "ACTUAL MICHIGAN STATE-SITE CAPTURE · ONE-PAGE RECORD",
     right,
-    ctx.y + TYPE.masthead,
+    ctx.y + TYPE.caption,
     { align: "right" }
   );
-  ctx.y += TYPE.masthead * LEADING.display;
+  ctx.y += lineHeightFor(TYPE.caption);
 
   if (metaLine) {
     const lines = doc.splitTextToSize(
@@ -2653,7 +2677,7 @@ export function repeatOffenderResultArgs(ro) {
       subtitle: ro?.error || ro?.message || "The state-site check could not be completed.",
     };
   }
-  if (classification.state === "missing") {
+  if (["missing", "not_run"].includes(classification.state)) {
     return {
       variant: "neutral",
       title: "NOT RUN",

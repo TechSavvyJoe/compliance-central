@@ -8,12 +8,14 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "node --test",
-    "assets": "node tools/build-store-assets.mjs",
+    "test:browser": "node tools/verify-panel-flows.mjs && node tools/verify-extension-flows.mjs && node --test tools/browser/scanner-flows.mjs",
+    "assets": "node tools/capture-store-shots.mjs",
     "package": "bash tools/package-extension.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.0",
-    "globals": "^17.8.0"
+    "globals": "^17.8.0",
+    "puppeteer-core": "25.10.0"
   }
 }

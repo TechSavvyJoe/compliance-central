@@ -175,32 +175,7 @@ try {
   console.log("PASS: clearing the unrelated panel preserves the pending VIN-only run");
 
   phase = "owning Clear, replacement run and late response";
-  console.log("DEBUG: owner clear before click", JSON.stringify(await owner.$eval("#clearBtn", (button) => {
-    const rect = button.getBoundingClientRect();
-    const style = getComputedStyle(button);
-    return {
-      disabled: button.disabled,
-      display: style.display,
-      visibility: style.visibility,
-      pointerEvents: style.pointerEvents,
-      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-    };
-  })));
-  await owner.evaluate(() => {
-    window.__clearProbe = { clicked: false, errors: [] };
-    window.addEventListener("unhandledrejection", (event) => {
-      window.__clearProbe.errors.push(String(event.reason?.message || event.reason || "unhandled rejection"));
-    }, { once: true });
-    document.querySelector("#clearBtn")?.addEventListener("click", () => {
-      window.__clearProbe.clicked = true;
-    }, { once: true, capture: true });
-  });
   await owner.click("#clearBtn");
-  await owner.waitForFunction(() => window.__clearProbe?.clicked === true);
-  console.log("DEBUG: owner clear after click", JSON.stringify(await owner.evaluate(async () => ({
-    probe: window.__clearProbe,
-    state: await chrome.storage.session.get(["activeRunId", "cancelledRunId", "currentResults", "searchStatus"]),
-  }))));
   await owner.waitForFunction(async (id) => {
     const state = await chrome.storage.session.get(["activeRunId", "cancelledRunId", "currentResults"]);
     return !state.activeRunId && state.cancelledRunId === id && !state.currentResults;

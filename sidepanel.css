@@ -6531,6 +6531,7 @@ body.is-screening-running .action-section {
   border: 0;
   background: transparent;
   box-shadow: none;
+  scroll-margin-top: calc(var(--hub-header-h) + 58px);
 }
 
 body.is-screening-running .main-actions {

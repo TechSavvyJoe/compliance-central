@@ -6519,8 +6519,30 @@ body.is-screening-running .hub-main {
 }
 
 body.is-screening-running .first-run-hero,
-body.is-screening-running .action-section {
+body.is-screening-running .action-section > :not(.main-actions),
+body.is-screening-running #runAllChecksBtn {
   display: none;
+}
+
+body.is-screening-running .action-section {
+  order: 3;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.is-screening-running .main-actions {
+  position: static;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.is-screening-running #clearBtn {
+  width: 100%;
 }
 
 body.is-screening-running .progress-section {

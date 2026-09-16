@@ -167,10 +167,14 @@ try {
   assert.equal(await page.evaluate(() => {
     const progress = document.querySelector("#progressSection");
     const action = document.querySelector(".action-section");
+    const runButton = document.querySelector("#runAllChecksBtn");
+    const clearButton = document.querySelector("#clearBtn");
     const hero = document.querySelector("#firstRunHero");
     const assurance = document.querySelector(".progress-assurance");
     return !progress.classList.contains("hidden") &&
-      getComputedStyle(action).display === "none" &&
+      getComputedStyle(action).display !== "none" &&
+      getComputedStyle(runButton).display === "none" &&
+      getComputedStyle(clearButton).display !== "none" &&
       getComputedStyle(hero).display === "none" &&
       getComputedStyle(assurance).display !== "none";
   }), true, "a live run prioritizes the readable progress workspace");

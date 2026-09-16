@@ -95,7 +95,7 @@ import {
   persistCurrentResults,
   discardPersistedResult,
   getIsRunning,
-  setIsRunning,
+  setIsRunning as setIsRunningState,
 } from "./src/sidepanel/state.js";
 import {
   SOS_QUOTE_MODE,
@@ -131,6 +131,15 @@ import {
 import { titlePresentation } from "./src/sidepanel/title-format.js";
 
 // ---------- DOM ----------
+
+// The compact running workspace is a state of the application, not merely a
+// disabled form. Keeping that state on <body> lets CSS remove controls that
+// cannot be used during a run and give the progress card the available space.
+function setIsRunning(value) {
+  const running = Boolean(value);
+  setIsRunningState(running);
+  document.body?.classList.toggle("is-screening-running", running);
+}
 
 const elements = {
   // Buyer
@@ -1080,7 +1089,10 @@ function renderSosPlatePreview() {
     currentSosFeeQuote?.source === SOS_QUOTE_SOURCE.calculated
       ? currentSosFeeQuote.platePreviewUrl
       : null;
-  const previewUrl = localDesign?.imageUrl || quotePreview || null;
+  // A completed SOS calculation returns the exact artwork the State priced.
+  // Prefer it over the public gallery thumbnail, which can be blocked in a
+  // Chromium side panel even though the printable worksheet can inline it.
+  const previewUrl = quotePreview || localDesign?.imageUrl || null;
   const fullPreviewUrl = quotePreview || localDesign?.fullImageUrl || previewUrl;
   const shouldShow =
     selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
@@ -2837,6 +2849,7 @@ function setInputCollapsed(collapsed, summaryCustomer = null) {
     if (elements.inputSummaryAction) elements.inputSummaryAction.textContent = "Hide";
     chevron?.classList.add("rotated");
   }
+  syncFirstRunPresentation();
 }
 
 function syncFirstRunPresentation() {
@@ -3039,6 +3052,7 @@ async function handleRunAllChecks() {
   const isCurrentRun = () =>
     activeUiRunId === runId && getIsRunning();
   setButtonsDisabled(elements, true);
+  setInputCollapsed(true, customerData);
   if (!isCurrentRun()) return;
 
   const hasTrade = !!customerData.tradeVin;

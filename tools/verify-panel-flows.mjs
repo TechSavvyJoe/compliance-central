@@ -33,8 +33,17 @@ try {
   await page.setViewport({ width: 400, height: 800 });
   await page.setRequestInterception(true);
   let artworkFixture = false;
+  let calculatedPlateFixture = false;
   page.on("request", (req) => {
     if (req.url().startsWith(origin) || req.url().startsWith("data:")) return req.continue();
+    if (calculatedPlateFixture && new URL(req.url()).hostname === "dsvsesvc.sos.state.mi.us") {
+      return req.respond({
+        status: 200,
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" },
+        body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6yHIAAAAASUVORK5CYII=", "base64"),
+      });
+    }
     if (artworkFixture && new URL(req.url()).hostname.endsWith("michigan.gov")) {
       return req.respond({ status: 200, contentType: "image/svg+xml", body:
         '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="#102c48"/><text x="300" y="170" text-anchor="middle" fill="white" font-size="40">TEST ARTWORK</text></svg>' });
@@ -46,7 +55,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     const listeners = new Set();
     const fixture = window.panelFixture = {
-      messages: [], pending: [], local: { dataUseNoticeSeen: true, retentionNoticeAckVersion: "1.6.0-retention" }, session: {},
+      messages: [], pending: [], platePreviewUrl: null, local: { dataUseNoticeSeen: true, retentionNoticeAckVersion: "1.6.0-retention" }, session: {},
     };
     const area = (name) => ({
       async get(keys) {
@@ -79,7 +88,9 @@ try {
     };
     fixture.respond = (feeCents = 17900, index = 0) => {
       const pending = fixture.pending.splice(index, 1)[0];
-      pending.resolve({ success: true, quote: { calculationMode: pending.mode, feeCents, feeBreakdown: [{ label: "Registration", feeCents }], registrationMonths: 12, expiresOn: "2027-03-14", vehicleDescription: "Synthetic test vehicle", calculatedAt: new Date().toISOString() } });
+      const quote = { calculationMode: pending.mode, feeCents, feeBreakdown: [{ label: "Registration", feeCents }], registrationMonths: 12, expiresOn: "2027-03-14", vehicleDescription: "Synthetic test vehicle", calculatedAt: new Date().toISOString() };
+      if (fixture.platePreviewUrl) quote.platePreviewUrl = fixture.platePreviewUrl;
+      pending.resolve({ success: true, quote });
     };
   });
   const fill = async (id, value, event = "input") => page.$eval(`#${id}`, (el, value, event) => { el.value = value; el.dispatchEvent(new Event(event, { bubbles: true })); }, value, event);
@@ -146,6 +157,25 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement.id), "settingsBtn");
   console.log("PASS: keyboard History loading and Settings focus restoration");
 
+  await reload();
+  await fill("firstName", "Marcus");
+  await fill("lastName", "Delaney");
+  await fill("dob", "03/14/1985");
+  await fill("dlnPid", "S123456789012");
+  await page.click("#runAllChecksBtn");
+  await page.waitForFunction(() => document.body.classList.contains("is-screening-running"));
+  assert.equal(await page.evaluate(() => {
+    const progress = document.querySelector("#progressSection");
+    const action = document.querySelector(".action-section");
+    const hero = document.querySelector("#firstRunHero");
+    const assurance = document.querySelector(".progress-assurance");
+    return !progress.classList.contains("hidden") &&
+      getComputedStyle(action).display === "none" &&
+      getComputedStyle(hero).display === "none" &&
+      getComputedStyle(assurance).display !== "none";
+  }), true, "a live run prioritizes the readable progress workspace");
+  console.log("PASS: active run collapses inactive controls and keeps a visible status surface");
+
   artworkFixture = true;
   await reload();
   await page.click("#sosTabBtn");
@@ -183,8 +213,16 @@ try {
   }
   await page.setViewport({ width: 400, height: 800 });
   await page.click("#sosTabBtn");
+  calculatedPlateFixture = true;
+  await page.evaluate(() => { window.panelFixture.platePreviewUrl = "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/TEST.CALCULATED.PLATE"; });
   await fill("sosModelYear", "2026"); await fill("sosMsrp", "42500"); await fill("sosOwnerBirthdate", "03/14/1985");
   await begin(); await respond();
+  await page.waitForFunction(() => {
+    const image = document.querySelector("#sosPlatePreviewImage");
+    return image.src.startsWith("blob:") && image.complete && image.naturalWidth > 0;
+  });
+  assert.equal(await page.$eval("#sosPlatePreviewUnavailable", (el) => el.hidden), true, "the calculated plate artwork replaces the unavailable placeholder");
+  console.log("PASS: the official calculated plate renders in the compact preview");
   if (process.env.CC_FLOW_ARTIFACTS) {
     await mkdir(process.env.CC_FLOW_ARTIFACTS, { recursive: true });
     await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "plate-result.png") });

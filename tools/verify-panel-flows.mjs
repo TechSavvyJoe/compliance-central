@@ -175,6 +175,7 @@ try {
       getComputedStyle(action).display !== "none" &&
       getComputedStyle(runButton).display === "none" &&
       getComputedStyle(clearButton).display !== "none" &&
+      clearButton.disabled === false &&
       getComputedStyle(hero).display === "none" &&
       getComputedStyle(assurance).display !== "none";
   }), true, "a live run prioritizes the readable progress workspace");

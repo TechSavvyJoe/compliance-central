@@ -887,6 +887,7 @@ export function setButtonsDisabled(elements, disabled) {
   elements.runOfacBtn.disabled = disabled;
   elements.runRepeatOffenderBtn.disabled = disabled;
   elements.runTitleBtn.disabled = disabled || !elements.tradeVin.value.trim();
+  if (elements.clearBtn) elements.clearBtn.disabled = false;
 
   // A completed result must always stay bound to the exact identity that was
   // submitted. Lock every identity/vehicle control while a check is active so

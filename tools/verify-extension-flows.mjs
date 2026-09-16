@@ -170,6 +170,7 @@ try {
   assert.equal(unaffected.currentResults.runId, cancelledRun, "unrelated Clear must retain the owner's results");
   assert.equal(unaffected.searchStatus, "running");
   assert.equal(await owner.$eval("#runAllChecksBtn", (button) => button.disabled), true);
+  assert.equal(await owner.$eval("#clearBtn", (button) => button.disabled), false);
   assert.equal(await worker.evaluate(() => globalThis.extensionFlowFixture.requests[0].aborted), false);
   console.log("PASS: clearing the unrelated panel preserves the pending VIN-only run");
 

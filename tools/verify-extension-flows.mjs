@@ -175,6 +175,17 @@ try {
   console.log("PASS: clearing the unrelated panel preserves the pending VIN-only run");
 
   phase = "owning Clear, replacement run and late response";
+  console.log("DEBUG: owner clear before click", JSON.stringify(await owner.$eval("#clearBtn", (button) => {
+    const rect = button.getBoundingClientRect();
+    const style = getComputedStyle(button);
+    return {
+      disabled: button.disabled,
+      display: style.display,
+      visibility: style.visibility,
+      pointerEvents: style.pointerEvents,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+    };
+  })));
   await owner.click("#clearBtn");
   await owner.waitForFunction(async (id) => {
     const state = await chrome.storage.session.get(["activeRunId", "cancelledRunId", "currentResults"]);

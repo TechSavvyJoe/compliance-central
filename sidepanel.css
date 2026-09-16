@@ -6511,6 +6511,7 @@ body,
 body.is-screening-running #screeningWorkspace {
   display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-height: calc(100vh - var(--hub-header-h) - 56px);
 }
 

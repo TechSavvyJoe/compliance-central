@@ -6527,6 +6527,8 @@ body.is-screening-running #runAllChecksBtn {
 
 body.is-screening-running .action-section {
   order: -1;
+  position: relative;
+  z-index: 130;
   padding: 0;
   border: 0;
   background: transparent;

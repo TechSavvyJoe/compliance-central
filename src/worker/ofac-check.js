@@ -143,13 +143,31 @@ export async function handleGetDataStatus() {
 
 let sdnUpdatePromise = null;
 
+function keepRefreshWorkerActive() {
+  // The MDOS request may finish while Treasury is still streaming its list.
+  // Give this bounded refresh its own lifetime rather than depending on MDOS.
+  if (!globalThis.chrome?.runtime?.getPlatformInfo) return () => {};
+  const pulse = () => {
+    try {
+      chrome.runtime.getPlatformInfo(() => { void chrome.runtime.lastError; });
+    } catch {
+      // Extension shutdown invalidates the API context; never throw from a timer.
+    }
+  };
+  pulse();
+  const timer = setInterval(pulse, CONFIG.timeouts.keepAliveInterval);
+  return () => clearInterval(timer);
+}
+
 // Single-flight guard. The buyer and optional co-buyer OFAC checks run in
 // parallel and may both find the data stale on the same run; without this they
 // would launch duplicate downloads and racing DB writes. Concurrent callers
 // (and the install/startup/alarm triggers) share one in-flight update.
 export function performSDNUpdate() {
   if (sdnUpdatePromise) return sdnUpdatePromise;
+  const stopKeepingActive = keepRefreshWorkerActive();
   sdnUpdatePromise = runSDNUpdate().finally(() => {
+    stopKeepingActive();
     sdnUpdatePromise = null;
   });
   return sdnUpdatePromise;

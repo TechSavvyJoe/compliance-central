@@ -11,6 +11,7 @@ import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { ensureDataUrl } from "../../lib/data-url.js";
 import { printBaseCSS } from "../../lib/print-html.js";
 import { sanitizeHTML } from "./dom-utils.js";
+import { plateDesignByValue } from "./sos-plate-catalog.js";
 
 export const SOS_QUOTE_MODE = Object.freeze({
   newPlate: "new_plate",
@@ -125,6 +126,8 @@ export function normalizeSosFeeQuote(value) {
   if (Number.isNaN(calculatedDate.getTime())) return null;
 
   const feeBreakdown = normalizeFeeBreakdown(value.feeBreakdown, feeCents);
+  const plateDesign = value.mode === SOS_QUOTE_MODE.newPlate && typeof value.plateDesignValue === "string"
+    ? plateDesignByValue(value.plateDesignValue) : null;
   return {
     mode: value.mode,
     source: value.source,
@@ -157,12 +160,15 @@ export function normalizeSosFeeQuote(value) {
         : null,
     feeBreakdown,
     officialPageImage: normalizeOfficialPageImage(value.officialPageImage),
+    ...(plateDesign?.value === value.plateDesignValue && typeof plateDesign?.value === "string"
+      ? { plateDesignValue: plateDesign.value } : {}),
   };
 }
 
 /** Convert a verified background result into a session-only quote. */
 export function createCalculatedQuote(result, mode, now = new Date(), local = {}) {
   if (result?.calculationMode !== mode) return null;
+  const selectedDesign = plateDesignByValue(local.plateDesignValue);
   return normalizeSosFeeQuote({
     mode,
     msrpCents: local.msrpCents,
@@ -176,6 +182,8 @@ export function createCalculatedQuote(result, mode, now = new Date(), local = {}
     expiresOn: result?.expiresOn,
     feeBreakdown: result?.feeBreakdown,
     officialPageImage: result?.officialPageImage,
+    // Bind only the validated local choice submitted for this calculation.
+    plateDesignValue: selectedDesign?.plateType === local.plateType ? selectedDesign?.value : null,
   });
 }
 
@@ -235,10 +243,25 @@ export function registrationTermText(quote) {
   return parts.join(" · ");
 }
 
-function passportSummary(value) {
+export function passportSummary(value) {
   if (value === true) return "Selected — included in the SOS calculation";
   if (value === false) return "Not selected";
   return "Not available for this calculator selection";
+}
+
+export const SOS_WORKSHEET_NOTE = "The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service. Title, lien, and tax amounts are reference figures. Michigan SOS and dealership staff determine the final transaction amount, eligibility, documents, and any additional fees.";
+export const SOS_WORKSHEET_FOOTER = "Session-only worksheet. It contains no customer name, VIN, plate number, SOS credentials, or account information.";
+
+/** One reference model shared by customer HTML and PDF, not new calculated fees. */
+export function sosCustomerReferenceRows(quote) {
+  return [
+    { label: "Title fee", value: "$15.00", amount: true },
+    { label: "Michigan lien recording fee", value: "$1.00", amount: true },
+    { label: "Total title fee", value: "$16.00", amount: true, total: true },
+    { label: "Instant title (if requested)", value: "$5.00 — expedited same-day title" },
+    { label: "Optional Recreation Passport", value: passportSummary(quote.recreationPassport) },
+    { label: "Quote time", value: new Date(quote.calculatedAt).toLocaleString() },
+  ];
 }
 
 /** Printable customer handoff. It intentionally never impersonates SOS. */
@@ -259,7 +282,6 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
   const normalized = normalizeSosFeeQuote(quote);
   if (!normalized) return "";
 
-  const calculatedAt = new Date(normalized.calculatedAt).toLocaleString();
   const term = registrationTermText(normalized);
   // A print window renders in about:blank or an iframe, where a remote image
   // may never load before the dialog opens — which is how the plate came out
@@ -370,17 +392,12 @@ export function createSosFeeQuotePrintHTML(quote, branding = {}) {
 
       <h2>Additional costs to expect</h2>
       <table>
-        <tr><th>Title fee</th><td></td><td class="amount">$15.00</td></tr>
-        <tr><th>Michigan lien recording fee</th><td></td><td class="amount">$1.00</td></tr>
-        <tr class="total"><th>Total title fee</th><td></td><td class="amount">$16.00</td></tr>
-        <tr><th>Instant title (if requested)</th><td colspan="2">$5.00 &mdash; expedited same-day title</td></tr>
-        <tr><th>Optional Recreation Passport</th><td colspan="2">${sanitizeHTML(passportSummary(normalized.recreationPassport))}</td></tr>
-        <tr><th>Quote time</th><td colspan="2">${sanitizeHTML(calculatedAt)}</td></tr>
+        ${sosCustomerReferenceRows(normalized).map((row) => `<tr${row.total ? ' class="total"' : ""}><th>${sanitizeHTML(row.label)}</th>${row.amount ? '<td></td><td class="amount">' : '<td colspan="2">'}${sanitizeHTML(row.value)}</td></tr>`).join("")}
       </table>
 
-      <div class="note"><strong>Verify before final paperwork.</strong> The registration/plate fee was calculated by the public Michigan SOS calculator through the Compliance Central service. Title, lien, and tax amounts are reference figures. Michigan SOS and dealership staff determine the final transaction amount, eligibility, documents, and any additional fees.</div>
+      <div class="note"><strong>Verify before final paperwork.</strong> ${SOS_WORKSHEET_NOTE}</div>
     </main>
-    <footer>Session-only worksheet. It contains no customer name, VIN, plate number, SOS credentials, or account information.</footer>
+    <footer>${SOS_WORKSHEET_FOOTER}</footer>
   </section></body></html>`;
 }
 

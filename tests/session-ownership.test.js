@@ -214,17 +214,23 @@ test("expired-result cleanup arriving after a new run is a no-op", async () => {
   assert.equal(state.currentResults.runId, "new");
 });
 
-test("reopening stale state delegates exact-run cancellation and never directly clears shared storage", async () => {
+test("reopening stale state returns its identity for bounded panel recovery without waiting on the worker", async () => {
   const old = full("old", "2000-01-01T00:00:00.000Z");
   const { state } = install({ ...completed("old"), searchStatus: "running", currentResults: old });
   const sendMessage = chrome.runtime.sendMessage;
-  chrome.runtime.sendMessage = async (message) => {
-    // Another window started after this panel read the expired record.
-    Object.assign(state, completed("new"));
-    return sendMessage(message);
-  };
+  let sent = false;
+  chrome.runtime.sendMessage = () => { sent = true; return new Promise(() => {}); };
   const panel = await import("../src/sidepanel/state.js?stale-test");
-  assert.equal((await panel.loadPersistedResults()).state, "idle");
+  const restored = await panel.loadPersistedResults();
+  assert.equal(restored.state, "running");
+  assert.equal(restored.runId, "old");
+  assert.equal(restored.stalled, true);
+  assert.equal(sent, false, "a dead worker must not prevent the form from opening");
+  assert.equal(state.currentResults.runId, "old");
+  // Another window started after this panel read the expired record. Recovery
+  // must cancel only the returned identity through the existing worker fence.
+  Object.assign(state, completed("new"));
+  await sendMessage({ type: "CANCEL_CURRENT_RUN", runId: restored.runId });
   assert.equal(state.currentResults.runId, "new");
   assert.equal(state.searchStatus, "complete");
 });

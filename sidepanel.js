@@ -14,6 +14,7 @@ import {
   IN_FLIGHT,
 } from "./lib/storage-keys.js";
 import { MISSING_API_KEY } from "./lib/api-client.js";
+import { CONFIG } from "./lib/config.js";
 import {
   acceptsRunStatusUpdate,
   createRunId,
@@ -77,7 +78,7 @@ import {
   downloadTitleReportPDF,
   downloadAllReportsPDF,
   downloadSosOfficialEvidencePDF,
-  printHtmlDocument,
+  exportSosFeeDocuments,
   downloadAllReportPDFs,
   availableReportItems,
 } from "./src/sidepanel/export.js";
@@ -102,8 +103,6 @@ import {
   SOS_QUOTE_SOURCE,
   clearSosFeeQuote,
   createCalculatedQuote,
-  createSosFeeQuotePrintHTML,
-  createSosOfficialEvidencePrintHTML,
   loadSosFeeQuote,
   quoteStatusText,
   registrationTermText,
@@ -172,6 +171,9 @@ const elements = {
   // Session-only SOS registration fee quote
   calculateSosFeeBtn: $("calculateSosFeeBtn"),
   printSosQuoteBtn: $("printSosQuoteBtn"),
+  downloadSosQuotePdfBtn: $("downloadSosQuotePdfBtn"),
+  printSosBothBtn: $("printSosBothBtn"),
+  downloadSosBothPdfBtn: $("downloadSosBothPdfBtn"),
   printSosCalculationBtn: $("printSosCalculationBtn"),
   downloadSosCalculationPdfBtn: $("downloadSosCalculationPdfBtn"),
   clearSosQuoteBtn: $("clearSosQuoteBtn"),
@@ -720,7 +722,13 @@ async function applyPersistedResults() {
     setInputCollapsed(true, persisted.results?.customer);
     elements.resultsSection.classList.add("hidden");
     elements.progressSection.classList.remove("hidden");
+    slowCheckLastProgress = persisted.progress || 0;
     updateProgress(elements, persisted.progress);
+    if (persisted.stalled) {
+      void recoverStalledRun(persisted.runId);
+      return;
+    }
+    armSlowCheckTimers();
     const results = persisted.results;
     if (results) {
       const checks = results.checks || {};
@@ -914,6 +922,9 @@ function renderSosReadiness() {
   const el = elements.sosReadiness;
   if (!el) return;
   if (sosWorkspaceBusy) { el.textContent = ""; return; }
+  // A restored quote is already calculated even if its input form is blank.
+  // Edits invalidate the quote before readiness is rendered again.
+  if (currentSosFeeQuote) { el.textContent = ""; el.classList.remove("is-ready"); return; }
   let errors;
   try {
     errors = validateSosLocalValues(localSosValues()) || [];
@@ -923,10 +934,6 @@ function renderSosReadiness() {
     return;
   }
   const n = errors.length;
-  // Once a fee has been calculated there is nothing left to be ready for, and
-  // "Ready to calculate." printed under a finished total reads as if the run
-  // never happened. The status bar above already reports the outcome.
-  if (n === 0 && currentSosFeeQuote) { el.textContent = ""; el.classList.remove("is-ready"); return; }
   el.textContent = n === 0 ? "Ready to calculate." : `${n} detail${n === 1 ? "" : "s"} left`;
   el.classList.toggle("is-ready", n === 0);
   if (sosSubmitAttempted) showSosValidation(errors, { focusFirst: false });
@@ -1014,6 +1021,10 @@ function disposeSosPlateImages() {
 }
 
 async function materializeSosPlateImage(source, { signal } = {}) {
+  // Only packaged plate assets may bypass the public-origin allowlist.
+  if (/^assets\/plates\/[a-z0-9._-]+\.(?:jpg|png|webp)$/.test(source)) {
+    return { source: chrome.runtime.getURL(source), objectUrl: null };
+  }
   const url = new URL(source);
   if (
     url.protocol !== "https:" ||
@@ -1084,22 +1095,28 @@ function renderSosPlatePreview() {
   const loadToken = ++sosPlatePreviewLoadToken;
   abortSosPlateLoad("preview");
   releaseSosPlateObjectUrl("preview");
-  const localDesign = plateDesignByValue(elements.sosPlateDesign?.value);
-  const quotePreview =
+  const calculatedQuote =
     currentSosFeeQuote?.source === SOS_QUOTE_SOURCE.calculated
-      ? currentSosFeeQuote.platePreviewUrl
+      ? currentSosFeeQuote
       : null;
+  // Restored quotes may leave the form on its default selection. Artwork for
+  // a result must belong to the saved quote, never that unrelated dropdown.
+  const localDesign = plateDesignByValue(
+    calculatedQuote ? calculatedQuote.plateDesignValue : elements.sosPlateDesign?.value
+  );
+  const quotePreview = calculatedQuote?.platePreviewUrl || null;
   // A completed SOS calculation returns the exact artwork the State priced.
   // Prefer it over the public gallery thumbnail, which can be blocked in a
   // Chromium side panel even though the printable worksheet can inline it.
-  const previewUrl = quotePreview || localDesign?.imageUrl || null;
-  const fullPreviewUrl = quotePreview || localDesign?.fullImageUrl || previewUrl;
+  const bundledPreview = localDesign?.bundledImageUrl || null;
+  const previewUrl = quotePreview || bundledPreview || localDesign?.imageUrl || null;
+  const fullPreviewUrl = quotePreview || bundledPreview || localDesign?.fullImageUrl || previewUrl;
   const shouldShow =
     selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
     Boolean(previewUrl);
   const shouldShowUnavailable =
     selectedSosQuoteMode() === SOS_QUOTE_MODE.newPlate &&
-    Boolean(localDesign) &&
+    Boolean(localDesign || calculatedQuote) &&
     !previewUrl;
   if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = !shouldShow;
   if (elements.sosPlatePreviewUnavailable) {
@@ -1107,14 +1124,25 @@ function renderSosPlatePreview() {
   }
   if (elements.sosPlatePreviewImage) {
     if (shouldShow) {
+      let usedBundledFallback = previewUrl === bundledPreview;
       elements.sosPlatePreviewImage.onerror = () => {
         if (loadToken !== sosPlatePreviewLoadToken) return;
+        elements.sosPlatePreview?.classList.remove("is-loading");
+        if (bundledPreview && !usedBundledFallback) {
+          usedBundledFallback = true;
+          elements.sosPlatePreviewImage.src = bundledPreview;
+          elements.sosPlatePreview.dataset.fullImageUrl = bundledPreview;
+          elements.sosPlatePreview.hidden = false;
+          elements.sosPlatePreviewUnavailable.hidden = true;
+          return;
+        }
         elements.sosPlatePreview.hidden = true;
         elements.sosPlatePreviewUnavailable.hidden = false;
       };
       elements.sosPlatePreviewImage.alt = `${localDesign?.label || "Michigan"} official plate design artwork`;
-      if (new URL(previewUrl).hostname === SOS_CALCULATOR_IMAGE_HOST) {
+      if (new URL(previewUrl, location.href).hostname === SOS_CALCULATOR_IMAGE_HOST) {
         const abortController = new AbortController();
+        const loadTimeout = setTimeout(() => abortController.abort(), 8000);
         sosPlatePreviewAbortController = abortController;
         elements.sosPlatePreviewImage.removeAttribute("src");
         elements.sosPlatePreview?.classList.add("is-loading");
@@ -1139,23 +1167,16 @@ function renderSosPlatePreview() {
             decodedImage.onerror = () => {
               if (objectUrl) URL.revokeObjectURL(objectUrl);
               if (loadToken !== sosPlatePreviewLoadToken) return;
-              elements.sosPlatePreview?.classList.remove("is-loading");
-              if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = true;
-              if (elements.sosPlatePreviewUnavailable) {
-                elements.sosPlatePreviewUnavailable.hidden = false;
-              }
+              elements.sosPlatePreviewImage.onerror();
             };
             decodedImage.src = source;
           })
           .catch(() => {
             if (loadToken !== sosPlatePreviewLoadToken) return;
             sosPlatePreviewAbortController = null;
-            elements.sosPlatePreview?.classList.remove("is-loading");
-            if (elements.sosPlatePreview) elements.sosPlatePreview.hidden = true;
-            if (elements.sosPlatePreviewUnavailable) {
-              elements.sosPlatePreviewUnavailable.hidden = false;
-            }
-          });
+            elements.sosPlatePreviewImage.onerror();
+          })
+          .finally(() => clearTimeout(loadTimeout));
       } else {
         elements.sosPlatePreviewImage.src = previewUrl;
         elements.sosPlatePreview?.classList.remove("is-loading");
@@ -1168,7 +1189,7 @@ function renderSosPlatePreview() {
   if (elements.sosPlatePreviewLabel) {
     const plateTypeLabel = elements.sosPlateType?.selectedOptions?.[0]?.textContent?.trim();
     elements.sosPlatePreviewLabel.textContent =
-      localDesign?.label || `${plateTypeLabel || "Plate"} official result`;
+      localDesign?.label || (calculatedQuote ? "Calculated plate" : `${plateTypeLabel || "Plate"} official result`);
   }
   if (elements.sosPlatePreview) {
     const label = elements.sosPlatePreviewLabel?.textContent || "selected Michigan plate";
@@ -1393,6 +1414,9 @@ function renderSosFeeQuote() {
     );
   }
   if (elements.printSosQuoteBtn) elements.printSosQuoteBtn.disabled = !quote;
+  for (const button of [elements.downloadSosQuotePdfBtn, elements.printSosBothBtn, elements.downloadSosBothPdfBtn]) {
+    if (button) button.disabled = !quote;
+  }
   if (elements.printSosCalculationBtn) {
     elements.printSosCalculationBtn.disabled = !quote?.officialPageImage;
   }
@@ -1414,6 +1438,7 @@ async function restoreSosFeeQuote() {
     if (!sosQuoteFence.isCurrent(token)) return;
     currentSosFeeQuote = quote;
     renderSosFeeQuote();
+    if (quote) setSosWorkspaceStatus("Saved SOS calculation. Changes require a new calculation.", "ok");
   } catch (error) {
     console.error("Could not restore SOS fee quote:", error);
   }
@@ -1613,16 +1638,20 @@ async function loadDealerName() {
  * resolves to an empty string and the sheet falls back to the name alone.
  */
 /** Inline any packaged or allowlisted image for print. Empty string on failure. */
-async function inlineImageForPrint(url) {
+async function inlineImageForPrint(url, signal) {
   try {
-    const response = await fetch(url, { cache: "force-cache", credentials: "omit" });
+    const response = await fetch(url, { cache: "force-cache", credentials: "omit", signal });
     if (!response.ok) return "";
     const blob = await response.blob();
     if (!/^image\//.test(blob.type) || blob.size > 4_000_000) return "";
     return await new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => resolve("");
+      const finish = (value) => { signal?.removeEventListener("abort", abort); resolve(value); };
+      const abort = () => { reader.abort(); finish(""); };
+      reader.onload = () => finish(String(reader.result || ""));
+      reader.onerror = () => finish("");
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) return finish("");
       reader.readAsDataURL(blob);
     });
   } catch {
@@ -1638,15 +1667,36 @@ async function inlineImageForPrint(url) {
  * frame where their plate should be.
  */
 async function loadPlateImageForPrint(quote) {
-  const source = quote?.platePreviewUrl;
-  if (!source) return "";
-  try {
-    // Reuse the existing origin check rather than trusting the stored value.
-    const { source: safe } = await materializeSosPlateImage(source);
-    return await inlineImageForPrint(safe);
-  } catch {
-    return "";
+  // A restored quote must not inherit the form's default or a different design.
+  const bundled = quote?.plateDesignValue ? plateDesignByValue(quote.plateDesignValue)?.bundledImageUrl : null;
+  const sources = [...new Set([quote?.platePreviewUrl, bundled].filter(Boolean))];
+  for (const source of sources) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), source === bundled ? 1000 : 2500);
+      let image;
+      try {
+        image = await materializeSosPlateImage(source, { signal: controller.signal });
+        const inlined = await inlineImageForPrint(image.source, controller.signal);
+        if (inlined) return inlined;
+      } catch { /* Try the packaged design if the state preview is unavailable. */ }
+      finally {
+        clearTimeout(timer);
+        if (image?.objectUrl) URL.revokeObjectURL(image.objectUrl);
+      }
   }
+  return "";
+}
+
+async function loadSosExportBranding(quote) {
+  // Branding is optional; a stuck storage or artwork load cannot block a PDF.
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.all([loadDealerName(), loadDealerLogo(), loadPlateImageForPrint(quote)])
+        .then(([dealerName, logoUrl, plateImageUrl]) => ({ dealerName, logoUrl, plateImageUrl })),
+      new Promise((resolve) => { timer = setTimeout(() => resolve({}), 4000); }),
+    ]);
+  } finally { clearTimeout(timer); }
 }
 
 async function loadDealerLogo() {
@@ -1895,7 +1945,7 @@ async function calculateSosFee() {
       response.quote,
       values.mode,
       new Date(),
-      { msrpCents }
+      { msrpCents, plateDesignValue: values.plateDesign, plateType: values.plateType }
     );
     if (!quote) {
       throw new Error("Michigan SOS returned an incomplete fee. Try calculating again.");
@@ -2068,30 +2118,20 @@ async function handleSosQuoteModeChange() {
 }
 
 async function printSosFeeQuote() {
-  const [dealerName, logoUrl, plateImageUrl] = await Promise.all([
-    loadDealerName(),
-    loadDealerLogo(),
-    loadPlateImageForPrint(currentSosFeeQuote),
-  ]);
-  const html = createSosFeeQuotePrintHTML(currentSosFeeQuote, {
-    dealerName,
-    logoUrl,
-    plateImageUrl,
-  });
-  if (!html) {
-    showToast("Calculate an official fee before printing the customer summary.", "info");
-    return;
-  }
-  await printHtmlDocument(html, { waitForImages: true });
+  return exportSosDocuments({ customer: true, official: false, print: true });
 }
 
 async function printSosOfficialCalculation() {
-  const html = createSosOfficialEvidencePrintHTML(currentSosFeeQuote);
-  if (!html) {
-    showToast("The official SOS page capture is unavailable. Calculate again.", "info");
-    return;
-  }
-  await printHtmlDocument(html, { waitForImages: true });
+  return exportSosDocuments({ customer: false, official: true, print: true });
+}
+
+function exportSosDocuments(options) {
+  // Capture the quote at click time; editing the form cannot mix two quotes.
+  const quote = currentSosFeeQuote ? structuredClone(currentSosFeeQuote) : null;
+  return exportSosFeeDocuments(quote, {
+    ...options,
+    branding: options.customer ? loadSosExportBranding(quote) : {},
+  });
 }
 
 async function downloadSosOfficialCalculation() {
@@ -2144,6 +2184,9 @@ function initEventListeners() {
   // salesperson explicitly requests the final official calculation.
   elements.calculateSosFeeBtn?.addEventListener("click", calculateSosFee);
   elements.printSosQuoteBtn?.addEventListener("click", printSosFeeQuote);
+  elements.downloadSosQuotePdfBtn?.addEventListener("click", () => exportSosDocuments({ customer: true, official: false }));
+  elements.printSosBothBtn?.addEventListener("click", () => exportSosDocuments({ customer: true, official: true, print: true }));
+  elements.downloadSosBothPdfBtn?.addEventListener("click", () => exportSosDocuments({ customer: true, official: true }));
   elements.printSosCalculationBtn?.addEventListener("click", printSosOfficialCalculation);
   elements.downloadSosCalculationPdfBtn?.addEventListener("click", downloadSosOfficialCalculation);
   elements.clearSosQuoteBtn?.addEventListener("click", clearCurrentSosFeeQuote);
@@ -2918,6 +2961,7 @@ const individualOperationFence = createOperationFence();
 let activeIndividualOperationId = null;
 
 function beginIndividualOperation() {
+  runRecoveryFence.cancel();
   const token = individualOperationFence.start();
   const operationId = createRunId();
   activeIndividualOperationId = operationId;
@@ -3049,6 +3093,7 @@ async function handleRunAllChecks() {
   setIsRunning(true);
   const runId = createRunId();
   activeUiRunId = runId;
+  runRecoveryFence.cancel();
   const isCurrentRun = () =>
     activeUiRunId === runId && getIsRunning();
   setButtonsDisabled(elements, true);
@@ -3061,6 +3106,8 @@ async function handleRunAllChecks() {
   elements.progressSection.classList.remove("hidden");
 
   resetProgress(elements);
+  slowCheckLastProgress = 0;
+  armSlowCheckTimers({ awaitingStart: true });
   if (!hasTrade) {
     elements.titleCheckItem.style.opacity = "0.5";
     setCheckStatus(elements.titleStatus, "skipped");
@@ -3083,13 +3130,16 @@ async function handleRunAllChecks() {
         response?.error || "The checks could not be started. Try again."
       );
     }
+    acknowledgeRunStart(runId);
   } catch (e) {
     if (!isCurrentRun()) return;
     console.error("Start Check Error:", e);
     showToast("Could not start checks: " + describeError(e), "error");
     setIsRunning(false);
     activeUiRunId = null;
+    clearSlowCheckTimers();
     setButtonsDisabled(elements, false);
+    resetInputPanel();
     elements.progressSection.classList.add("hidden");
   }
 }
@@ -3251,6 +3301,7 @@ async function handleRunTitle() {
 }
 
 async function handleClear() {
+  runRecoveryFence.cancel();
   // Capture/fence this form's saved identity before resetting its controls.
   const cachedFormClear = clearCachedFormData().then(() => true, () => false);
   void cancelSosFeeRequest();
@@ -3369,41 +3420,126 @@ async function openHistory({ focusTab = false } = {}) {
   }
 }
 
-// ---------- Slow-check messaging ----------
-// MDOS (government portal) checks can take up to ~90s with no intermediate
-// progress. If the bar stalls, surface a reassuring "still running" note rather
-// than a label that looks frozen. The stall clock resets whenever progress
-// actually advances, so a normal fast run never shows the slow message.
+// ---------- Slow-check messaging and recovery ----------
+// A transport timeout does not cover a lost worker reply or a stopped worker.
+// Bound the start acknowledgment and each gap without meaningful progress,
+// while allowing multiple government checks to take their normal time.
 let slowCheckTimers = [];
 let slowCheckLastProgress = 0;
+let checkStartTimer = null;
+const CHECK_START_TIMEOUT_MS = 15000;
+const CHECK_CANCEL_TIMEOUT_MS = 5000;
+const runRecoveryFence = createOperationFence();
+
+function acknowledgeRunStart(runId) {
+  if (activeUiRunId !== runId) return;
+  clearTimeout(checkStartTimer);
+  checkStartTimer = null;
+}
 
 function clearSlowCheckTimers() {
   slowCheckTimers.forEach((t) => clearTimeout(t));
   slowCheckTimers = [];
+  clearTimeout(checkStartTimer);
+  checkStartTimer = null;
   if (elements.progressLabel) delete elements.progressLabel.dataset.locked;
 }
 
-function armSlowCheckTimers() {
+function armSlowCheckTimers({ awaitingStart = false } = {}) {
   slowCheckTimers.forEach((t) => clearTimeout(t));
   slowCheckTimers = [];
+  if (elements.progressLabel) delete elements.progressLabel.dataset.locked;
+  const runId = activeUiRunId;
+  if (!runId || !getIsRunning()) return;
+  const isCurrent = () => activeUiRunId === runId && getIsRunning();
   const setSlowLabel = (text) => {
-    if (!elements.progressLabel) return;
+    if (!isCurrent() || !elements.progressLabel) return;
     // Lock so the progress animation loop won't overwrite the note.
     elements.progressLabel.textContent = text;
     elements.progressLabel.dataset.locked = "1";
   };
   slowCheckTimers.push(
     setTimeout(
-      () => setSlowLabel("Still running — government checks can take up to ~90s…"),
+      () => setSlowLabel("Waiting for the check service to respond…"),
       30000
     )
   );
   slowCheckTimers.push(
     setTimeout(
-      () => setSlowLabel("Still running — almost there (up to ~90s total)…"),
+      () => setSlowLabel("No new result yet. You can stop this check with Clear."),
       60000
     )
   );
+  slowCheckTimers.push(setTimeout(() => {
+    if (isCurrent()) void recoverStalledRun(runId);
+  }, CONFIG.timeouts.stuckSearchTimeout));
+  if (awaitingStart) {
+    clearTimeout(checkStartTimer);
+    checkStartTimer = setTimeout(() => {
+      if (isCurrent()) void recoverStalledRun(
+        runId, "The check service did not confirm the start. No completed result is available."
+      );
+    }, CHECK_START_TIMEOUT_MS);
+  }
+}
+
+async function recoverStalledRun(
+  runId,
+  message = "The check stopped responding and did not complete."
+) {
+  if (activeUiRunId !== runId || !getIsRunning()) return;
+  // Fence first: neither a delayed acknowledgment nor a completed result may
+  // resurrect this run while cancellation is still waiting for the worker.
+  activeUiRunId = null;
+  const noticeToken = runRecoveryFence.start();
+  clearSlowCheckTimers();
+  if (completeRevealTimer) clearTimeout(completeRevealTimer);
+  completeRevealTimer = null;
+  setIsRunning(false);
+  setButtonsDisabled(elements, false);
+  setCardsLoadingState(elements, false);
+  setCurrentResults(null);
+  syncReportSelection(null);
+  resetInputPanel();
+  elements.resultsSection.classList.add("hidden");
+  elements.progressSection.classList.remove("hidden");
+  for (const el of [elements.ofacStatus, elements.repeatStatus, elements.titleStatus]) {
+    if (el?.classList.contains("status-running") || el?.classList.contains("status-waiting")) {
+      setCheckStatus(el, "warning");
+    }
+  }
+  const explanation = message + " Your entries are kept. Try the check again.";
+  if (elements.progressLabel) elements.progressLabel.dataset.locked = "1";
+  updateProgress(elements, slowCheckLastProgress, explanation);
+  if (elements.progressSpinner) elements.progressSpinner.style.display = "none";
+  showToast(explanation, "error");
+
+  // Restoring the controls must not wait on a cancellation acknowledgment.
+  // Observe its eventual rejection even when the deadline wins the race.
+  let cancellationTimer;
+  try {
+    const response = await Promise.race([
+      chrome.runtime.sendMessage({ type: "CANCEL_CURRENT_RUN", runId }),
+      new Promise((_, reject) => {
+        cancellationTimer = setTimeout(
+          () => reject(new Error("Cancellation was not confirmed by the check service.")),
+          CHECK_CANCEL_TIMEOUT_MS
+        );
+      }),
+    ]);
+    if (!response?.success) {
+      throw new Error(response?.error || "The check service could not confirm cancellation.");
+    }
+  } catch (error) {
+    if (!runRecoveryFence.isCurrent(noticeToken)) return;
+    showToast(
+      "The incomplete check is no longer displayed, but cancellation could not be confirmed. " +
+      describeError(error) + " If retry stays busy, reload Compliance Central in Extensions.",
+      "warning"
+    );
+  } finally {
+    clearTimeout(cancellationTimer);
+  }
 }
 
 // ---------- Storage listener (worker -> UI sync) ----------
@@ -3453,7 +3589,7 @@ async function handleSessionStorageChanges(changes) {
       if (pct > slowCheckLastProgress) {
         slowCheckLastProgress = pct;
         clearSlowCheckTimers();
-        if (pct < 100) armSlowCheckTimers();
+        armSlowCheckTimers();
       }
       updateProgress(elements, pct);
     } catch (e) {
@@ -3517,6 +3653,7 @@ function handleSearchStatusChange(changes) {
   const status = changes[STORAGE_KEYS.searchStatus].newValue;
 
   if (status === SEARCH_STATUS.running) {
+    acknowledgeRunStart(activeUiRunId);
     setIsRunning(true);
     setButtonsDisabled(elements, true);
     setInputCollapsed(true, getCurrentResults()?.customer);

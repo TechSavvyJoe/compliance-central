@@ -413,7 +413,7 @@
 
             <button type="button" id="sosPlatePreview" class="sos-quote-plate-preview" aria-label="Expand the Pure Michigan plate image" title="Expand official plate artwork">
               <div class="sos-plate-art">
-                <img id="sosPlatePreviewImage" src="https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard_PureMichigan.jpg?mw=768&amp;rev=7d34d742a2654b28a629235f959fa5e8&amp;hash=0B2EA17F2FF650FC8464D07C074FA926" alt="Pure Michigan official plate design artwork" referrerpolicy="no-referrer" decoding="async" />
+                <img id="sosPlatePreviewImage" src="assets/plates/standard_puremichigan.webp" alt="Pure Michigan official plate design artwork" referrerpolicy="no-referrer" decoding="async" />
               </div>
               <div>
                 <span class="sos-preview-kicker">Selected artwork</span>
@@ -460,7 +460,10 @@
 
           <div id="sosWorkspaceStatus" class="sos-workspace-status" role="status" aria-live="polite">
             <span class="sos-status-icon" aria-hidden="true"></span>
-            <span class="sos-status-text" id="sosWorkspaceStatusText">Complete the fields, then run one official SOS calculation.</span>
+            <span class="sos-status-copy">
+              <span class="sos-status-text" id="sosWorkspaceStatusText">Complete the fields, then run one official SOS calculation.</span>
+              <span id="sosProgress" class="hidden"><span id="sosProgressElapsed" class="sos-progress-elapsed"></span></span>
+            </span>
             <span class="sos-status-bar" aria-hidden="true"><i></i></span>
           </div>
           <div id="sosQuoteHeadline" class="sos-quote-headline hidden" role="status" aria-live="polite">
@@ -484,17 +487,16 @@
           </details>
 
           <p id="sosReadiness" class="sos-readiness" aria-live="polite"></p>
-          <div id="sosProgress" class="sos-progress hidden" role="status" aria-live="polite">
-            <span class="sos-progress-track"><span class="sos-progress-bar"></span></span>
-            <span class="sos-progress-copy">Running the official Michigan SOS calculator<span id="sosProgressElapsed" class="sos-progress-elapsed"></span></span>
-          </div>
 
           <div class="sos-primary-actions" role="group" aria-label="Michigan SOS fee quote actions">
             <button type="button" id="calculateSosFeeBtn" class="btn-primary btn-sm">Calculate SOS fee</button>
             <button type="button" id="clearSosQuoteBtn" class="btn-secondary btn-ghost btn-sm" aria-label="Clear SOS quote">Clear</button>
           </div>
           <div id="sosExportActions" class="sos-export-actions" role="group" aria-label="Print or save the calculated fee" hidden>
-            <button type="button" id="printSosQuoteBtn" class="btn-secondary btn-sm" disabled>Customer print</button>
+            <button type="button" id="printSosBothBtn" class="btn-primary btn-sm" disabled>Print both</button>
+            <button type="button" id="downloadSosBothPdfBtn" class="btn-primary btn-sm" disabled>Save both PDF</button>
+            <button type="button" id="printSosQuoteBtn" class="btn-secondary btn-sm" disabled>Print customer</button>
+            <button type="button" id="downloadSosQuotePdfBtn" class="btn-secondary btn-sm" disabled>Customer PDF</button>
             <button type="button" id="printSosCalculationBtn" class="btn-secondary btn-sm" disabled>Print SOS</button>
             <button type="button" id="downloadSosCalculationPdfBtn" class="btn-secondary btn-sm" disabled>SOS PDF</button>
           </div>
@@ -628,8 +630,8 @@
           </div>
           <aside class="progress-assurance" aria-label="Screening status">
             <span class="progress-assurance-kicker">Live status</span>
-            <strong>Results will appear here automatically.</strong>
-            <p>Keep this panel open while the checks finish. You can continue working in the dealership site.</p>
+            <strong>Checks in progress</strong>
+            <p>Results appear here. Clear stops the check.</p>
           </aside>
         </section>
 

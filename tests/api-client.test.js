@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { setImmediate } from "node:timers/promises";
 
 import {
   backendRepeatOffenderCheck,
@@ -45,6 +46,7 @@ function stubSosBackend(body) {
 
 function stubStorage(key) {
   globalThis.chrome = {
+    runtime: { getPlatformInfo(callback) { callback({}); } },
     storage: {
       local: {
         async get() {
@@ -299,6 +301,112 @@ test("an in-flight backend request can be cancelled", async () => {
   await fetchStarted;
   controller.abort();
   await assert.rejects(() => pending, /cancelled/i);
+});
+
+// Headers can arrive before the service finishes sending JSON. Keep a real
+// Response stream open to exercise that separate phase of the request.
+function stalledBackendBody(status) {
+  let bodyController;
+  let requestSignal;
+  let markReading;
+  const reading = new Promise((resolve) => { markReading = resolve; });
+  globalThis.fetch = async (_url, options) => {
+    requestSignal = options.signal;
+    const stream = new ReadableStream({
+      start(controller) { bodyController = controller; },
+    });
+    options.signal.addEventListener("abort", () => {
+      bodyController.error(new DOMException("Response aborted", "AbortError"));
+    }, { once: true });
+    const response = new Response(stream, { status });
+    const readJson = response.json.bind(response);
+    response.json = () => {
+      markReading();
+      return readJson();
+    };
+    return response;
+  };
+  return {
+    reading,
+    get signal() { return requestSignal; },
+    finish() {
+      if (requestSignal?.aborted) return;
+      bodyController.enqueue(new TextEncoder().encode(JSON.stringify({
+        success: true, status: "eligible", passed: true,
+      })));
+      bodyController.close();
+    },
+  };
+}
+
+for (const status of [200, 500]) {
+  test(`a stalled HTTP ${status} response body reaches the request deadline`, async (t) => {
+    stubStorage("test-key");
+    t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+    const body = stalledBackendBody(status);
+    const pending = backendRepeatOffenderCheck({ firstName: "A", lastName: "B" });
+    const outcome = pending.then((value) => ({ value }), (error) => ({ error }));
+    await body.reading;
+    try {
+      t.mock.timers.tick(CONFIG.backend.requestTimeout);
+      await setImmediate();
+      assert.equal(body.signal.aborted, true, "deadline must include the response body");
+      const result = await outcome;
+      assert.match(result.error?.message || "", /did not respond in time/i);
+    } finally {
+      body.finish();
+      await outcome;
+    }
+  });
+
+  test(`Clear can cancel a pending HTTP ${status} response body`, async () => {
+    stubStorage("test-key");
+    const controller = new AbortController();
+    const body = stalledBackendBody(status);
+    const pending = backendRepeatOffenderCheck(
+      { firstName: "A", lastName: "B" },
+      { signal: controller.signal }
+    );
+    const outcome = pending.then((value) => ({ value }), (error) => ({ error }));
+    await body.reading;
+    controller.abort();
+    await setImmediate();
+    try {
+      assert.equal(body.signal.aborted, true, "Clear must still reach a response body read");
+      const result = await outcome;
+      assert.equal(result.error?.name, "AbortError");
+      assert.match(result.error?.message || "", /cancelled/i);
+    } finally {
+      body.finish();
+      await outcome;
+    }
+  });
+}
+
+test("Clear cancels a busy retry wait without sending another request", async () => {
+  stubStorage("test-key");
+  const controller = new AbortController();
+  let calls = 0;
+  let markDiscarded;
+  const discarded = new Promise((resolve) => { markDiscarded = resolve; });
+  globalThis.fetch = async () => {
+    calls++;
+    return {
+      ok: false,
+      status: 503,
+      headers: { get: () => "10" },
+      body: { async cancel() { markDiscarded(); } },
+    };
+  };
+  const pending = backendRepeatOffenderCheck(
+    { firstName: "A", lastName: "B" },
+    { signal: controller.signal }
+  );
+  const rejected = assert.rejects(() => pending, /cancelled/i);
+  await discarded;
+  controller.abort();
+  await rejected;
+  assert.equal(calls, 1);
 });
 
 test("a SOS fee quote posts the contract payload and returns a verified quote", async () => {

@@ -429,7 +429,7 @@ function animateProgress(elements) {
     } else if (displayPercent < 90) {
       elements.progressLabel.textContent = "Verifying Title & Lien…";
     } else if (displayPercent < 100) {
-      elements.progressLabel.textContent = "Finalizing report…";
+      elements.progressLabel.textContent = "Waiting for remaining checks…";
     } else {
       elements.progressLabel.textContent = "Complete";
     }

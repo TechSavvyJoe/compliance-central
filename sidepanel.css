@@ -3956,14 +3956,16 @@ body {
 /* A quote takes ten seconds or more against the state site, so the busy state
    carries a moving bar rather than a sentence that looks frozen. */
 .sos-workspace-status.is-busy {
-  border-color: #bcd6ee;
-  border-left-color: var(--navy-soft);
-  background: var(--line-soft);
-  color: var(--navy-soft);
+  border-color: #0d3f6b;
+  border-left-color: #ffcc00;
+  background: #102f4b;
+  color: #fff;
 }
 
-.sos-workspace-status.is-busy .sos-status-icon { background: var(--navy-soft); }
+.sos-workspace-status.is-busy .sos-status-icon { background: #ffcc00; }
 .sos-workspace-status.is-busy .sos-status-bar { display: block; }
+.sos-workspace-status.is-busy .sos-status-bar { background: #546e85; }
+.sos-workspace-status.is-busy .sos-status-bar i { background: #ffcc00; }
 
 .sos-workspace-status.is-error {
   border-color: #fecaca;
@@ -4311,7 +4313,7 @@ body {
 
 .sos-export-actions {
   display: grid;
-  grid-template-columns: 1.25fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-top: 7px;
 }
@@ -5425,53 +5427,11 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--success);
 }
 
-/* The run reports no stages, so this shows motion and elapsed time rather
-   than inventing a percentage. Six seconds against a government site is a
-   long time to look at one unchanging line of text. */
-.sos-progress {
-  display: grid;
-  gap: 6px;
-  margin: 0 2px 8px;
-}
-
-.sos-progress.hidden {
-  display: none !important;
-}
-
-.sos-progress-track {
-  position: relative;
-  overflow: hidden;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--line-soft);
-}
-
-.sos-progress-bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 38%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--design-navy), var(--focus));
-  animation: sosProgressSlide 1.15s ease-in-out infinite;
-}
-
-@keyframes sosProgressSlide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
-}
-
-.sos-progress-copy {
-  color: var(--design-slate);
-  font: 600 var(--fs-caption)/1.3 var(--font-body);
-}
-
+/* Elapsed time belongs to the single workspace status, not a second bar. */
 .sos-progress-elapsed {
-  color: var(--design-muted);
+  color: inherit;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sos-progress-bar { animation: none; width: 100%; opacity: 0.5; }
 }
 
 
@@ -5740,7 +5700,7 @@ button, input, select, textarea { font-family: inherit; }
  * older theme layers above from flattening individual screens differently.
  */
 :root {
-  --hub-content-max: 468px;
+  --hub-content-max: 100%;
   --design-navy: #082b4c;
   --design-navy-soft: #124b78;
   --design-gold: #ffc400;
@@ -6472,6 +6432,11 @@ body,
   font-weight: 800;
 }
 
+#progressPercent {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .progress-assurance {
   display: grid;
   gap: 4px;
@@ -6484,6 +6449,10 @@ body,
     linear-gradient(135deg, #06233f 0%, #0b4875 100%);
   color: #fff;
   box-shadow: 0 8px 18px rgba(5, 38, 66, 0.24);
+}
+
+body:not(.is-screening-running) .progress-assurance {
+  display: none;
 }
 
 .progress-assurance-kicker {
@@ -6505,14 +6474,14 @@ body,
   line-height: 1.45;
 }
 
-/* During a run, inputs and actions are intentionally unavailable. Collapse
-   them so progress reaches the top of the panel, then let its status surface
-   occupy the open vertical workspace instead of leaving an empty pale field. */
+/* The buyer summary, actions and progress are siblings in .hub-main. Keep
+   each content-sized so the collapsed summary cannot push progress a full
+   viewport below the fold. Clear stays available throughout a run. */
 body.is-screening-running #screeningWorkspace {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
-  min-height: calc(100vh - var(--hub-header-h) - 56px);
+  min-height: 0;
 }
 
 body.is-screening-running .hub-main {
@@ -6551,25 +6520,12 @@ body.is-screening-running #clearBtn {
 
 body.is-screening-running .progress-section {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
-  min-height: 340px;
+  min-height: 0;
 }
 
 body.is-screening-running .progress-assurance {
-  margin-top: auto;
-}
-
-@media (max-height: 760px) {
-  body.is-screening-running #screeningWorkspace {
-    min-height: 0;
-  }
-
-  body.is-screening-running .progress-section {
-    min-height: 0;
-  }
-
-  body.is-screening-running .progress-assurance {
-    margin-top: 16px;
-  }
+  margin-top: 12px;
+  padding: 12px;
 }

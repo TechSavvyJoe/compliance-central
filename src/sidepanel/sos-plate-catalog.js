@@ -1,8 +1,10 @@
 /**
  * Official Michigan plate artwork used by the public registration-fee
  * calculator. The IDs and SOS option values are local workflow identifiers;
- * every image and source link is an official Michigan.gov asset.
+ * every image and source link is an official Michigan.gov asset. Packaged
+ * copies keep the preview available when the state moves its gallery.
  */
+import { SOS_BUNDLED_PLATE_ARTWORK } from "./sos-plate-artwork.js";
 
 const IMAGE_ROOT =
   "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images";
@@ -90,12 +92,17 @@ function makeDesign({
   selection,
   background = null,
 }) {
+  const imageKey = new URL(officialImage(image)).pathname.split("/").at(-1)
+    .replace(/\.(?:png|jpe?g|webp)$/i, "").toLowerCase();
+  const artwork = SOS_BUNDLED_PLATE_ARTWORK[imageKey];
+  const imageUrl = artwork?.url || officialImage(image);
   return Object.freeze({
     value,
     plateType,
     label,
-    imageUrl: officialImage(image),
-    fullImageUrl: VERIFIED_LARGE_IMAGES[value] || highResolutionImage(image),
+    imageUrl,
+    bundledImageUrl: artwork?.path || null,
+    fullImageUrl: VERIFIED_LARGE_IMAGES[value] || highResolutionImage(imageUrl),
     sourceUrl: SOS_PLATE_SOURCE_PAGES[source],
     selection: Object.freeze({ ...selection }),
     background: background ? Object.freeze({ ...background }) : null,

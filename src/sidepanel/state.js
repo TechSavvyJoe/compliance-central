@@ -99,7 +99,7 @@ export async function discardPersistedResult(resultId, timestamp) {
  *
  * @returns one of:
  *   { state: "idle" }
- *   { state: "running", results, progress }
+ *   { state: "running", results, progress, runId, stalled }
  *   { state: "complete", results }
  *   { state: "stale" }  (auto-cleared)
  */
@@ -125,27 +125,14 @@ export async function loadPersistedResults() {
       if (!isCurrentRunState(runState) || isCheckCancelled(storage, `run:${runState.activeRunId}`)) {
         return { state: "idle" };
       }
-      const startTime = storage[STORAGE_KEYS.currentResults]?.timestamp;
-      if (startTime) {
-        const parsedTime = new Date(startTime).getTime();
-        if (!Number.isNaN(parsedTime)) {
-          const elapsed = Date.now() - parsedTime;
-          if (elapsed > CONFIG.timeouts.stuckSearchTimeout) {
-            const runId = runState.activeRunId;
-            const response = await chrome.runtime.sendMessage({
-              type: "CANCEL_CURRENT_RUN",
-              runId,
-            });
-            if (!response?.success) throw new Error(response?.error || "Could not cancel the stale check.");
-            setCurrentResults(null);
-            isRunning = false;
-            return { state: "idle" };
-          }
-        }
-      }
-
       const results = storage[STORAGE_KEYS.currentResults];
       if (resultIdentity(results) !== `run:${runState.activeRunId}`) return { state: "idle" };
+      // The panel owns recovery and its bounded cancellation acknowledgment.
+      // Waiting for cancellation here could prevent the panel from opening at
+      // all, then let a late reply clear a newer retry's local state.
+      const startedAt = new Date(results.timestamp).getTime();
+      const stalled = Number.isFinite(startedAt) &&
+        Date.now() - startedAt > CONFIG.timeouts.stuckSearchTimeout;
       setCurrentResults(results);
       isRunning = true;
       return {
@@ -153,6 +140,7 @@ export async function loadPersistedResults() {
         results: currentResults,
         progress: storage[STORAGE_KEYS.searchProgress] || 0,
         runId: runState.activeRunId,
+        stalled,
       };
     }
 

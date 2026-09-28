@@ -196,7 +196,7 @@ test("selected plate artwork expands in a fast in-sidebar viewer", () => {
   assert.equal(plateDesignOptionsForType("CONSUL").length, 1);
   assert.equal(SOS_PLATE_DESIGNS.aro_amateur_radio.selection.optionValue, "PM");
   assert.match(SOS_PLATE_DESIGNS.commercial_mackinac_bridge.imageUrl, /Standard_MacBridge\.jpg/);
-  assert.match(sidepanelHtml, /id="sosPlatePreviewImage"[^>]+src="https:\/\/www\.michigan\.gov\/sos\//);
+  assert.match(sidepanelHtml, /id="sosPlatePreviewImage"[^>]+src="assets\/plates\/standard_puremichigan\.(?:jpg|webp)"/);
   for (const id of [
     "sosPlateViewer",
     "sosPlateViewerImage",
@@ -1369,12 +1369,25 @@ test("the workspace status reads as the state it is in", () => {
 
 // Left as a state URL the plate simply did not appear: the print window opens
 // before a remote image can load, so the customer got a broken frame.
+test("quote artwork identity is bound to the submitted design, never inferred for legacy quotes", () => {
+  const design = Object.values(SOS_PLATE_DESIGNS).find((entry) => entry.value && entry.plateType);
+  const result = { calculationMode: SOS_QUOTE_MODE.newPlate, feeCents: 19500 };
+  const bound = createCalculatedQuote(result, SOS_QUOTE_MODE.newPlate, new Date(), { plateDesignValue: design.value, plateType: design.plateType });
+  assert.equal(bound.plateDesignValue, design.value);
+  assert.equal(normalizeSosFeeQuote(bound).plateDesignValue, design.value);
+  assert.equal(createCalculatedQuote(result, SOS_QUOTE_MODE.newPlate).plateDesignValue, undefined);
+  assert.equal(createCalculatedQuote(result, SOS_QUOTE_MODE.newPlate, new Date(), { plateDesignValue: design.value, plateType: "wrong" }).plateDesignValue, undefined);
+  assert.equal(normalizeSosFeeQuote({ ...bound, plateDesignValue: "__proto__" }).plateDesignValue, undefined);
+  assert.equal(normalizeSosFeeQuote({ ...bound, mode: SOS_QUOTE_MODE.plateTransfer }).plateDesignValue, undefined);
+});
+
 test("the printed plate is inlined rather than fetched", () => {
   assert.match(sidepanelScript, /function loadPlateImageForPrint\(quote\)/);
   assert.match(sidepanelScript, /plateImageUrl/);
-  // The dialog must not open before the images are on the page.
+  // Printing uses the same inlined PDF as downloading, not a blocked iframe.
   const print = sidepanelScript.slice(sidepanelScript.indexOf("async function printSosFeeQuote()"));
-  assert.match(print.slice(0, 900), /printHtmlDocument\(html, \{ waitForImages: true \}\)/);
+  assert.match(print.slice(0, 900), /exportSosDocuments\(\{ customer: true, official: false, print: true \}\)/);
+  assert.match(sidepanelScript, /setTimeout\(\(\) => controller\.abort\(\), source === bundled \? 1000 : 2500\)/);
   // An inlined plate is accepted by the sheet, a remote one is not smuggled in.
   const quote = createCalculatedQuote(
     {

@@ -10,7 +10,7 @@
 import { sanitizeHTML, buildSanitizedName } from "./dom-utils.js";
 import { registerPdfFonts, PDF_FACE } from "../../lib/pdf-fonts.js";
 import { showToast } from "./toast.js";
-import { sanitizeDealerLogo } from "./sos-fee-quote.js";
+import { sanitizeDealerLogo, normalizeSosFeeQuote, formatMoney, modeLabel, registrationTermText, sourceLabel, sosCustomerReferenceRows, SOS_WORKSHEET_NOTE, SOS_WORKSHEET_FOOTER } from "./sos-fee-quote.js";
 import { STORAGE_KEYS } from "../../lib/storage-keys.js";
 import { CONFIG } from "../../lib/config.js";
 import {
@@ -1394,24 +1394,37 @@ export async function printAllReports(currentResults, selectedKeys) {
 // official letterhead, same colour palette, same certification footer. All
 // drawn programmatically in jsPDF so we avoid html2canvas/html2pdf bloat.
 
+let jsPdfLoading = null;
 async function loadJsPDF() {
   if (window.jspdf?.jsPDF) {
     registerPdfFonts(window.jspdf.jsPDF);
     return window.jspdf.jsPDF;
   }
 
-  return new Promise((resolve, reject) => {
+  if (jsPdfLoading) return jsPdfLoading;
+  jsPdfLoading = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      if (error) { script.remove(); reject(error); }
+      else resolve(window.jspdf.jsPDF);
+    };
+    const timer = setTimeout(() => finish(new Error("PDF library loading timed out")), 10000);
     script.src = chrome.runtime.getURL("lib/jspdf.umd.min.js");
     script.onload = () => {
       if (window.jspdf?.jsPDF) {
         registerPdfFonts(window.jspdf.jsPDF);
-        resolve(window.jspdf.jsPDF);
-      } else reject(new Error("jsPDF did not load"));
+        finish();
+      } else finish(new Error("jsPDF did not load"));
     };
-    script.onerror = () => reject(new Error("Failed to load jsPDF script"));
+    script.onerror = () => finish(new Error("Failed to load jsPDF script"));
     document.head.appendChild(script);
-  });
+  }).finally(() => { jsPdfLoading = null; });
+  return jsPdfLoading;
 }
 
 // The PDF draws from the same ten colours as the print HTML, so a report
@@ -2866,24 +2879,8 @@ export function finalDecisionSection(currentResults, branding) {
 
 // ---------- Public downloaders ----------
 
-/** Download the actual captured SOS result page as one readable letter page. */
-export async function downloadSosOfficialEvidencePDF(quote) {
-  const image = ensureDataUrl(quote?.officialPageImage);
-  if (!image) {
-    showToast("The official SOS page capture is unavailable. Calculate again.", "info");
-    return false;
-  }
-  let ctx;
-  try {
-    // The capture is a full state web page, which is taller than it is wide, so
-    // portrait matches both the source and every other report this app prints.
-    ctx = await createPdfContext("portrait");
-  } catch (err) {
-    console.error("jsPDF load error:", err);
-    showToast("The PDF could not be created. Use Print SOS instead.", "error");
-    return false;
-  }
-
+function drawSosOfficialEvidence(ctx, quote) {
+  const image = ensureDataUrl(quote.officialPageImage);
   const { doc, pageWidth, pageHeight } = ctx;
   const margin = 24;
   doc.setTextColor(...PALETTE.navy);
@@ -2903,8 +2900,9 @@ export async function downloadSosOfficialEvidencePDF(quote) {
   doc.line(margin, 46, pageWidth - margin, 46);
 
   const props = doc.getImageProperties(image);
+  if (!(props.width > 0 && props.height > 0)) throw new Error("The official SOS capture could not be read. Calculate again.");
   const availableWidth = pageWidth - margin * 2;
-  const availableHeight = pageHeight - 78;
+  const availableHeight = pageHeight - 88;
   const ratio = Math.min(
     availableWidth / props.width,
     availableHeight / props.height
@@ -2917,15 +2915,116 @@ export async function downloadSosOfficialEvidencePDF(quote) {
 
   doc.setFontSize(7);
   doc.setTextColor(...PALETTE.slate);
-  doc.text("Source: dsvsesvc.sos.state.mi.us", margin, pageHeight - 10);
+  doc.text("Source: dsvsesvc.sos.state.mi.us", margin, pageHeight - 20);
+  doc.text(`Captured ${new Date(quote.calculatedAt).toLocaleString()}`, margin, pageHeight - 10);
   doc.text(
     "Verify before final paperwork",
     pageWidth - margin,
     pageHeight - 10,
     { align: "right" }
   );
-  doc.save(`Michigan_SOS_Fee_Calculation_${Date.now()}.pdf`);
-  return true;
+}
+
+function drawSosCustomerWorksheet(ctx, quote, branding) {
+  drawMasthead(ctx, "Customer Registration Cost Summary", branding);
+  writeText(ctx, "Sales-desk worksheet · Not a Michigan SOS document", { fontSize: 9, color: PALETTE.slate });
+  writeText(ctx, sourceLabel(quote.source), { fontSize: 9, bold: true });
+  ctx.y += 8;
+  writeText(ctx, `Official SOS total: ${formatMoney(quote.feeCents)}`, { fontSize: 20, bold: true, color: PALETTE.navy });
+  writeText(ctx, registrationTermText(quote) || "Term not stated by SOS", { fontSize: 10 });
+  writeText(ctx, modeLabel(quote.mode), { fontSize: 10 });
+  if (quote.vehicleDescription) writeText(ctx, quote.vehicleDescription, { fontSize: 10 });
+  if (quote.msrpCents) writeText(ctx, `Vehicle base MSRP: ${formatMoney(quote.msrpCents)}`, { fontSize: 10 });
+  const plate = ensureDataUrl(branding?.plateImageUrl);
+  if (plate) {
+    try {
+      const props = ctx.doc.getImageProperties(plate);
+      const scale = Math.min(128 / props.width, 62 / props.height);
+      if (Number.isFinite(scale) && scale > 0) {
+        ctx.y += 8;
+        ctx.doc.addImage(plate, imageDataUrlExtension(plate), ctx.margin, ctx.y, props.width * scale, props.height * scale);
+        ctx.y += props.height * scale + 4;
+        writeText(ctx, "Official Michigan artwork. Sample characters shown — your plate number is assigned by the Secretary of State.", { fontSize: 8, color: PALETTE.slate });
+      }
+    } catch { /* Optional artwork must never block the priced worksheet. */ }
+  }
+  ctx.y += 8;
+  writeText(ctx, "What the SOS calculated", { fontSize: 12, bold: true });
+  for (const row of quote.feeBreakdown) {
+    writeText(ctx, `${row.label}: ${formatMoney(row.feeCents)}`, { fontSize: 10 });
+  }
+  writeText(ctx, `Registration / plate fee total: ${formatMoney(quote.feeCents)}`, { fontSize: 11, bold: true });
+  ctx.y += 8;
+  writeText(ctx, "Additional costs to expect", { fontSize: 12, bold: true });
+  for (const row of sosCustomerReferenceRows(quote)) {
+    writeText(ctx, `${row.label}: ${row.value}`, { fontSize: 9, bold: !!row.total });
+  }
+  ctx.y += 8;
+  writeText(ctx, `Verify before final paperwork. ${SOS_WORKSHEET_NOTE}`, { fontSize: 8, color: PALETTE.slate });
+  ctx.y += 8;
+  writeText(ctx, SOS_WORKSHEET_FOOTER, { fontSize: 8, color: PALETTE.slate });
+}
+
+/** Build separate, clearly labelled customer and state sections from one quote. */
+export async function createSosFeeDocumentsPDF(quote, { customer = true, official = true, branding = {} } = {}) {
+  const normalized = normalizeSosFeeQuote(quote);
+  if (!normalized) throw new Error("Calculate an official fee before exporting the documents.");
+  if (!customer && !official) throw new Error("Select a plate-fee document to export.");
+  if (official && !normalized.officialPageImage) {
+    throw new Error("The official SOS capture is unavailable. Calculate again to include it. The customer summary is still available separately.");
+  }
+  const ctx = await createPdfContext("portrait");
+  if (customer) drawSosCustomerWorksheet(ctx, normalized, branding);
+  if (official) {
+    if (customer) addPageWithOrientation(ctx);
+    try { drawSosOfficialEvidence(ctx, normalized); }
+    catch { throw new Error("The official SOS capture could not be read. Calculate again. The customer summary is still available separately."); }
+  }
+  return ctx.doc;
+}
+
+/** Print and download use the identical PDF, including the original SOS capture. */
+export async function exportSosFeeDocuments(quote, { customer = true, official = true, branding = {}, print = false } = {}) {
+  let reservedWindow = null;
+  if (print && !globalThis.chrome?.tabs?.create) {
+    try { reservedWindow = window.open("", "_blank"); } catch { /* Report below. */ }
+    if (!reservedWindow) {
+      showToast("The print tab was blocked. Use the PDF button, then print the saved file.", "warning");
+      return false;
+    }
+  }
+  try {
+    const doc = await createSosFeeDocumentsPDF(quote, { customer, official, branding: await branding });
+    if (print) {
+      doc.autoPrint?.({ variant: "non-conform" });
+      const url = URL.createObjectURL(doc.output("blob"));
+      try {
+        if (globalThis.chrome?.tabs?.create) await chrome.tabs.create({ url, active: true });
+        else reservedWindow.location.replace(url);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        throw error;
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+      showToast("Print preview opened. If the dialog stays closed, use Ctrl+P in that tab.", "success");
+    } else {
+      const kind = customer && official ? "Customer_and_Michigan_SOS" : customer ? "Customer_Registration_Summary" : "Michigan_SOS_Fee_Calculation";
+      downloadBlob(doc.output("blob"), `${kind}_${Date.now()}.pdf`);
+    }
+    return true;
+  } catch (error) {
+    try { reservedWindow?.close(); } catch { /* Already closed. */ }
+    console.error("Plate-fee export failed:", error);
+    const message = /^(The official SOS capture|Calculate an official fee)/.test(error?.message || "")
+      ? error.message : "The plate-fee document could not be created. Try the PDF button again.";
+    showToast(message, "error", 10000);
+    return false;
+  }
+}
+
+/** Retain the existing public downloader for callers requesting state-only PDF. */
+export async function downloadSosOfficialEvidencePDF(quote) {
+  return exportSosFeeDocuments(quote, { customer: false, official: true });
 }
 
 export async function downloadOfacReportPDF(currentResults) {

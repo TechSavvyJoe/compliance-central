@@ -1,0 +1,945 @@
+{
+  "source": "Michigan Secretary of State public license-plate galleries",
+  "retrievedAt": "2026-09-25T20:55:46.042Z",
+  "images": {
+    "legacy_greatlakes": {
+      "path": "assets/plates/legacy_greatlakes.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Legacy/Legacy_GreatLakes.png?mw=768&rev=07bdf924dbd04613b1d3bc1e7aa6918f&extension=webp&hash=FBBE74233428614CF04F3883F3F799DD",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/legacy-plate-options",
+      "designs": [
+        "legacy_great_lakes"
+      ],
+      "contentType": "image/webp",
+      "bytes": 9090,
+      "sha256": "35ff08e8eba27d9092b5c63c07a1ee8afb25ce9d0fffa2eec7a227b48b146d79"
+    },
+    "legacy_greatlakestate": {
+      "path": "assets/plates/legacy_greatlakestate.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Legacy/Legacy_GreatLakeState.png?mw=768&rev=be0cd36ba7c1414eb5218c161b0ee9ef&extension=webp&hash=468000C13ECFB9AF3EC7ED1C3118D98D",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/legacy-plate-options",
+      "designs": [
+        "legacy_great_lake_state"
+      ],
+      "contentType": "image/webp",
+      "bytes": 7432,
+      "sha256": "92fcf55b62e9be3e2b58fb2a33413d31c621ec063aea1bc96774b706438b538c"
+    },
+    "legacy_semiquincentennial": {
+      "path": "assets/plates/legacy_semiquincentennial.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Legacy/Legacy_Semiquincentennial.jpg?mw=768&rev=a68add6204da466685a62dcd06746b4c&extension=webp&hash=104CD01B7826C00B6F5B1123A0974EA0",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/legacy-plate-options",
+      "designs": [
+        "legacy_semiquincentennial"
+      ],
+      "contentType": "image/webp",
+      "bytes": 11578,
+      "sha256": "55b0f6c47ce9d66774f8a367a673729b028c13637bb75014678a12901c5184bc"
+    },
+    "militaryveterans_afghanistancampaignmedal": {
+      "path": "assets/plates/militaryveterans_afghanistancampaignmedal.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_AfghanistanCampaignMedal.jpg?mw=768&rev=4da57fc625f1486db64a6122a117a4c5&hash=78B4453DDE2C02C1CE0A01B21837B477",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_afghanistan_campaign"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18740,
+      "sha256": "c85de6cc6db53ac0df5e40cdf9f5cae1b13964cc272d9fc1fe1b559f779652e7"
+    },
+    "militaryveterans_afghanistanconflict": {
+      "path": "assets/plates/militaryveterans_afghanistanconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_AfghanistanConflict.jpg?mw=768&rev=320625b2a60d44b19f861dcd770677d5&hash=98A809C582E60D7E014FA907175ABCA5",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_afghanistan_conflict"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17316,
+      "sha256": "14bca8491e1e0807aad010a9a5b529589e43a7562030fcc642d02f358205beca"
+    },
+    "militaryveterans_airforce": {
+      "path": "assets/plates/militaryveterans_airforce.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_AirForce.jpg?mw=768&rev=b560de927dbb4af299e55ad79e22fbd0&hash=E5F49C36ED891615E8C260737C817181",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_air_force"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19853,
+      "sha256": "aad704f4fbfb29d2dbda9cd408b94d3e76b7257a59e091eef8b0b8e0c9f1082c"
+    },
+    "militaryveterans_army": {
+      "path": "assets/plates/militaryveterans_army.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_Army.png?mw=768&rev=f802d121a6b84132a243317d175fe522&hash=BA1616540246D114830EEC1262DBE236",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_army"
+      ],
+      "contentType": "image/png",
+      "bytes": 35360,
+      "sha256": "aa5cc8b2902bc4c1c1a9e53c289bafa353679d2e00751508f17d1f509eb63c7f"
+    },
+    "militaryveterans_bluestarfamily": {
+      "path": "assets/plates/militaryveterans_bluestarfamily.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_BlueStarFamily.jpg?mw=768&rev=66ada7a38cdb440fa8f0972cb9546928&hash=FD3638B6DB878EBAB3E32D0BD9949B22",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_blue_star"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19323,
+      "sha256": "8fe72ad07ea61175fac6c87520ff5678b42a147b1ed0bf0c6faccb73e137c213"
+    },
+    "militaryveterans_coastguard": {
+      "path": "assets/plates/militaryveterans_coastguard.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_CoastGuard.jpg?mw=768&rev=65d5ee8367b74aa4a910ffde6643f842&hash=91AEBF38C8630BA8613F73986459C64E",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_coast_guard"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21408,
+      "sha256": "170ac742d971af1d2edc18dd31b4e5bd6128d07e07cfcd9bddd5692d72c2eaad"
+    },
+    "militaryveterans_combatwoundedveteran": {
+      "path": "assets/plates/militaryveterans_combatwoundedveteran.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_CombatWoundedVeteran.jpg?mw=768&rev=b25812b97a8945f8ac5e68f7d67a7f9f&hash=7960632F51368A204015C8075AC63C76",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_purple_heart"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19760,
+      "sha256": "9527033e755e595b12b3ca6eb9f9f98a88f4495e04a6d2e0eb14ffe529bac31f"
+    },
+    "militaryveterans_cubanmissilecrisis": {
+      "path": "assets/plates/militaryveterans_cubanmissilecrisis.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_CubanMissileCrisis.jpg?mw=768&rev=b0d28ddb3e3c4aaa9db38ff462de103a&hash=66691C574A0C53AE30A23DA80DEF7F4E",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_cuban_missile"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19061,
+      "sha256": "16d2c5ab4a8c1364d0e620159e07139fb7f05fb60bf997ce7b0784542caa76fa"
+    },
+    "militaryveterans_dominicanrepublic": {
+      "path": "assets/plates/militaryveterans_dominicanrepublic.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_DominicanRepublic.jpg?mw=768&rev=32673cd47bd5480d8146cf5b886c8730&hash=933009C348FE7985E0A09A468E60AF20",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_dominican_republic"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18936,
+      "sha256": "c7eaad4b5fed91eb1265008bab05121cf735fea63d4d743b0c6fd3aaba3a10a5"
+    },
+    "militaryveterans_exprisonerofwar": {
+      "path": "assets/plates/militaryveterans_exprisonerofwar.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_ExPrisonerofWar.jpg?mw=768&rev=015221f2f4234341bd9ce3cc2fa4d588&hash=0F6CA2F6DFA7F9474A651D4DA8883417",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_ex_pow_permanent",
+        "vt_ex_pow_standard"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19984,
+      "sha256": "b0509958d1b4028d660ffcb34eb89b5765b20efbf1db179df09724c7858279af"
+    },
+    "militaryveterans_goldstarfamily": {
+      "path": "assets/plates/militaryveterans_goldstarfamily.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_GoldStarFamily.jpg?mw=768&rev=4e02ec707e284186942071bd5595fda6&hash=81FB5FDEE52E72EF63F9444304AE7508",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "gld_gold_star_family"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20722,
+      "sha256": "4ec8f979debb3626a398d30e2a4db1df4ed227892417caff4d4276d5d94bc4bb"
+    },
+    "militaryveterans_grenadaconflict": {
+      "path": "assets/plates/militaryveterans_grenadaconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_GrenadaConflict.jpg?mw=768&rev=b4bb3cc6cb6445ccbb7c3a90f4cd502d&hash=93C249562CA89E99A91B9C0B44E27CF8",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_grenada"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17415,
+      "sha256": "0e3768267fb601f9684bf6d4a9ff621ed7dce21285c647e89bc4da03c041befa"
+    },
+    "militaryveterans_iraqcampaignmedal": {
+      "path": "assets/plates/militaryveterans_iraqcampaignmedal.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_IraqCampaignMedal.jpg?mw=768&rev=8d97cc7923774625b9f4dc058c06dcee&hash=55BC4CC7B15BE4F8A6F821ED0EF5DF90",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_iraq_campaign"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17982,
+      "sha256": "45dd2a984e1c23a3b86b2cbd7122bf00ed6f72c5d10e6110fa6f50d08ef433be"
+    },
+    "militaryveterans_iraqconflict": {
+      "path": "assets/plates/militaryveterans_iraqconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_IraqConflict.jpg?mw=768&rev=b4005f4ddc4042aab5bbfe93fafaeffd&hash=42EF051980E6ADD08887D71788DA6531",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_iraq_conflict"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 16808,
+      "sha256": "e91c095440f5f77edf53447b065ea4d33416dd5ada5fc0d657cfb05fbf65fd5d"
+    },
+    "militaryveterans_koreanwar": {
+      "path": "assets/plates/militaryveterans_koreanwar.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_KoreanWar.jpg?mw=768&rev=0544e1b8602147db944e6fc60e4cb56a&hash=4A6064CCF4374A8D7B5581B658C98F3D",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_korean_war"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17195,
+      "sha256": "d13143a46ff1cdf9acdd8a7c0d7310380a4738a652c6de0543085d78e7d1d442"
+    },
+    "militaryveterans_laosconflict": {
+      "path": "assets/plates/militaryveterans_laosconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_LaosConflict.jpg?mw=768&rev=ebb0a1fe94b84f1eba26cbc3a0f0d078&hash=23BBA7319FDA07AA962EB0FDF6C601D3",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_laos"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 16835,
+      "sha256": "efe6b5978fc683acaf209ef96de8bd20723593a65dc658e3561f5369d9b6d5e1"
+    },
+    "militaryveterans_lebanonconflict": {
+      "path": "assets/plates/militaryveterans_lebanonconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_LebanonConflict.jpg?mw=768&rev=e3304f7a484d4a3591ec16e3f1e9f5cf&hash=82A784C9BE449E7CE517CC63D37A0DBB",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_lebanon"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17443,
+      "sha256": "90fc38c919dadb75243e8f3ba5adfa6863e03047c2473a7590dc0adff0c4e051"
+    },
+    "militaryveterans_marinecorps": {
+      "path": "assets/plates/militaryveterans_marinecorps.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_MarineCorps.jpg?mw=768&rev=71a3285d4a67422693a8b0be78bada7c&hash=4B0673DA8751440E91BEE78E8D486851",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_marine_corps"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21047,
+      "sha256": "fe700d115b2475e10653f0e65ec8c30f7e5b24eae1039862332ed34dd3c3725a"
+    },
+    "militaryveterans_merchantmarine": {
+      "path": "assets/plates/militaryveterans_merchantmarine.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_MerchantMarine.jpg?mw=768&rev=be3026ad4f29492db7c094d40acfad3e&hash=32257ACF780FB61D23F2FAEBC282E7EF",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_merchant_marine"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 23635,
+      "sha256": "399785b25700d93515169126c474134d3685ac7efe5300a10cdb0e80da11b855"
+    },
+    "militaryveterans_militaryreserve": {
+      "path": "assets/plates/militaryveterans_militaryreserve.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_MilitaryReserve.jpg?mw=768&rev=932cccb0a2c341d083ffbb46baa70576&hash=013F4254A31B857AD1E59A9E4CEF27E3",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_military_reserve"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18572,
+      "sha256": "3af56223127810a68e82420246dd58cb1a7ebc796ca03351d322288f1a8092fc"
+    },
+    "militaryveterans_nationalguard": {
+      "path": "assets/plates/militaryveterans_nationalguard.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_NationalGuard.jpg?mw=768&rev=cc76710b2bad425db1141987ee1c0d98&hash=FB4CA573F13A0F592BB7816D5436B0DD",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_national_guard"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21335,
+      "sha256": "a74a965274523843373594f17b5bd2d2c959b1c8b4d2304463cac08a8944326d"
+    },
+    "militaryveterans_navy": {
+      "path": "assets/plates/militaryveterans_navy.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_Navy.jpg?mw=768&rev=9a78f92814e44e01b1e38dcb5d8b9fae&hash=967F63B09CB33AB3CABF67C127D3AF34",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_navy"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21679,
+      "sha256": "21cadf3157715967cdf743583dcc1df0c6a70b23ee5c50a768c68f593fb9101d"
+    },
+    "militaryveterans_panamaconflict": {
+      "path": "assets/plates/militaryveterans_panamaconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_PanamaConflict.jpg?mw=768&rev=1178b4a54a6f4d3db104c276b70ae8fb&hash=F09501C8F6D56D305655A306151F5823",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_panama"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17269,
+      "sha256": "a6cf2955dcbe22080addca46cc26e5260ce3df32a75a5a0bb0d553dfd9b5bfcc"
+    },
+    "militaryveterans_pearlharborsurvivor": {
+      "path": "assets/plates/militaryveterans_pearlharborsurvivor.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_PearlHarborSurvivor.jpg?mw=768&rev=d5c20023a60b4867b590150810438107&hash=AB72D55C7D8A2128955E8D2171DE1720",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_pearl_harbor"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17954,
+      "sha256": "ef1440c20946230823f9b3e75b2cecfdab6cf785fcc46ba4663ef8491c500f29"
+    },
+    "militaryveterans_permanentdisabledveteran": {
+      "path": "assets/plates/militaryveterans_permanentdisabledveteran.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_PermanentDisabledVeteran.jpg?mw=768&rev=cd484142580f46c9a21109bdeb9b25e9&hash=C5DFE514E6E314D42F5B93F8D78C61A8",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_disabled_permanent"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20273,
+      "sha256": "20ea3c3d18347989e6e298b9d47a6acd78ca986b6e0f7138da0e9dbc17c9ed66"
+    },
+    "militaryveterans_persiangulfdesertstorm": {
+      "path": "assets/plates/militaryveterans_persiangulfdesertstorm.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_PersianGulfDesertStorm.jpg?mw=768&rev=423219bdcffa4bc986be739c8bdceca8&hash=37FA74E453334245D6EBED4C54786A5B",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_persian_gulf"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18080,
+      "sha256": "5fa398ed87c11e09e43031d2899b5c4b8620c9b93c82f7dc99e1bcfd875659db"
+    },
+    "militaryveterans_somaliaconflict": {
+      "path": "assets/plates/militaryveterans_somaliaconflict.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_SomaliaConflict.jpg?mw=768&rev=484e8c556789468db3e87c9e24ea96e3&hash=6791057DEE6CEFF8F663E3F7CD3BBAC0",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_somalia"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17346,
+      "sha256": "126b3288972c0ef8426502591fc8549e053b9f42282a7eac524d478d74643611"
+    },
+    "militaryveterans_standarddisabledveteran": {
+      "path": "assets/plates/militaryveterans_standarddisabledveteran.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_StandardDisabledVeteran.jpg?mw=768&rev=5237a20980d94fe6a601d7107fd9d481&hash=03A2A40936376A9115BCA497819E6364",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_disabled_standard"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20971,
+      "sha256": "06accd63bdbfc4cd2a0ed24237c6a95c86eb64eb76f5d3aa52ae2de9dc27afed"
+    },
+    "militaryveterans_vietnamservicemedal": {
+      "path": "assets/plates/militaryveterans_vietnamservicemedal.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_VietnamServiceMedal.jpg?mw=768&rev=2bf941d5676549c194c159893a708bc0&hash=06103F03B881A81DBAA7BBAB065DA41E",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_vietnam_service"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18663,
+      "sha256": "9e5adc9de64465157ad3e1767ebcbbd237d56dcdb6b31de5fb484626fa9e5616"
+    },
+    "militaryveterans_vietnamwar": {
+      "path": "assets/plates/militaryveterans_vietnamwar.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_VietnamWar.jpg?mw=768&rev=1f2f78d7bb6e4d0f8a59baf6dd764885&hash=2E7DB7A72D6A73FB5587491EA5594C46",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_vietnam_war"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 16849,
+      "sha256": "c31900ed8083481cbde21acd0f7a971c64e23d18d600a428bf2833ee948cb2d9"
+    },
+    "militaryveterans_womanveteran": {
+      "path": "assets/plates/militaryveterans_womanveteran.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_WomanVeteran.jpg?mw=768&rev=5b9e2c7b895c441e805bc4b19a04142a&hash=93CEE673D6A883FE4393929CCAC77FF8",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_woman"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 24743,
+      "sha256": "eb309faaf300e0e4f98f6e652176f8f309234114184a60f575a11a642168e21e"
+    },
+    "militaryveterans_worldwarii": {
+      "path": "assets/plates/militaryveterans_worldwarii.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Military-and-veteran/MilitaryVeterans_WorldWarII.jpg?mw=768&rev=b2797d57af65469e8d17004ca90b044e&hash=A69F2881AE6CE37E8E66F53D1AB3C5D0",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/military-and-veteran-plate-options",
+      "designs": [
+        "vt_world_war_ii"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18012,
+      "sha256": "d9abf39015d1b1e43ef1d42e76c409389d49a5027083a4179f8d8ee5dee5dca7"
+    },
+    "mm.flt.pm": {
+      "path": "assets/plates/mm.flt.pm.jpg",
+      "url": "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.FLT.PM",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates",
+      "designs": [
+        "fleet_standard_white"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 8705,
+      "sha256": "1cb28ecd538fcf4e99a39478da409747676c0d9000c6c36f77daabeff9ae1d47"
+    },
+    "mm.rfl.pm": {
+      "path": "assets/plates/mm.rfl.pm.png",
+      "url": "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/MM.RFL.PM.png",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates",
+      "designs": [
+        "rental_fleet_standard_white"
+      ],
+      "contentType": "image/png",
+      "bytes": 543951,
+      "sha256": "578513f8fd139eefe3dcc7de34d072a7b9d815b9610dbf2717966219ba7e850c"
+    },
+    "specialcause_4h": {
+      "path": "assets/plates/specialcause_4h.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_4H.jpg?mw=768&rev=f368b91dafff4744b59a9de119364450&hash=EB50690FDBC51D84E8DB62D0D06744A5",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_4h"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20829,
+      "sha256": "03aaadd222b16d61568f599b98a3fc53d030b2a32620483b4b9b456b1915e338"
+    },
+    "specialcause_agriculturalheritage": {
+      "path": "assets/plates/specialcause_agriculturalheritage.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_AgriculturalHeritage.jpg?mw=768&rev=200193f938b545019679336df7b6d871&hash=8F30F6CC67853056735A078747A65CFA",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_agricultural_heritage"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21105,
+      "sha256": "dd14d3139ce2933aa9082f79de5a92cf63ea71ec4f41694cfd7f853616ce1ae5"
+    },
+    "specialcause_breastcancerawareness": {
+      "path": "assets/plates/specialcause_breastcancerawareness.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_BreastCancerAwareness.jpg?mw=768&rev=3d28d821727a4af5ada81aefc453f29b&hash=B7712CC9A85CAB3FD880476F3242FE8A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_breast_cancer"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17902,
+      "sha256": "a7fc3642ef9400f856e161cf43a6fd08a53b080e42340b5380d1ccfd6cee78e3"
+    },
+    "specialcause_childrenstrustfund": {
+      "path": "assets/plates/specialcause_childrenstrustfund.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_ChildrensTrustFund.jpg?mw=768&rev=e1e1f49dbb9c45e38f385bc551dfabf1&hash=198B6D7D8B068B19E708955A472A4B97",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_childrens_trust"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19611,
+      "sha256": "e178bffdeb58de597e4252877559d978980eec5f7a65d2c6601a2a50056f706d"
+    },
+    "specialcause_detroitlions": {
+      "path": "assets/plates/specialcause_detroitlions.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DetroitLions.jpg?mw=768&rev=949e9f5f38a3494eaefcafb2d3e6ebd7&hash=24D47242236B288BB649B3F1869A55D9",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_detroit_lions"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18709,
+      "sha256": "069d577793065ca977ef7827a25f186818b6ad4cf3a024b2af91f67b340fc5bd"
+    },
+    "specialcause_detroitpistons": {
+      "path": "assets/plates/specialcause_detroitpistons.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DetroitPistons.jpg?mw=768&rev=a4495133ab1441cb8792a9e35e7f0d8b&hash=085EC0BDE13148A2E543F29B49957F1C",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_detroit_pistons"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21123,
+      "sha256": "442f0b2fd0ec6ec60471df69d4b9fb7a9c8370ca1011ff5d2762789067312937"
+    },
+    "specialcause_detroitredwings": {
+      "path": "assets/plates/specialcause_detroitredwings.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DetroitRedWings.jpg?mw=768&rev=632be5e20c154c17b4dec5c2e9de6aa1&hash=CEA038A700D9595F491E72733B093C8B",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_detroit_red_wings"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20034,
+      "sha256": "64a5f7241795d23258810f9b1c1d507ac837271d4d133089cad48348de7e1296"
+    },
+    "specialcause_detroittigers": {
+      "path": "assets/plates/specialcause_detroittigers.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DetroitTigers.jpg?mw=768&rev=0129bf575af14fe08124d2c1243fc4b7&hash=BB69CB072C1D6CCCF79D6E6B4A5DFC6C",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_detroit_tigers"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19888,
+      "sha256": "a2868e8bf787034af190b68a0f77186ca326dca47aadb8cf7ee42b7e08f4da81"
+    },
+    "specialcause_donatelife": {
+      "path": "assets/plates/specialcause_donatelife.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DonateLife.jpg?mw=768&rev=519c0e5f5d6944618feb5795d5b12b63&hash=DDE13A55976E1499CED6BBD7499565EC",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_donate_life"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19784,
+      "sha256": "b162aceb9c19c4513e164efb339b93039463cffdaf17d5722fbf6d1a5ac3eea3"
+    },
+    "specialcause_ducksunlimited": {
+      "path": "assets/plates/specialcause_ducksunlimited.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_DucksUnlimited.jpg?mw=768&rev=bc73b852a6af4fed93cde74c11fa1def&hash=DE9B24F3BB59A5B1EF460654FF6D4657",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_ducks_unlimited"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 17919,
+      "sha256": "ae6757bd2d759d138bde22d1e3bd16a0a4707a788b21882d73c128440831aef6"
+    },
+    "specialcause_lighthousepreservation": {
+      "path": "assets/plates/specialcause_lighthousepreservation.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_LighthousePreservation.jpg?mw=768&rev=23d16617d2d840278fb03bca23f5a5b9&hash=BA28C9C1EC99E4305113D30385E270F4",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_lighthouse"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21178,
+      "sha256": "cdf3c4debe3f3b3697154f797a51403a3ee7352e462f1ebaca8209d050456af7"
+    },
+    "specialcause_olympiceducation": {
+      "path": "assets/plates/specialcause_olympiceducation.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_OlympicEducation.jpg?mw=768&rev=facf76b7db5d42858a81da3253eb5425&hash=C815794677E3316C59EE3198967E141A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_olympic"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20164,
+      "sha256": "351636af81a2e569d756476d97e3ac4962190b2e0f49c05dd4962737bef27a87"
+    },
+    "specialcause_patriotic": {
+      "path": "assets/plates/specialcause_patriotic.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_Patriotic.jpg?mw=768&rev=816af03f87ae48679fd677365524317c&hash=66CC7745FDB1594F17AFB176DA49193C",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_patriotic"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21144,
+      "sha256": "0b5c16094be3fd1ca4e71cb1d539f581d1b394627ef7cf84301778e598f23ddd"
+    },
+    "specialcause_sicklecell": {
+      "path": "assets/plates/specialcause_sicklecell.png",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_SickleCell.png?mw=768&rev=b79f7fdbdd74400e887afb417053522e&hash=EE866DEA7E32A312A928A7781134542A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_sickle_cell"
+      ],
+      "contentType": "image/png",
+      "bytes": 27964,
+      "sha256": "4c506d50660357e99a678075b703af70bf94db9c7f19fb6d9f1e900ac44ccd76"
+    },
+    "specialcause_supportmichiganveterans": {
+      "path": "assets/plates/specialcause_supportmichiganveterans.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_SupportMichiganVeterans.jpg?mw=768&rev=9fb4132255b8469bb3d8d376abed4839&hash=0CB6AC39C2020A1FC1EA4123E9FAE450",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_support_veterans"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19753,
+      "sha256": "1d137211e0cac0701b0fcf123189e1e45b95f4c9d8c91718dbc4563e40f7be21"
+    },
+    "specialcause_veteransmemorial": {
+      "path": "assets/plates/specialcause_veteransmemorial.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_VeteransMemorial.jpg?mw=768&rev=2358d31a94c647ee857c015e74e7181b&hash=B4980514DEE41AE3FE3DE0A139903084",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_veterans_memorial"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18518,
+      "sha256": "b54b49c85dbe2e8e7d325649b1f3fe5d1c7c5b755d4b3b805c37330c97e7e3b3"
+    },
+    "specialcause_waterquality": {
+      "path": "assets/plates/specialcause_waterquality.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_WaterQuality.jpg?mw=768&rev=7266196e454449cf92a1a2b2a673f74a&hash=E98EE43065C85ED82CB5EB7CAD6C49E3",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_water_quality"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19815,
+      "sha256": "b4a394c07401fae9a626b6fba12872b1a68252c126d30c54195bcb6ee376324c"
+    },
+    "specialcause_wildlifehabitat": {
+      "path": "assets/plates/specialcause_wildlifehabitat.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-cause/SpecialCause_WildlifeHabitat.jpg?mw=768&rev=1e606e2696c148708f08ec0afbba892d&hash=5055A39F4314897EC0177EC99A4B7633",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/special-cause-fundraising-options",
+      "designs": [
+        "sc_wildlife_habitat"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18745,
+      "sha256": "8fd7e14c9a8043c881d9707a424ceca63a2d73b30cabafef82fa08bb597691cb"
+    },
+    "specialorg_alphaphialpha": {
+      "path": "assets/plates/specialorg_alphaphialpha.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_AlphaPhiAlpha.jpg?mw=768&rev=6e41d12369a744d7bb136cf11e02660b&hash=5BFE76C3F63F6E7AD1553F3DA0C6AE34",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_alpha_phi_alpha"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21674,
+      "sha256": "41a951234765cf183487cbe3b42bfc733f7809bd2be80f4bb13f96b60c82d311"
+    },
+    "specialorg_amateurradio": {
+      "path": "assets/plates/specialorg_amateurradio.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_AmateurRadio.jpg?mw=768&rev=bf38cce6c6f74950819dd0336b61a1d9&hash=FFF0B357CEFCD9F49987A411B112F55A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "aro_amateur_radio"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21549,
+      "sha256": "c036a7c7ed9bab6411abb8617fe85c49f7bd4854b36d74dd9102346a4c2c2851"
+    },
+    "specialorg_deltasigmatheta": {
+      "path": "assets/plates/specialorg_deltasigmatheta.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_DeltaSigmaTheta.jpg?mw=768&rev=77f7388da4b445cd919951c10600e9cd&hash=B408EF0604EDDF30EFD7CCAD9DAB80EB",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_delta_sigma_theta"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20484,
+      "sha256": "798dc1817c9ef6bca3439def77b5bcb578b84e9d1d249d0da2e6bed4bce291be"
+    },
+    "specialorg_firemensassociation": {
+      "path": "assets/plates/specialorg_firemensassociation.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_FiremensAssociation.jpg?mw=768&rev=e87a2c479b9d4845bd1230e2731fd98f&hash=869D492A83706CE200791892D492B97F",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_michigan_firemen"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 22458,
+      "sha256": "17b4d425a9c491ce2d13d16770a0af3115e368864c2e5644551fa4b7a38862aa"
+    },
+    "specialorg_fraternalorderofpolice": {
+      "path": "assets/plates/specialorg_fraternalorderofpolice.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_FraternalOrderofPolice.jpg?mw=768&rev=c142afd5ec064d98bb7a55ecdb3f7d07&hash=CD519E7097CE67EF729D5F03C424DF86",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_fraternal_order_police"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21163,
+      "sha256": "72bc5cc8282aeafae50e244b1ea55d3c00a4cf91e0648f6a60918b2e8da107bd"
+    },
+    "specialorg_freemasons": {
+      "path": "assets/plates/specialorg_freemasons.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_Freemasons.jpg?mw=768&rev=36e6b612dfec4f8ea5ba8084569eb4e5&hash=F4FAB4DB12FD6728CFEEFC2E0F991589",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_masons"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20034,
+      "sha256": "98d1285fc7e12b660a537ddbe518ba4fffaa812b2b590f2cdd65a7228bf1c077"
+    },
+    "specialorg_kappaalphapsi": {
+      "path": "assets/plates/specialorg_kappaalphapsi.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_KappaAlphaPsi.jpg?mw=768&rev=f8cd3e3970294ccf95c3b8e575d1e626&hash=903F74DDA0AED71CA2BB2E6D74A7B168",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_kappa_alpha_psi"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21044,
+      "sha256": "f1fa48a44bab577e01488cd3b6e23c703dec65862f99b90cf26cd12e615dc5cc"
+    },
+    "specialorg_phibetasigma": {
+      "path": "assets/plates/specialorg_phibetasigma.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_PhiBetaSigma.jpg?mw=768&rev=bfb02ed614a34e99807a2b5f76621874&hash=13462B17289411E19F749D97D0648507",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_phi_beta_sigma"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20688,
+      "sha256": "64b8a488c12c208676e54639d78177b8eb2f3612264436158ea052fc55c0374c"
+    },
+    "specialorg_poam": {
+      "path": "assets/plates/specialorg_poam.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_POAM.jpg?mw=768&rev=7f51b7cac68e4846949afd87bd5f6ac4&hash=BD720F56962CA8D81D990F04F2C921B8",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_poam"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 22922,
+      "sha256": "e48aa98995938acfb8b7938a5a0beaf7169f320ac69cc2b60d3e7a5570694e86"
+    },
+    "specialorg_professionalfirefightersunion": {
+      "path": "assets/plates/specialorg_professionalfirefightersunion.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_ProfessionalFireFightersUnion.jpg?mw=768&rev=28fee7be27474daea15909c8480dfc9b&hash=FDDD9E2BB3671B0185100C076477BCB6",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_fire_fighters"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 22311,
+      "sha256": "ecb8771fc4648d8e2573e5ceedb56c21d330c16a82920440f96ada4311b7837f"
+    },
+    "specialorg_zetaphibeta": {
+      "path": "assets/plates/specialorg_zetaphibeta.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Special-org/SpecialOrg_ZetaPhiBeta.jpg?mw=768&rev=4975e83c090549bc8e412d4b429ad4a0&hash=665619303AF506E3F0206F1851D09DF5",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/amateur-radio-and-special-organization-plate-options",
+      "designs": [
+        "pso_zeta_phi_beta"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 22193,
+      "sha256": "c38264a01636b91c970cdf44f44dfba16355f2c244df9308f708a46232e3a632"
+    },
+    "standard_macbridge": {
+      "path": "assets/plates/standard_macbridge.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard/Standard_MacBridge.jpg?mw=768&rev=413b8fc602d94d54b24fdd08e5c2e0d5&extension=webp&hash=5D11E396412EB208A1BB36AB777298AD",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/standard-plate-options",
+      "designs": [
+        "mackinac_bridge",
+        "commercial_mackinac_bridge"
+      ],
+      "contentType": "image/webp",
+      "bytes": 18684,
+      "sha256": "a0e548ed55bdb6fc129d141ab71dfa3d11324747f0b76bb9d8b487f3ca1bea67"
+    },
+    "standard_puremichigan": {
+      "path": "assets/plates/standard_puremichigan.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard/Standard_PureMichigan.jpg?mw=768&rev=c7f8121db6c64949a9d872fab0db0627&extension=webp&hash=27BC6C304E249263EFE5DA29E16F7CDF",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/standard-plate-options",
+      "designs": [
+        "pure_michigan",
+        "consul_standard_white",
+        "commercial_standard_white"
+      ],
+      "contentType": "image/webp",
+      "bytes": 8088,
+      "sha256": "77222ba42f34ff9684a79c63169922ed1091112258ac4328cb4605b41ede231a"
+    },
+    "standard_waterwinterwonderland": {
+      "path": "assets/plates/standard_waterwinterwonderland.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard/Standard_WaterWinterWonderland.png?mw=768&rev=7c515f174b324f00b7117f0ceb5f4ca1&extension=webp&hash=9EC134DE89985D0AD2CCA5F7CAA2A49A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/standard-plate-options",
+      "designs": [
+        "water_winter_wonderland"
+      ],
+      "contentType": "image/webp",
+      "bytes": 10974,
+      "sha256": "4bb19aecaa3393e390e5447f536a772a9c8bb3b2250628cac5fe100162869c3f"
+    },
+    "standard_waterwonderland": {
+      "path": "assets/plates/standard_waterwonderland.webp",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/Standard/Standard_WaterWonderland.png?mw=768&rev=5100cbd66ac14b63bcd9d0c6f176d8e1&extension=webp&hash=D5BD0360588618000B760A8FB0270114",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/standard-plate-options",
+      "designs": [
+        "water_wonderland"
+      ],
+      "contentType": "image/webp",
+      "bytes": 9538,
+      "sha256": "cb56d9fe06dec00cf253766a4999f71b9faf7ac064d1419f57cd4cb57d4fbbfb"
+    },
+    "university_centralmichigan": {
+      "path": "assets/plates/university_centralmichigan.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_CentralMichigan.jpg?mw=768&rev=66114bcecd424d70b820fa57a3e473e5&hash=6F534DAD6164CD2037F93E745A3F1AAB",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_central_michigan"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18989,
+      "sha256": "74ea8531f1f570c57084b6d7a542c3d5b88ff7cb14ba35790b1571351e5c69e4"
+    },
+    "university_easternmichigan": {
+      "path": "assets/plates/university_easternmichigan.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_EasternMichigan.png?mw=768&rev=18a7e07049244574b8569044e8a0f706&hash=93AC731EAEB042CB5F52BC645CB23497",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_eastern_michigan"
+      ],
+      "contentType": "image/png",
+      "bytes": 55144,
+      "sha256": "9059160e266818c7e08c2c3800e51dd31de51880ddabc3a863f4c9550a7efc0d"
+    },
+    "university_ferrisstate": {
+      "path": "assets/plates/university_ferrisstate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_FerrisState.jpg?mw=768&rev=967713bbf7f34f06a393f21bdefde926&hash=06AAC79651E857408E0EDEEE8EE8018F",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_ferris_state"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20478,
+      "sha256": "50419336419266feae86680c2db5afbbeefbec039cbd7b8475a2e37984ccd23b"
+    },
+    "university_grandvalleystate": {
+      "path": "assets/plates/university_grandvalleystate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_GrandValleyState.jpg?mw=768&rev=350ad7cc7ed642bdb92609f22dcd8df1&hash=07E5AC4F6AAC0789C440BC8889B70B75",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_grand_valley"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 21184,
+      "sha256": "26950e561e7ee3fc8f9a6d398a6f1ed29da5bf84543ae0f38e3d18d1709e74d0"
+    },
+    "university_lakesuperiorstate": {
+      "path": "assets/plates/university_lakesuperiorstate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_LakeSuperiorState.jpg?mw=768&rev=58deff08433840c6827b4668a50c914d&hash=98B404EF2C1787EA54DA99598169D556",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_lake_superior"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20020,
+      "sha256": "c4dfaa9323a91ef779dc583b9299a172d3620855afb9c32cffda2aa02fa9c51a"
+    },
+    "university_michiganstate": {
+      "path": "assets/plates/university_michiganstate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_MichiganState.jpg?mw=768&rev=8226224347d2463caab0391e1d85cdf5&hash=5801A5462AF74E712684B026F6ACE226",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_michigan_state"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 18581,
+      "sha256": "03dc39527e2255ce8277f6c76133329878234f024698f38b5ca6bc3a478f6b3b"
+    },
+    "university_michigantech": {
+      "path": "assets/plates/university_michigantech.png",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_MichiganTech.png?mw=768&rev=d3532e5a64ad4d4a87bc67f366c82e9c&hash=B4307984CC02F3DBC5C0FAC9EE1BB472",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_michigan_tech"
+      ],
+      "contentType": "image/png",
+      "bytes": 56254,
+      "sha256": "bd7f8a9060bee8d316000ef00c733dbbb91b8baad30fdf8451ff0c324b953dac"
+    },
+    "university_northernmichigan": {
+      "path": "assets/plates/university_northernmichigan.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_NorthernMichigan.jpg?mw=768&rev=2e6ea030d3d84937ab87f4facb4e4e11&hash=82855736A3688B2F1DABE4322DF13A34",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_northern_michigan"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20018,
+      "sha256": "7eb74aab447a8352e6feb94014c9f17326dbdbe08b23abf067aa158f9dd9a427"
+    },
+    "university_oakland": {
+      "path": "assets/plates/university_oakland.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_Oakland.jpg?mw=768&rev=71c1bed03528471c80dc8b2908fa5b9f&hash=80D6567EB1E8179530C5E3FA4878B24A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_oakland"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20018,
+      "sha256": "6b36df76a3066cb4d7ef4bbb58ac629d066357289fb96de39ff027d74635eb38"
+    },
+    "university_saginawvalleystate": {
+      "path": "assets/plates/university_saginawvalleystate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_SaginawValleyState.jpg?mw=768&rev=0fcbc34a2da54f47baeafcf7815574dc&hash=7F87A8071751724DA3D15CD7D3425F81",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_saginaw_valley"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 23332,
+      "sha256": "0be95b3c359ed1cea7d3fc85ab191944668b16d121c4a5e8508660330656261d"
+    },
+    "university_umichigan": {
+      "path": "assets/plates/university_umichigan.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_UMichigan.jpg?mw=768&rev=8d089d1433de47f595edf56d37373990&hash=C83BF19211215E367995D38140D1D9C8",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_michigan"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19084,
+      "sha256": "a8016bffe5ec638e6219fb12d4aced601ffdbbbda8b01bd00c890c21eda5ac42"
+    },
+    "university_umichigandearborn": {
+      "path": "assets/plates/university_umichigandearborn.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_UMichiganDearborn.jpg?mw=768&rev=0036db77cefd48f1a7a52c6c96bb1cdb&hash=D2BEF0FADDDFA468A379D0A8122A03FF",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_michigan_dearborn"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19667,
+      "sha256": "24e62b4a62d8b4693ab42401134c6ade1c5e5d7ad904b330251f436fd5e1c499"
+    },
+    "university_umichiganflint": {
+      "path": "assets/plates/university_umichiganflint.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_UMichiganFlint.jpg?mw=768&rev=73999528b03d400e9e6a53095e2558be&hash=CD62A15D879F934FE6A613C9D6618819",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_michigan_flint"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 20131,
+      "sha256": "416232b2be13140d21b939b813dc005fba058b0dc729eab24977b8278882cebe"
+    },
+    "university_waynestate": {
+      "path": "assets/plates/university_waynestate.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_WayneState.jpg?mw=768&rev=5965e805c20044d5b901a4fd8c845aed&hash=46F15209CE2E4EA8C5FA5DCE2858338A",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_wayne_state"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19953,
+      "sha256": "d6042e4eba2935f4220a1d99f5662859434d27cf14c29f0c5edf03e564c0fc51"
+    },
+    "university_westernmichigan": {
+      "path": "assets/plates/university_westernmichigan.jpg",
+      "url": "https://www.michigan.gov/sos/-/media/Project/Websites/sos/Vehicle/License-plate-images/University/University_WesternMichigan.jpg?mw=768&rev=9b9624827bc34bc2ae4dce3a82c41be3&hash=64CD7E195D24E828DC12A59C06050F30",
+      "sourcePage": "https://www.michigan.gov/sos/vehicle/license-plates/university-plate-options",
+      "designs": [
+        "u_western_michigan"
+      ],
+      "contentType": "image/jpeg",
+      "bytes": 19555,
+      "sha256": "c609fed3365134751e13315fb90c8000af31e15b2db6370a40005514223774a3"
+    }
+  }
+}

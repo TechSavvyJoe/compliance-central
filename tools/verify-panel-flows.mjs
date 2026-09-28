@@ -57,6 +57,22 @@ try {
     const fixture = window.panelFixture = {
       messages: [], pending: [], platePreviewUrl: null, local: { dataUseNoticeSeen: true, retentionNoticeAckVersion: "1.6.0-retention" }, session: {},
     };
+    const restoredQuote = sessionStorage.getItem("test-restored-sos-quote");
+    if (restoredQuote) fixture.session.sosFeeQuote = JSON.parse(restoredQuote);
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    const nativeClearTimeout = window.clearTimeout.bind(window);
+    const stallTimers = new Map();
+    window.setTimeout = (callback, delay, ...args) => {
+      const id = nativeSetTimeout(callback, delay, ...args);
+      if (delay === 300000) stallTimers.set(id, () => callback(...args));
+      return id;
+    };
+    window.clearTimeout = (id) => { stallTimers.delete(id); nativeClearTimeout(id); };
+    fixture.expireStall = () => {
+      const timer = [...stallTimers.values()].at(-1);
+      if (!timer) throw new Error("No live screening deadline was armed");
+      timer();
+    };
     const area = (name) => ({
       async get(keys) {
         const store = fixture[name];
@@ -79,6 +95,7 @@ try {
         getManifest: () => ({ version: "test" }), getURL: (path) => new URL(path, location.href).href,
         sendMessage: async (message) => {
           fixture.messages.push(message);
+          if (message.type === "CANCEL_CURRENT_RUN" && fixture.holdCancellation) return new Promise(() => {});
           if (message.type === "getDataStatus") return { success: true, lastUpdate: Date.now(), entryCount: 1000 };
           if (message.type === "SOS_FEE_CALCULATE") return new Promise((resolve) => fixture.pending.push({ resolve, mode: message.data.mode }));
           return { success: true };
@@ -181,13 +198,88 @@ try {
   }), true, "a live run prioritizes the readable progress workspace");
   console.log("PASS: active run collapses inactive controls and keeps a visible status surface");
 
-  artworkFixture = true;
+  for (const size of [{ width: 320, height: 640 }, { width: 400, height: 850 }, { width: 588, height: 1250 }]) {
+    await page.setViewport(size);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+      const progress = rect("#progressSection");
+      const workspace = rect("#screeningWorkspace");
+      const main = rect(".hub-main");
+      const clear = rect("#clearBtn");
+      return {
+        progressTop: progress.top,
+        progressBottom: progress.bottom,
+        progressVisible: progress.top >= 0 && progress.bottom <= innerHeight,
+        summaryHeight: workspace.height,
+        sideGutter: main.left,
+        clearReachable: document.elementFromPoint(clear.x + clear.width / 2, clear.y + clear.height / 2)?.closest("#clearBtn") !== null,
+        noOverflow: document.documentElement.scrollWidth <= innerWidth,
+      };
+    });
+    if (!layout.progressVisible && process.env.CC_FLOW_ARTIFACTS) {
+      await mkdir(process.env.CC_FLOW_ARTIFACTS, { recursive: true });
+      await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "running-layout-failure.png"), fullPage: true });
+    }
+    assert.equal(layout.progressVisible, true, `progress stays in the first viewport at ${size.width}x${size.height}: ${JSON.stringify(layout)}`);
+    assert.ok(layout.summaryHeight < 150, "collapsed buyer summary does not reserve an empty screen");
+    assert.ok(layout.sideGutter <= 10, "panel width is used without large outside gutters");
+    assert.equal(layout.clearReachable, true, "Clear is visible and not covered by sticky tabs");
+    assert.equal(layout.noOverflow, true);
+  }
+  if (process.env.CC_FLOW_ARTIFACTS) {
+    await mkdir(process.env.CC_FLOW_ARTIFACTS, { recursive: true });
+    await page.setViewport({ width: 400, height: 850 });
+    await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "running-compact.png") });
+  }
+  await page.evaluate(() => { window.panelFixture.holdCancellation = true; window.panelFixture.expireStall(); });
+  await page.waitForFunction(() => !document.body.classList.contains("is-screening-running"));
+  assert.equal(await page.$eval("#runAllChecksBtn", (el) => el.disabled), false, "retry does not wait for a stalled cancellation reply");
+  assert.equal(await page.$eval("#firstName", (el) => el.value), "Marcus", "recovery keeps the entered buyer details");
+  assert.match(await page.$eval("#progressLabel", (el) => el.textContent), /did not complete/);
+  assert.equal(await page.$eval("#progressSpinner", (el) => getComputedStyle(el).display), "none");
+  assert.equal(await page.$eval("#resultsSection", (el) => el.classList.contains("hidden")), true, "timeout cannot expose an approved result");
+  assert.equal(await page.$eval(".progress-assurance", (el) => getComputedStyle(el).display), "none", "stalled runs do not claim checks are still in progress");
+  console.log("PASS: a stalled run stops spinning and enables retry while preserving input");
+  await page.click("#clearBtn");
+  await page.waitForFunction(() => !document.body.classList.contains("is-screening-running"));
+  assert.equal(await page.$eval("#runAllChecksBtn", (el) => el.disabled), false);
+  console.log("PASS: compact progress and working Clear at narrow and tall panel sizes");
+
   await reload();
   await page.click("#sosTabBtn");
   await page.waitForFunction(() => {
     const img = document.querySelector("#sosPlatePreviewImage");
     return img.complete && img.naturalWidth > 0;
   });
+  assert.match(await page.$eval("#sosPlatePreviewImage", (el) => el.src), /\/assets\/plates\/standard_puremichigan\./);
+  if (process.env.CC_FLOW_ARTIFACTS) {
+    await page.setViewport({ width: 400, height: 850 });
+    await page.$eval("#sosPlatePreview", (el) => el.scrollIntoView({ block: "center" }));
+    await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "plate-preview-offline.png") });
+  }
+  await fill("sosPlateType", "U", "change");
+  await fill("sosPlateDesign", "u_michigan_state", "change");
+  await page.waitForFunction(() => {
+    const img = document.querySelector("#sosPlatePreviewImage");
+    return img.src.includes("/assets/plates/university_michiganstate.") && img.complete && img.naturalWidth > 0;
+  });
+  if (process.env.CC_FLOW_ARTIFACTS) {
+    await page.$eval("#sosPlatePreview", (el) => el.scrollIntoView({ block: "center" }));
+    await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "plate-preview-msu-offline.png") });
+  }
+  await fill("sosPlateType", "PAS", "change");
+  await fill("sosPlateDesign", "pure_michigan", "change");
+  await page.evaluate(() => { window.panelFixture.platePreviewUrl = "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/TEST.UNAVAILABLE.PLATE"; });
+  await fill("sosModelYear", "2026"); await fill("sosMsrp", "42500"); await fill("sosOwnerBirthdate", "03/14/1985");
+  await begin(); await respond();
+  await page.waitForFunction(() => {
+    const img = document.querySelector("#sosPlatePreviewImage");
+    return img.src.includes("/assets/plates/standard_puremichigan.") && img.complete && img.naturalWidth > 0 &&
+      !document.querySelector("#sosPlatePreview").hidden && document.querySelector("#sosPlatePreviewUnavailable").hidden;
+  });
+  console.log("PASS: Pure Michigan and MSU show before calculation without external network; failed quote art falls back to the selected official bundle");
+  artworkFixture = true;
   for (const size of [{ width: 320, height: 640 }, { width: 400, height: 400 }, { width: 1280, height: 720 }]) {
     await page.setViewport(size);
     await page.click("#sosPlatePreview");
@@ -209,6 +301,36 @@ try {
   }
   console.log("PASS: plate viewer fits short/narrow/wide screens; zoom and Escape recover");
 
+  // A restored specialty quote must not silently use the form's default
+  // Pure Michigan art when its state-hosted image cannot be loaded.
+  await page.setViewport({ width: 400, height: 850 });
+  await fill("sosPlateType", "U", "change");
+  await fill("sosPlateDesign", "u_michigan_state", "change");
+  await begin(); await respond();
+  await page.evaluate(() => {
+    sessionStorage.setItem("test-restored-sos-quote", JSON.stringify(window.panelFixture.session.sosFeeQuote));
+  });
+  await reload();
+  await page.click("#sosTabBtn");
+  await page.waitForFunction(() => {
+    const img = document.querySelector("#sosPlatePreviewImage");
+    return img.src.includes("/assets/plates/university_michiganstate.") && img.complete && img.naturalWidth > 0;
+  });
+  assert.equal(await page.$eval("#sosPlateDesign", (el) => el.value), "pure_michigan");
+  assert.equal(await page.$eval("#sosPlatePreviewLabel", (el) => el.textContent), "Michigan State University");
+  await page.evaluate(() => {
+    const quote = JSON.parse(sessionStorage.getItem("test-restored-sos-quote"));
+    delete quote.plateDesignValue;
+    sessionStorage.setItem("test-restored-sos-quote", JSON.stringify(quote));
+  });
+  await reload();
+  await page.click("#sosTabBtn");
+  await page.waitForFunction(() => document.querySelector("#sosPlatePreview").hidden && !document.querySelector("#sosPlatePreviewUnavailable").hidden);
+  assert.equal(await page.$eval("#sosPlatePreviewLabel", (el) => el.textContent), "Calculated plate");
+  await page.evaluate(() => sessionStorage.removeItem("test-restored-sos-quote"));
+  await reload();
+  console.log("PASS: restored specialty quote uses its bound plate; legacy quote never substitutes default artwork");
+
   for (const width of [320, 400, 600]) {
     await page.setViewport({ width, height: 800 });
     for (const tab of ["#screeningTabBtn", "#sosTabBtn", "#viewHistoryBtn"]) {
@@ -221,7 +343,23 @@ try {
   calculatedPlateFixture = true;
   await page.evaluate(() => { window.panelFixture.platePreviewUrl = "https://dsvsesvc.sos.state.mi.us/TAP/Image/ENG/TEST.CALCULATED.PLATE"; });
   await fill("sosModelYear", "2026"); await fill("sosMsrp", "42500"); await fill("sosOwnerBirthdate", "03/14/1985");
-  await begin(); await respond();
+  await begin();
+  assert.deepEqual(await page.evaluate(() => {
+    const status = document.querySelector("#sosWorkspaceStatus");
+    const style = getComputedStyle(status);
+    return {
+      bars: document.querySelectorAll(".sos-status-bar, .sos-progress-track").length,
+      timerInStatus: status.contains(document.querySelector("#sosProgressElapsed")),
+      busy: status.classList.contains("is-busy"),
+      background: style.backgroundColor,
+      text: style.color,
+    };
+  }), { bars: 1, timerInStatus: true, busy: true, background: "rgb(16, 47, 75)", text: "rgb(255, 255, 255)" }, "plate calculation has one high-contrast progress status with its elapsed timer");
+  if (process.env.CC_FLOW_ARTIFACTS) {
+    await mkdir(process.env.CC_FLOW_ARTIFACTS, { recursive: true });
+    await page.screenshot({ path: resolve(process.env.CC_FLOW_ARTIFACTS, "plate-running.png") });
+  }
+  await respond();
   await page.waitForFunction(() => {
     const image = document.querySelector("#sosPlatePreviewImage");
     return image.src.startsWith("blob:") && image.complete && image.naturalWidth > 0;

@@ -10,32 +10,61 @@ const DB_VERSION = 2;
 const SDN_STORE = "sdnEntries";
 const HISTORY_STORE = "searchHistory";
 const SETTINGS_STORE = "settings";
+const OPEN_TIMEOUT_MS = 10000;
+const TRANSACTION_TIMEOUT_MS = 20000;
 
 let db = null;
+let opening = null;
 
 /**
  * Initialize the IndexedDB database
  * @returns {Promise<IDBDatabase>}
  */
 export async function initDB() {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      resolve(db);
-      return;
-    }
-
+  if (db) return db;
+  if (opening) return opening;
+  opening = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => {
-      reject(new Error("Failed to open database"));
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
     };
+    const timer = setTimeout(() => fail(new Error(
+      "Opening the OFAC database timed out. Reload the extension and try again."
+    )), OPEN_TIMEOUT_MS);
+
+    request.onerror = () => fail(new Error("Could not open the OFAC database. Reload the extension and try again."));
+    request.onblocked = () => fail(new Error(
+      "The OFAC database is busy. Close other Compliance Central panels, reload the extension, and try again."
+    ));
 
     request.onsuccess = (event) => {
-      db = event.target.result;
-      resolve(db);
+      const database = event.target.result;
+      // A timed-out open can still succeed later. Never publish or retain it.
+      if (settled) {
+        database.close();
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      db = database;
+      const forget = () => { if (db === database) db = null; };
+      database.onversionchange = () => {
+        database.close();
+        forget();
+      };
+      database.onclose = forget;
+      resolve(database);
     };
 
     request.onupgradeneeded = (event) => {
+      if (settled) {
+        request.transaction?.abort();
+        return;
+      }
       const database = event.target.result;
 
       // SDN Entries Store
@@ -64,11 +93,44 @@ export async function initDB() {
         database.createObjectStore(SETTINGS_STORE, { keyPath: "key" });
       }
     };
-  });
+  }).finally(() => { opening = null; });
+  return opening;
 }
 
-
-
+// Resolve writes only after commit. A deadline aborts the transaction, so late
+// request events cannot publish data or mark an unfinished refresh as current.
+async function transact(storeName, mode, work) {
+  const database = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([storeName], mode);
+    let settled = false;
+    let result;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const timer = setTimeout(() => {
+      const error = new Error("The OFAC database timed out. Reload the extension and try again.");
+      finish(error);
+      try { transaction.abort(); } catch { /* It may already have completed. */ }
+      database.close();
+      if (db === database) db = null;
+    }, TRANSACTION_TIMEOUT_MS);
+    transaction.oncomplete = () => finish();
+    transaction.onerror = () => finish(transaction.error || new Error("OFAC database operation failed."));
+    transaction.onabort = () => finish(transaction.error || new Error("OFAC database operation was interrupted."));
+    try {
+      const request = work(transaction.objectStore(storeName));
+      if (request) request.onsuccess = () => { result = request.result; };
+    } catch (error) {
+      finish(error);
+      try { transaction.abort(); } catch { /* No unfinished transaction remains. */ }
+    }
+  });
+}
 /**
  * Atomically replace all SDN entries: clears the store and writes the new set
  * within a SINGLE transaction. If the worker dies mid-write or any put fails,
@@ -84,17 +146,7 @@ export async function replaceSDNEntries(entries) {
   if (!Array.isArray(entries) || entries.length === 0) {
     throw new Error("replaceSDNEntries refused an empty entry set");
   }
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SDN_STORE], "readwrite");
-    const store = transaction.objectStore(SDN_STORE);
-
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () =>
-      reject(transaction.error || new Error("Failed to replace SDN entries"));
-    transaction.onabort = () =>
-      reject(transaction.error || new Error("SDN replace transaction aborted"));
-
+  return transact(SDN_STORE, "readwrite", (store) => {
     store.clear();
     for (const entry of entries) {
       store.put(entry);
@@ -107,15 +159,7 @@ export async function replaceSDNEntries(entries) {
  * @returns {Promise<Array>}
  */
 export async function getAllSDNEntries() {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SDN_STORE], "readonly");
-    const store = transaction.objectStore(SDN_STORE);
-    const request = store.getAll();
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error("Failed to get SDN entries"));
-  });
+  return transact(SDN_STORE, "readonly", (store) => store.getAll());
 }
 
 /**
@@ -123,15 +167,7 @@ export async function getAllSDNEntries() {
  * @returns {Promise<number>}
  */
 export async function getSDNCount() {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SDN_STORE], "readonly");
-    const store = transaction.objectStore(SDN_STORE);
-    const request = store.count();
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error("Failed to count SDN entries"));
-  });
+  return transact(SDN_STORE, "readonly", (store) => store.count());
 }
 
 
@@ -144,15 +180,7 @@ export async function getSDNCount() {
  * @returns {Promise<void>}
  */
 export async function saveSetting(key, value) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SETTINGS_STORE], "readwrite");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.put({ key, value });
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error("Failed to save setting"));
-  });
+  await transact(SETTINGS_STORE, "readwrite", (store) => store.put({ key, value }));
 }
 
 /**
@@ -161,15 +189,6 @@ export async function saveSetting(key, value) {
  * @returns {Promise<any>}
  */
 export async function getSetting(key) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction([SETTINGS_STORE], "readonly");
-    const store = transaction.objectStore(SETTINGS_STORE);
-    const request = store.get(key);
-
-    request.onsuccess = () => {
-      resolve(request.result ? request.result.value : null);
-    };
-    request.onerror = () => reject(new Error("Failed to get setting"));
-  });
+  const result = await transact(SETTINGS_STORE, "readonly", (store) => store.get(key));
+  return result ? result.value : null;
 }
